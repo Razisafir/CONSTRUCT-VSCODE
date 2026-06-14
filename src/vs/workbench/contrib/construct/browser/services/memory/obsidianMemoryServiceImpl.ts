@@ -213,7 +213,7 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
                         }));
 
                         // Filter out zero-score entries
-                        scored.filter(s => s.score > 0);
+                        scored = scored.filter(s => s.score > 0);
 
                         // Sort by score descending
                         scored.sort((a, b) => b.score - a.score);

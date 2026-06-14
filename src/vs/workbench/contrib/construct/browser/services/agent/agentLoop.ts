@@ -1347,6 +1347,10 @@ Guidelines:
 
         skipCurrentMilestone(): void {
                 if (this._resumeResolver) {
+                        // Mark current milestone as skipped
+                        if (this._currentMilestone) {
+                                this._currentMilestone.status = 'skipped';
+                        }
                         this._resumeResolver();
                         this._resumeResolver = null;
                         this._kovixExecutionState = { type: 'running', currentStepIndex: 0, currentMilestoneId: '' };
@@ -1413,6 +1417,8 @@ Guidelines:
                 if (!signal?.aborted) {
                         const completedMilestones = plan.milestones.filter(m => m.status === 'completed').length;
                         this._kovixExecutionState = { type: 'completed', totalSteps: plan.selectedSteps.length, milestonesCompleted: completedMilestones };
+                } else {
+                        this._kovixExecutionState = { type: 'aborted', reason: 'User cancelled' };
                 }
                 } catch (err) {
                         const msg = err instanceof Error ? err.message : String(err);
