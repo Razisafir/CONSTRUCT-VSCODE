@@ -97,12 +97,14 @@ suite('Ollama Integration Tests', function () {
         let fullContent = '';
         while (true) {
             const { done, value } = await reader.read();
-            if (done)
+            if (done) {
                 break;
+            }
             const text = decoder.decode(value, { stream: true });
             for (const line of text.split('\n')) {
-                if (!line.trim())
+                if (!line.trim()) {
                     continue;
+                }
                 try {
                     const json = JSON.parse(line);
                     if (json.message?.content) {

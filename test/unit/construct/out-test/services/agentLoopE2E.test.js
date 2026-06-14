@@ -76,12 +76,14 @@ class OllamaTestClient {
             let fullContent = '';
             while (true) {
                 const { done, value } = await reader.read();
-                if (done)
+                if (done) {
                     break;
+                }
                 const text = decoder.decode(value, { stream: true });
                 for (const line of text.split('\n')) {
-                    if (!line.trim())
+                    if (!line.trim()) {
                         continue;
+                    }
                     try {
                         const json = JSON.parse(line);
                         if (json.message?.content) {
@@ -101,8 +103,9 @@ class OllamaTestClient {
     async isReady() {
         try {
             const res = await fetch(`${this.host}/api/tags`);
-            if (!res.ok)
+            if (!res.ok) {
                 return false;
+            }
             const data = await res.json();
             const models = (data.models || []).map((m) => m.name || m);
             return models.some((name) => name === this.model || name.startsWith(this.model + ':'));

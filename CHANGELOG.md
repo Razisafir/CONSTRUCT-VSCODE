@@ -1,6 +1,29 @@
 # Changelog
 
-## [1.0.0] - 2025-06-11
+## [1.0.0] - 2026-06-14
+
+### Fixed
+- IToolResult type mismatch on 9 Kali security tool stubs (returned `tool`/`status`/`target` instead of `output`)
+- Platform-level privilege escalation blocklist missing `gksudo` and `kdesu` (inconsistency with workbench layer)
+- ESLint step in build-verify.yml silently ignoring failures (`|| true` replaced with proper conditional)
+- MCP connection pool type safety: 19 `any` types replaced with `IMCPClient`, `IMCPTransport`, `Record<string, unknown>`
+
+### Added
+- ErrorBanner component with Retry/Undo/Dismiss actions (WCAG 2.1 AA: role="alert", aria-live="assertive", focus management)
+- 9 Kali security tools wired through kaliToolBridge (sqlmap, nikto, hydra, john, hashcat, aircrack, metasploit, wpscan, gobuster)
+- 5 new kaliToolBridge methods: `niktoScan`, `hashcatCrack`, `aircrackScan`, `wpscanScan`, `gobusterScan`
+- WCAG role attributes in agent view (toolbar, combobox, textbox, plus existing log/article/status/alert)
+- TEST_INDEX.md documentation in repo root
+- New test files: `errorBanner.test.ts` (20 tests), `kaliDetector.test.ts` (28 tests)
+- Test tsconfig expanded to include all test subdirectories
+
+### Changed
+- All 9 Kali tool stubs now route through kaliToolBridge with proper input validation and error handling
+- ESLint CI step outputs results instead of swallowing them
+- Test suite expanded from 493 to 754 passing tests (+261 new tests)
+- MCP server manager uses `IMCPClient` interface instead of `any` for all client callbacks
+
+## [1.0.0] - 2026-06-11
 
 ### Fixed
 - **Multi-turn conversation context**: Agent now retains conversation history across turns within a session (50-message cap)

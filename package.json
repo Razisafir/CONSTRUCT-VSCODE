@@ -2,7 +2,7 @@
   "name": "kovix",
   "version": "1.0.0",
   "productName": "KOVIX",
-  "description": "AI-native integrated development environment \u2014 Kovix",
+  "description": "AI-native integrated development environment — Kovix",
   "distro": "c883c91dadf5f063b26c86ffe01851acee3747c6",
   "author": {
     "name": "Razisafir"
@@ -142,7 +142,7 @@
     "@types/kerberos": "^1.1.2",
     "@types/minimist": "^1.2.1",
     "@types/mocha": "^9.1.1",
-    "@types/node": "20.x",
+    "@types/node": "^20.19.43",
     "@types/sinon": "^10.0.2",
     "@types/sinon-test": "^2.4.2",
     "@types/trusted-types": "^1.0.6",
