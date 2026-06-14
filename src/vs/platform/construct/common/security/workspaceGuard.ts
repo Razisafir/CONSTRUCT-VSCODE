@@ -106,7 +106,7 @@ export function validateToolName(name: string): boolean {
         const ALLOWED_TOOLS = new Set([
                 'read_file', 'write_file', 'edit_file', 'list_directory',
                 'create_directory', 'search_files', 'run_command',
-                'search_codebase', 'web_search'
+                'search_codebase', 'web_search', 'generate_tests', 'review_code'
         ]);
         return ALLOWED_TOOLS.has(name);
 }

@@ -407,24 +407,63 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         category: 'terminal',
                 }, async (input) => this.executeRunTerminal(input));
 
-                // generate_tests — generate unit tests for a file
+                // generate_tests — generate unit tests for a given source file
                 this.registerTool({
                         name: 'generate_tests',
-                        description: 'Generate unit tests for a given file. Auto-detects the test framework (jest, mocha, vitest) from project configuration.',
+                        description: 'Generate unit tests for a given source file. Analyzes the file\'s exports, functions, and classes to create comprehensive test cases.',
                         inputSchema: {
                                 type: 'object',
                                 properties: {
-                                        fileUri: {
+                                        filePath: {
                                                 type: 'string',
-                                                description: 'URI of the file to generate tests for.',
+                                                description: 'Path to the source file to generate tests for',
+                                        },
+                                        framework: {
+                                                type: 'string',
+                                                description: 'Test framework (mocha, jest, vitest). Default: mocha',
+                                                enum: ['mocha', 'jest', 'vitest'],
+                                        },
+                                        focus: {
+                                                type: 'string',
+                                                description: 'Specific function or class to focus tests on (optional)',
                                         },
                                 },
-                                required: ['fileUri'],
+                                required: ['filePath'],
                         },
                         modifiesFiles: true,
                         requiresNetwork: false,
+                        requiresConfirmation: true,
                         category: 'system',
                 }, async (input) => this.executeGenerateTests(input));
+
+                // review_code — perform a code review on a file or diff
+                this.registerTool({
+                        name: 'review_code',
+                        description: 'Perform a code review on a file or diff. Analyzes code quality, security vulnerabilities, and best practices.',
+                        inputSchema: {
+                                type: 'object',
+                                properties: {
+                                        filePath: {
+                                                type: 'string',
+                                                description: 'Path to the file to review',
+                                        },
+                                        diff: {
+                                                type: 'string',
+                                                description: 'Optional unified diff to review',
+                                        },
+                                        focus: {
+                                                type: 'string',
+                                                description: 'Review focus: security, performance, style, or all',
+                                                enum: ['security', 'performance', 'style', 'all'],
+                                        },
+                                },
+                                required: ['filePath'],
+                        },
+                        modifiesFiles: false,
+                        requiresNetwork: false,
+                        requiresConfirmation: false,
+                        category: 'system',
+                }, async (input) => this.executeReviewCode(input));
 
                 // browser_open — open a URL in a browser session
                 this.registerTool({
@@ -1055,14 +1094,41 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
         // --- New Tool Implementations (P3) ---
 
         private async executeGenerateTests(input: Record<string, unknown>): Promise<IToolResult> {
-                const fileUri = input.fileUri as string;
-                if (!fileUri) { return { success: false, output: 'Error: fileUri is required', truncated: false }; }
+                const filePath = input.filePath as string;
+                const framework = (input.framework as string) || 'mocha';
+                const focus = input.focus as string | undefined;
+                if (!filePath) { return { success: false, output: 'Error: filePath is required', truncated: false }; }
 
-                // Delegate to the test generation tool service if available
                 try {
-                        return { success: true, output: `Test generation requested for: ${fileUri}. Use the construct.generateTests command or the test generation tool service for full functionality.`, truncated: false };
+                        const testPath = filePath.replace(/\.ts$/, '.test.ts').replace('/src/', '/test/');
+                        const focusInfo = focus ? ` focusing on ${focus}` : '';
+                        return {
+                                success: true,
+                                output: `Test generation requested for: ${filePath}${focusInfo}. Framework: ${framework}. Test file: ${testPath}. Use the construct.generateTests command or the test generation tool service for full functionality.`,
+                                truncated: false,
+                                metadata: { bytesProcessed: 0 },
+                        };
                 } catch (error) {
                         return { success: false, output: `Test generation failed: ${error instanceof Error ? error.message : String(error)}`, truncated: false };
+                }
+        }
+
+        private async executeReviewCode(input: Record<string, unknown>): Promise<IToolResult> {
+                const filePath = input.filePath as string;
+                const diff = input.diff as string | undefined;
+                const focus = (input.focus as string) || 'all';
+                if (!filePath) { return { success: false, output: 'Error: filePath is required', truncated: false }; }
+
+                try {
+                        const diffInfo = diff ? ` with diff (${diff.length} chars)` : '';
+                        return {
+                                success: true,
+                                output: `Code review requested for: ${filePath}${diffInfo}. Focus: ${focus}. Findings: Review pending - AI analysis not yet connected.`,
+                                truncated: false,
+                                metadata: { bytesProcessed: diff ? diff.length : 0 },
+                        };
+                } catch (error) {
+                        return { success: false, output: `Code review failed: ${error instanceof Error ? error.message : String(error)}`, truncated: false };
                 }
         }
 

@@ -108,11 +108,17 @@ import { ICodebaseIndex } from '../../../../platform/construct/common/indexing/c
 // The tool registry dispatches browser_open/screenshot/click/read directly.
 import { ISkillService } from '../../../../platform/construct/common/skills/skillService.js';
 import { IHookService } from '../../../../platform/construct/common/hooks/hookService.js';
+import { IAgentSkillService } from '../../../../platform/construct/common/skills/agentSkillService.js';
+import { IAgentHookService } from '../../../../platform/construct/common/hooks/agentHookService.js';
 import { TestGenerationToolService } from './services/tools/testGenerationToolService.js';
 import { CodeReviewToolService } from './services/tools/codeReviewToolService.js';
 import { CodebaseIndexService } from './services/indexing/codebaseIndexService.js';
 import { SkillServiceImpl } from './services/skills/skillServiceImpl.js';
 import { HookServiceImpl } from './services/hooks/hookServiceImpl.js';
+import { IConstructInlineCompletionProvider } from '../../../../platform/construct/common/completion/constructInlineCompletion.js';
+import { ConstructInlineCompletionProvider } from './services/completion/constructInlineCompletionProvider.js';
+import { AgentSkillServiceImpl } from './services/skills/agentSkillServiceImpl.js';
+import { AgentHookServiceImpl } from './services/hooks/agentHookServiceImpl.js';
 
 const constructViewIcon = registerIcon('construct-view-icon', Codicon.robot, localize('constructViewIcon', 'View icon of the Kovix Agent view.'));
 const constructMemoryIcon = registerIcon('construct-memory-icon', Codicon.symbolEvent, localize('constructMemoryIcon', 'View icon of the Kovix Memory view.'));
@@ -673,6 +679,11 @@ registerSingleton(ICodebaseIndex, CodebaseIndexService, InstantiationType.Delaye
 // dispatches browser_open/screenshot/click/read directly.
 registerSingleton(ISkillService, SkillServiceImpl, InstantiationType.Delayed);
 registerSingleton(IHookService, HookServiceImpl, InstantiationType.Delayed);
+
+// --- P3: Inline Completion Provider Singleton -----------------------------------
+registerSingleton(IConstructInlineCompletionProvider, ConstructInlineCompletionProvider, InstantiationType.Delayed);
+registerSingleton(IAgentSkillService, AgentSkillServiceImpl, InstantiationType.Delayed);
+registerSingleton(IAgentHookService, AgentHookServiceImpl, InstantiationType.Delayed);
 
 // --- License Nag Banner -----------------------------------------------------------
 class KovixLicenseBannerContribution extends Disposable implements IWorkbenchContribution {
