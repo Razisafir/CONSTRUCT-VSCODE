@@ -919,7 +919,7 @@ export class ConstructOnboardingWizard extends Disposable {
         </style>
 </head>
 <body>
-        <div class="wizard" role="dialog" aria-modal="true" aria-label="Onboarding wizard">
+        <div class="wizard" role="dialog" aria-modal="true" aria-label="KOVIX Setup Wizard">
                 <!-- P5: Progress indicator showing "Step X of Y" -->
                 <div style="text-align:center;margin-bottom:4px;font-size:11px;color:var(--text-muted);" id="step-label" aria-live="polite">Step 1 of 5</div>
 
@@ -942,7 +942,7 @@ export class ConstructOnboardingWizard extends Disposable {
                 </div>
 
                 <!-- Step 0: Welcome -->
-                <div class="step active" id="step-0" role="tabpanel" aria-label="Welcome to Kovix">
+                <div class="step active" id="step-0" role="tabpanel" aria-label="Step 1 of 5: Welcome to Kovix">
                         <div class="hex-logo">&#x2B21;</div>
                         <div class="step-title">Welcome to Kovix</div>
                         <div class="step-subtitle">
@@ -983,7 +983,7 @@ export class ConstructOnboardingWizard extends Disposable {
                 </div>
 
                 <!-- Step 1: AI Provider Setup -->
-                <div class="step" id="step-1" role="tabpanel" aria-label="AI Provider Setup">
+                <div class="step" id="step-1" role="tabpanel" aria-label="Step 2 of 5: Select AI Provider">
                         <div class="step-title">AI Provider Setup</div>
                         <div class="step-subtitle">
                                 Kovix needs an AI provider to power your coding assistant.<br>
@@ -1063,7 +1063,7 @@ export class ConstructOnboardingWizard extends Disposable {
                 </div>
 
                 <!-- Step 2: Kali Linux (Windows only) -->
-                <div class="step" id="step-2" role="tabpanel" aria-label="Kali Linux Setup">
+                <div class="step" id="step-2" role="tabpanel" aria-label="Step 3 of 5: Kali Linux Setup">
                         <div class="step-title">Kali Linux (Optional)</div>
                         <div class="step-subtitle">
                                 Kovix can integrate with Kali Linux via WSL2 on Windows<br>
@@ -1091,7 +1091,7 @@ export class ConstructOnboardingWizard extends Disposable {
                 </div>
 
                 <!-- Step 3: Security Tools Setup -->
-                <div class="step" id="step-3" role="tabpanel" aria-label="Security Tools Setup">
+                <div class="step" id="step-3" role="tabpanel" aria-label="Step 4 of 5: Security Tools Setup">
                         <div class="step-title">Security Tools Setup</div>
                         <div class="step-subtitle">
                                 Kovix can integrate with Kali Linux security tools.<br>
@@ -1119,7 +1119,7 @@ export class ConstructOnboardingWizard extends Disposable {
                 </div>
 
                 <!-- Step 4: You're Ready! -->
-                <div class="step" id="step-4" role="tabpanel" aria-label="Setup Complete">
+                <div class="step" id="step-4" role="tabpanel" aria-label="Step 5 of 5: Setup Complete">
                         <div class="completion-checkmark">&#x2713;</div>
                         <div class="step-title">You're Ready!</div>
                         <div class="step-subtitle">
@@ -1644,6 +1644,29 @@ export class ConstructOnboardingWizard extends Disposable {
                                 case 'configSaved':
                                         // Config saved — could close or redirect
                                         break;
+                        }
+                });
+
+                // ---- Keyboard Navigation ----
+                document.addEventListener('keydown', (e) => {
+                        // Enter to proceed to next step when a primary button is focused
+                        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey) {
+                                const active = document.activeElement;
+                                // If focused on a radio/checkbox/select, don't interfere
+                                if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')) {
+                                        // Let form elements handle Enter natively
+                                        return;
+                                }
+                                // If focused on a next-step button, click it
+                                if (active && active.tagName === 'BUTTON') {
+                                        active.click();
+                                        e.preventDefault();
+                                }
+                        }
+                        // Escape to cancel/skip onboarding
+                        if (e.key === 'Escape') {
+                                skipOnboarding();
+                                e.preventDefault();
                         }
                 });
 

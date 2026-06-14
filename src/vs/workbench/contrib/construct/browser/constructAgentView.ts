@@ -263,7 +263,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 this.messageContainer = dom.$('.construct-messages');
                 this.messageContainer.setAttribute('role', 'log');
                 this.messageContainer.setAttribute('aria-live', 'polite');
-                this.messageContainer.setAttribute('aria-label', 'Chat message stream');
+                this.messageContainer.setAttribute('aria-label', 'Agent chat messages');
                 this.messageContainer.style.cssText = `
                         flex: 1; overflow-y: auto; padding: 10px;
                 `;
@@ -319,7 +319,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 this.inputBox.className = 'construct-chat-input';
                 this.inputBox.rows = 1;
                 this.inputBox.placeholder = Nls.PLACEHOLDER_ASK;
-                this.inputBox.setAttribute('aria-label', 'Type your message');
+                this.inputBox.setAttribute('aria-label', 'Type your message to the AI agent');
                 this.inputBox.style.cssText = `
                         flex: 1; background: #0A0E1A; border: 1px solid #1A1F2E;
                         border-radius: 4px; padding: 8px 10px; color: #E0E7FF;
@@ -351,7 +351,7 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 this.stopBtn = dom.$('button.construct-stop-btn') as HTMLButtonElement;
                 this.stopBtn.textContent = '\u25A0'; // Stop square
-                this.stopBtn.setAttribute('aria-label', 'Stop execution');
+                this.stopBtn.setAttribute('aria-label', 'Stop agent execution');
                 this.stopBtn.style.cssText = `
                         background: #FF4444; color: white; border: none;
                         border-radius: 4px; padding: 6px 10px; cursor: pointer;
@@ -437,7 +437,24 @@ export class ConstructAgentViewPane extends ViewPane {
                                 sendMessage();
                         }
                         if (e.key === 'Escape') {
+                                // Stop agent execution when Escape is pressed
+                                if (this.executionState !== 'idle') {
+                                        if (this.currentCancellationToken) {
+                                                this.currentCancellationToken.cancel();
+                                                this.currentCancellationToken = null;
+                                        }
+                                        const controller = this._abortController;
+                                        if (controller) {
+                                                controller.abort();
+                                                this._abortController = null;
+                                        }
+                                }
                                 this.inputBox.blur();
+                        }
+                        // Ctrl+Shift+Enter accepts all pending diffs
+                        if (e.key === 'Enter' && e.ctrlKey && e.shiftKey) {
+                                e.preventDefault();
+                                this.acceptAllPendingDiffs();
                         }
                 };
 
@@ -1115,6 +1132,8 @@ export class ConstructAgentViewPane extends ViewPane {
 
         private addUserMessage(text: string): void {
                 const msg = dom.$('.construct-user-msg');
+                msg.setAttribute('role', 'article');
+                msg.setAttribute('aria-label', 'User message');
                 msg.style.cssText = `
                         background: #00E5FF20; border-left: 2px solid #00E5FF;
                         padding: 8px 10px; margin: 8px 0; border-radius: 0 4px 4px 0;
@@ -1127,6 +1146,8 @@ export class ConstructAgentViewPane extends ViewPane {
 
         private addAgentMessage(text: string, type: 'info' | 'error' | 'streaming' = 'info'): HTMLElement {
                 const msg = dom.$('.construct-agent-msg');
+                msg.setAttribute('role', 'article');
+                msg.setAttribute('aria-label', 'Assistant message');
 
                 const borderColors: Record<string, string> = {
                         info: '#4A5568',

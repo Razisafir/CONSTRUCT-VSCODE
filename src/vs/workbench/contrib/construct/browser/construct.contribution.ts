@@ -83,6 +83,8 @@ import { ConstructSessionServiceImpl } from './services/session/constructSession
 import { ConstructProjectWizard } from './constructProjectWizard.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { ConstructOnboardingWizard } from './constructOnboarding.js';
+import { IConstructErrorState } from './services/ui/constructErrorState.js';
+import { ConstructErrorStateService } from './services/ui/constructErrorState.js';
 import { IObsidianMemoryService } from '../../../../platform/construct/common/memory/obsidianMemoryService.js';
 import { IConstructTelemetryService } from '../../../../platform/construct/common/telemetry/constructTelemetryService.js';
 import { ObsidianMemoryServiceImpl } from './services/memory/obsidianMemoryServiceImpl.js';
@@ -684,6 +686,7 @@ registerSingleton(IHookService, HookServiceImpl, InstantiationType.Delayed);
 registerSingleton(IConstructInlineCompletionProvider, ConstructInlineCompletionProvider, InstantiationType.Delayed);
 registerSingleton(IAgentSkillService, AgentSkillServiceImpl, InstantiationType.Delayed);
 registerSingleton(IAgentHookService, AgentHookServiceImpl, InstantiationType.Delayed);
+registerSingleton(IConstructErrorState, ConstructErrorStateService, InstantiationType.Delayed);
 
 // --- License Nag Banner -----------------------------------------------------------
 class KovixLicenseBannerContribution extends Disposable implements IWorkbenchContribution {
