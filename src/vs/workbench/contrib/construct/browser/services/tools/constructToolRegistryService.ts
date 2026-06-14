@@ -34,7 +34,7 @@ import * as pathModule from '../../../../../../base/common/path.js';
 // SEC-CWE59: Symlink resolution for file operation tools
 import { realpathSync } from 'fs';
 
-const MAX_OUTPUT_LENGTH = 100_000; // Characters
+const MAX_OUTPUT_LENGTH = 10_000; // SEC-7: Content-size limit prevents token overflow
 const COMMAND_BLOCKLIST = [
         'rm -rf /', 'format c:', 'del /s /q c:\\', 'mkfs', 'dd if=',
         ':(){ :|:& };:', 'wget.*|.*sh', 'curl.*|.*sh',

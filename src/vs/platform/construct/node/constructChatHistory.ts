@@ -7,6 +7,7 @@
 import { Disposable } from '../../../base/common/lifecycle.js';
 import { ILogService } from '../../log/common/log.js';
 import { IConstructChatHistory, IChatSession, IChatHistoryMessage } from '../common/memory/vectorStore.js';
+import * as nodeCrypto from 'crypto';
 
 /**
  * ConstructChatHistoryService — SQLite-backed chat history store.
@@ -96,7 +97,7 @@ export class ConstructChatHistoryService extends Disposable implements IConstruc
         async createSession(title?: string): Promise<IChatSession> {
                 const now = Date.now();
                 const session: IChatSession = {
-                        id: 'session_' + now.toString(36) + '_' + Math.random().toString(36).substring(2, 8),
+                        id: 'session_' + now.toString(36) + '_' + nodeCrypto.randomBytes(4).toString('hex').substring(0, 6),
                         title: title ?? 'New Chat',
                         createdAt: now,
                         updatedAt: now,
@@ -136,7 +137,7 @@ export class ConstructChatHistoryService extends Disposable implements IConstruc
         async addMessage(sessionId: string, role: IChatHistoryMessage['role'], content: string, toolCalls?: string, toolCallId?: string): Promise<IChatHistoryMessage> {
                 const now = Date.now();
                 const message: IChatHistoryMessage = {
-                        id: 'msg_' + now.toString(36) + '_' + Math.random().toString(36).substring(2, 8),
+                        id: 'msg_' + now.toString(36) + '_' + nodeCrypto.randomBytes(4).toString('hex').substring(0, 6),
                         sessionId,
                         role,
                         content,
