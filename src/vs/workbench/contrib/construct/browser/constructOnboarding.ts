@@ -1415,13 +1415,21 @@ export class ConstructOnboardingWizard extends Disposable {
 
                         if (msg.valid) {
                                 cloudApiKeyValid = true;
-                                statusDiv.innerHTML = '<div class="cloud-key-valid">&#x2713; API key validated and saved.</div>';
+                                statusDiv.textContent = ''; // Clear
+                                const validDiv = document.createElement('div');
+                                validDiv.className = 'cloud-key-valid';
+                                validDiv.textContent = '\u2713 API key validated and saved.';
+                                statusDiv.appendChild(validDiv);
                                 cloudIcon.className = 'card-icon success';
                                 cloudIcon.textContent = '\\u2713';
                                 document.getElementById('step1-next').disabled = false;
                         } else {
                                 cloudApiKeyValid = false;
-                                statusDiv.innerHTML = '<div class="cloud-key-invalid">&#x2717; ' + (msg.errorMsg || 'Invalid API key format.') + '</div>';
+                                statusDiv.textContent = ''; // Clear
+                                const div = document.createElement('div');
+                                div.className = 'cloud-key-invalid';
+                                div.textContent = '\u2717 ' + (msg.errorMsg || 'Invalid API key format.');
+                                statusDiv.appendChild(div);
                                 document.getElementById('step1-next').disabled = true;
                         }
                 }

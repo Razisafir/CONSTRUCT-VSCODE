@@ -92,6 +92,9 @@ jobs:
       - name: Run Construct Unit Tests
         run: npm run test-unit-construct
 
+      - name: Run Test Coverage
+        run: npm run test-coverage
+
   license-check:
     name: License Header Check
     runs-on: ubuntu-latest

@@ -20,7 +20,7 @@
     "test-extension": "vscode-test",
     "test-unit-construct": "tsc -p test/unit/construct/tsconfig.json && mocha --ui tdd --timeout 10000 'test/unit/construct/out-test/**/*.test.js'",
     "test-security": "mocha --ui tdd --timeout 10000 --require ts-node/register test/unit/construct/security/security.test.ts",
-    "test-coverage": "nyc --reporter=lcov --reporter=text mocha --ui tdd --timeout 10000 --require ts-node/register 'test/unit/construct/**/*.test.ts'",
+    "test-coverage": "nyc --reporter=text --reporter=lcov npm run test-unit-construct",
     "preinstall": "node build/npm/preinstall.js",
     "postinstall": "node build/npm/postinstall.js",
     "compile": "node ./node_modules/gulp/bin/gulp.js compile",

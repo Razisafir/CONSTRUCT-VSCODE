@@ -14,6 +14,26 @@ import {
         INiktoResult, IHashcatResult, IWpscanResult, IGobusterResult
 } from '../../../../../../platform/construct/common/terminal/kaliToolBridge.js';
 import { ITerminalExecutor, sanitiseForAuditLog } from '../../../../../../platform/construct/common/terminal/terminalExecutor.js';
+// SEC-P5: Sanitize error messages returned to agent
+import { sanitizeErrorForAgent } from '../../../../../../platform/construct/common/security/workspaceGuard.js';
+
+/**
+ * Validate and sanitize a shell argument.
+ * Rejects arguments containing shell metacharacters that could enable injection.
+ * Returns the sanitized string or throws an error.
+ */
+function sanitizeShellArg(arg: string, name: string): string {
+        // Block shell metacharacters that could enable injection
+        const DANGEROUS = /[;&|`$(){}!<>\\\n\r]/;
+        if (DANGEROUS.test(arg)) {
+                throw new Error(`Invalid ${name}: contains shell metacharacters. Value: "${arg.substring(0, 50)}..."`);
+        }
+        // Also block command chaining via newlines
+        if (arg.includes('\n') || arg.includes('\r')) {
+                throw new Error(`Invalid ${name}: contains newline characters`);
+        }
+        return arg;
+}
 
 /**
  * Maximum concurrent security tool executions.
@@ -74,11 +94,26 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Validate nmap options allowlist BEFORE sanitize
+                const ALLOWED_NMAP_FLAGS = /^(-[sSvVpPoOAaTn]+\s|-\d|--open|--reason|--version-all|--script-timeout|--host-timeout|--max-retries)\s*$/;
+                if (options && !ALLOWED_NMAP_FLAGS.test(options)) {
+                        return { success: false, output: 'Invalid nmap options: only scan type, port, timing, and output flags allowed', error: 'Invalid options' };
+                }
+
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(target, 'target');
+                        sanitizeShellArg(options, 'options');
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const command = `nmap ${options} -oX - ${target}`.replace(/\s+/g, ' ').trim();
-                return this.executeTool<INmapResult>(command, (output) => ({
-                        success: true,
-                        output,
-                }));
+                return this.executeTool<INmapResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe };
+                });
         }
 
         async nucleiScan(target: string, templates?: string): Promise<INucleiResult> {
@@ -92,12 +127,21 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(target, 'target');
+                        if (templates) { sanitizeShellArg(templates, 'templates'); }
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const templateArg = templates ? `-t ${templates}` : '';
                 const command = `nuclei -u ${target} ${templateArg} -json`.replace(/\s+/g, ' ').trim();
-                return this.executeTool<INucleiResult>(command, (output) => ({
-                        success: true,
-                        output,
-                }));
+                return this.executeTool<INucleiResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe };
+                });
         }
 
         async sqlmapTest(url: string, options?: string): Promise<ISqlmapResult> {
@@ -111,12 +155,21 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(url, 'url');
+                        if (options) { sanitizeShellArg(options, 'options'); }
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const optArg = options ?? '';
                 const command = `sqlmap -u "${url}" ${optArg} --batch`.replace(/\s+/g, ' ').trim();
-                return this.executeTool<ISqlmapResult>(command, (output) => ({
-                        success: true,
-                        output,
-                }));
+                return this.executeTool<ISqlmapResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe };
+                });
         }
 
         async metasploitRun(module: string, options: Record<string, string>): Promise<IMsfResult> {
@@ -125,13 +178,24 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs — metasploit options are especially dangerous
+                try {
+                        sanitizeShellArg(module, 'module');
+                        for (const [k, v] of Object.entries(options)) {
+                                sanitizeShellArg(k, 'option key');
+                                sanitizeShellArg(v, 'option value');
+                        }
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const optionsStr = Object.entries(options).map(([k, v]) => `set ${k} ${v}`).join('; ');
                 const command = `msfconsole -q -x "use ${module}; ${optionsStr}; run; exit"`.replace(/\s+/g, ' ').trim();
-                return this.executeTool<IMsfResult>(command, (output) => ({
-                        success: true,
-                        output,
-                        module,
-                }));
+                return this.executeTool<IMsfResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe, module };
+                });
         }
 
         async wiresharkCapture(iface: string, duration: number): Promise<ICaptureResult> {
@@ -140,12 +204,19 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(iface, 'interface');
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const command = `tshark -i ${iface} -a duration:${duration} -w /tmp/kovix-capture.pcap`;
-                return this.executeTool<ICaptureResult>(command, (output) => ({
-                        success: true,
-                        output,
-                        captureFilePath: '/tmp/kovix-capture.pcap',
-                }));
+                return this.executeTool<ICaptureResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe, captureFilePath: '/tmp/kovix-capture.pcap' };
+                });
         }
 
         async johnCrack(hashFile: string, wordlist?: string): Promise<ICrackResult> {
@@ -154,12 +225,21 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(hashFile, 'hashFile');
+                        if (wordlist) { sanitizeShellArg(wordlist, 'wordlist'); }
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const wordlistArg = wordlist ? `--wordlist=${wordlist}` : '';
                 const command = `john ${wordlistArg} ${hashFile}`.replace(/\s+/g, ' ').trim();
-                return this.executeTool<ICrackResult>(command, (output) => ({
-                        success: true,
-                        output,
-                }));
+                return this.executeTool<ICrackResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe };
+                });
         }
 
         async hydraBrute(target: string, service: string, wordlist: string): Promise<IHydraResult> {
@@ -173,11 +253,21 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(target, 'target');
+                        sanitizeShellArg(service, 'service');
+                        sanitizeShellArg(wordlist, 'wordlist');
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const command = `hydra -L ${wordlist} -P ${wordlist} ${target} ${service}`;
-                return this.executeTool<IHydraResult>(command, (output) => ({
-                        success: true,
-                        output,
-                }));
+                return this.executeTool<IHydraResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe };
+                });
         }
 
         async aircrackCapture(iface: string): Promise<IAircrackResult> {
@@ -186,11 +276,19 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(iface, 'interface');
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const command = `airmon-ng start ${iface} && airodump-ng ${iface}mon`;
-                return this.executeTool<IAircrackResult>(command, (output) => ({
-                        success: true,
-                        output,
-                }));
+                return this.executeTool<IAircrackResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe };
+                });
         }
 
         async aircrackScan(captureFile: string, wordlist?: string): Promise<IAircrackResult> {
@@ -199,12 +297,21 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(captureFile, 'captureFile');
+                        if (wordlist) { sanitizeShellArg(wordlist, 'wordlist'); }
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const wordlistArg = wordlist ? `-w ${wordlist}` : '';
                 const command = `aircrack-ng ${wordlistArg} ${captureFile}`.replace(/\s+/g, ' ').trim();
-                return this.executeTool<IAircrackResult>(command, (output) => ({
-                        success: true,
-                        output,
-                }));
+                return this.executeTool<IAircrackResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe };
+                });
         }
 
         async niktoScan(target: string, port?: number): Promise<INiktoResult> {
@@ -218,12 +325,20 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(target, 'target');
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const portArg = port ? ` -p ${port}` : '';
                 const command = `nikto -h ${target}${portArg} -Tuning 1234567890 -timeout 60`;
-                return this.executeTool<INiktoResult>(command, (output) => ({
-                        success: true,
-                        output,
-                }));
+                return this.executeTool<INiktoResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe };
+                });
         }
 
         async hashcatCrack(hashFile: string, mode: number, wordlist?: string): Promise<IHashcatResult> {
@@ -232,12 +347,21 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(hashFile, 'hashFile');
+                        if (wordlist) { sanitizeShellArg(wordlist, 'wordlist'); }
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const wordlistArg = wordlist ? ` ${wordlist}` : '';
                 const command = `hashcat -m ${mode} ${hashFile}${wordlistArg} --force`;
-                return this.executeTool<IHashcatResult>(command, (output) => ({
-                        success: true,
-                        output,
-                }));
+                return this.executeTool<IHashcatResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe };
+                });
         }
 
         async wpscanScan(target: string, enumUsers?: boolean, enumPlugins?: boolean): Promise<IWpscanResult> {
@@ -251,15 +375,23 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(target, 'target');
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const enumArgs: string[] = [];
                 if (enumUsers) { enumArgs.push('--enumerate u'); }
                 if (enumPlugins) { enumArgs.push('--enumerate vp,ap'); }
                 const enumStr = enumArgs.length > 0 ? ' ' + enumArgs.join(' ') : '';
                 const command = `wpscan --url ${target}${enumStr} --disable-tls-checks`;
-                return this.executeTool<IWpscanResult>(command, (output) => ({
-                        success: true,
-                        output,
-                }));
+                return this.executeTool<IWpscanResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe };
+                });
         }
 
         async gobusterScan(target: string, wordlist: string, extensions?: string): Promise<IGobusterResult> {
@@ -273,18 +405,36 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         return { success: false, output: guardError, error: guardError };
                 }
 
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(target, 'target');
+                        sanitizeShellArg(wordlist, 'wordlist');
+                        if (extensions) { sanitizeShellArg(extensions, 'extensions'); }
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
+                }
+
                 const extArg = extensions ? ` -x ${extensions}` : '';
                 const command = `gobuster dir -u ${target} -w ${wordlist}${extArg}`;
-                return this.executeTool<IGobusterResult>(command, (output) => ({
-                        success: true,
-                        output,
-                }));
+                return this.executeTool<IGobusterResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe };
+                });
         }
 
         async ghidraDecompile(binaryPath: string): Promise<IGhidraResult> {
                 const guardError = await this.preExecutionGuard();
                 if (guardError) {
                         return { success: false, output: guardError, error: guardError };
+                }
+
+                // Sanitize inputs
+                try {
+                        sanitizeShellArg(binaryPath, 'binaryPath');
+                } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        return { success: false, output: msg, error: msg };
                 }
 
                 // Check if Docker is available first
@@ -294,19 +444,29 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                                 return { success: false, output: 'Docker not found — Ghidra decompilation requires Docker for isolation. Install Docker first.', error: 'Docker not available' };
                         }
                 } catch (err: unknown) {
-                        const msg = err instanceof Error ? err.message : String(err);
+                        const msg = sanitizeErrorForAgent(err, 'docker_check');
                         return { success: false, output: `Docker check failed: ${msg}. Ghidra decompilation requires Docker.`, error: msg };
                 }
 
                 const command = `docker run --rm -v "${binaryPath}:${binaryPath}" ghidra/ghidra ${binaryPath}`;
-                return this.executeTool<IGhidraResult>(command, (output) => ({
-                        success: true,
-                        output,
-                        analysisPath: binaryPath,
-                }));
+                return this.executeTool<IGhidraResult>(command, (output) => {
+                        const { output: safe } = this.truncateOutput(output);
+                        return { success: true, output: safe, analysisPath: binaryPath };
+                });
         }
 
         // ─── Safety Guards ─────────────────────────────────────────────────────────
+
+        /**
+         * Truncate output to MAX_OUTPUT_LENGTH (10,000 chars) to prevent
+         * excessive memory usage and potential DoS from tool output.
+         */
+        private truncateOutput(output: string): { output: string; truncated: boolean } {
+                if (output.length > 10000) {
+                        return { output: output.substring(0, 10000) + '\n... [truncated]', truncated: true };
+                }
+                return { output, truncated: false };
+        }
 
         /**
          * Validate that a target is not an internal IP address (unless explicitly allowed).
@@ -375,7 +535,7 @@ export class KaliToolBridgeService extends Disposable implements IKaliToolBridge
                         const output = result.stdout || result.stderr;
                         return successParser(output);
                 } catch (err: unknown) {
-                        const msg = err instanceof Error ? err.message : String(err);
+                        const msg = sanitizeErrorForAgent(err, 'kali_tool');
                         await this.securityAuditLog(rawCommand, -1, Date.now() - startTime);
 
                         if (msg.includes('not found') || msg.includes('ENOENT')) {

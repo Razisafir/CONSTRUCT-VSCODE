@@ -30,7 +30,7 @@ export const SHELL_METACHAR_BLOCKLIST = [
 /**
  * SEC-3: Regex patterns for detecting shell metacharacters in arguments.
  */
-const SHELL_METACHAR_REGEX = /(;|&&|\|\||`|\$\(|\{|}|\d*>|<)/;
+const SHELL_METACHAR_REGEX = /(;|&&|\|\||`|\$\(|\$\w|\{|}|\d*>|<<<|<>|<|\n|\r)/;
 
 /**
  * SEC-3: Default allowlist for restricted mode.

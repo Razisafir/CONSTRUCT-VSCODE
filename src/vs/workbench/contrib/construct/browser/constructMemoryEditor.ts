@@ -529,11 +529,12 @@ export class ObsidianMemoryEditorPane extends Disposable {
         }
 
         private updateMetadata(entry: IObsidianMemoryEntry): void {
+                // Safe DOM construction — use escapeHtml for innerHTML content
                 this.metaEl.innerHTML = `
-                        ID: <code style="font-size:10px;color:var(--vscode-textPreformat-foreground);background:var(--vscode-textPreformat-background);padding:1px 3px;border-radius:2px;">${entry.id.substring(0, 8)}...</code>
-                        &nbsp;·&nbsp; Source: <span style="padding:1px 4px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);border-radius:2px;">${entry.source}</span>
-                        &nbsp;·&nbsp; Created: ${new Date(entry.createdAt).toLocaleString()}
-                        &nbsp;·&nbsp; Updated: ${new Date(entry.updatedAt).toLocaleString()}
+                        ID: <code style="font-size:10px;color:var(--vscode-textPreformat-foreground);background:var(--vscode-textPreformat-background);padding:1px 3px;border-radius:2px;">${this.escapeHtml(entry.id.substring(0, 8))}...</code>
+                        &nbsp;·&nbsp; Source: <span style="padding:1px 4px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);border-radius:2px;">${this.escapeHtml(entry.source)}</span>
+                        &nbsp;·&nbsp; Created: ${this.escapeHtml(new Date(entry.createdAt).toLocaleString())}
+                        &nbsp;·&nbsp; Updated: ${this.escapeHtml(new Date(entry.updatedAt).toLocaleString())}
                 `;
         }
 
@@ -582,8 +583,14 @@ export class ObsidianMemoryEditorPane extends Disposable {
                 html = html.replace(/`([^`]+)`/g,
                         '<code style="background:var(--vscode-textCodeBlock-background);padding:1px 4px;border-radius:2px;font-size:12px;">$1</code>');
 
-                // Links
-                html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" style="color:var(--vscode-textLink-foreground);">$1</a>');
+                // Links — validate href scheme to prevent XSS
+                html = html.replace(/\[(.+?)\]\((.+?)\)/g, (_match, text, href) => {
+                        const safeHref = href.trim().toLowerCase();
+                        if (safeHref.startsWith('javascript:') || safeHref.startsWith('data:') || safeHref.startsWith('vbscript:')) {
+                                return `<span style="color:var(--vscode-foreground);">${text}</span>`; // Strip dangerous links
+                        }
+                        return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:var(--vscode-textLink-foreground);">${text}</a>`;
+                });
 
                 // Bullet lists
                 html = html.replace(/^[-*] (.+)$/gm, '<li style="margin-left:16px;">$1</li>');

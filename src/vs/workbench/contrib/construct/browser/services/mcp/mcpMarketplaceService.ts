@@ -15,6 +15,35 @@ import { IMCPServerDefinition, IMCPMarketplaceItem, MCPTransportType,
         MCP_MARKETPLACE_CACHE_TTL_MS
 } from '../../../../../../platform/construct/common/mcp/mcpTypes';
 
+/** Raw entry shape from the MCP registry JSON. */
+interface IRegistryEntry {
+        id?: string;
+        name?: string;
+        description?: string;
+        author?: string;
+        version?: string;
+        categories?: string[];
+        tags?: string[];
+        rating?: number;
+        downloadCount?: number;
+        stargazers_count?: number;
+        command?: string;
+        args?: string[];
+        env?: Record<string, string>;
+        transport?: string;
+        featured?: boolean;
+        iconUrl?: string;
+        documentationUrl?: string;
+        repositoryUrl?: string;
+        repository?: string;
+        install?: { command?: string; args?: string[]; env?: Record<string, string> };
+}
+
+/** Registry response shape — either an array or { servers: [...] }. */
+interface IRegistryResponse {
+        servers?: IRegistryEntry[];
+}
+
 export class MCPMarketplaceService extends Disposable implements IMCPMarketplace {
         declare readonly _serviceBrand: undefined;
 
@@ -71,7 +100,7 @@ export class MCPMarketplaceService extends Disposable implements IMCPMarketplace
                                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                         }
 
-                        const body = await response.json() as any;
+                        const body = await response.json() as IRegistryEntry[] | IRegistryResponse;
                         this.catalog = this.parseRegistryResponse(body);
 
                         // Add curated featured servers if not in registry
@@ -100,7 +129,7 @@ export class MCPMarketplaceService extends Disposable implements IMCPMarketplace
                 }
         }
 
-        private parseRegistryResponse(body: any): IMCPMarketplaceItem[] {
+        private parseRegistryResponse(body: IRegistryEntry[] | IRegistryResponse): IMCPMarketplaceItem[] {
                 if (!body || typeof body !== 'object') { return []; }
 
                 const serverList = Array.isArray(body) ? body : (body.servers ?? []);

@@ -402,7 +402,11 @@ export class MCPServerManagerService extends Disposable implements IMCPServerMan
                                 return result.prompts?.map((p: Record<string, unknown>) => ({
                                         name: p.name as string,
                                         description: (p.description ?? '') as string,
-                                        arguments: p.arguments as Record<string, unknown>[] | undefined,
+                                        arguments: (p.arguments as Array<Record<string, unknown>> | undefined)?.map(a => ({
+                                                name: (a.name ?? '') as string,
+                                                description: (a.description ?? '') as string,
+                                                required: a.required as boolean | undefined
+                                        })),
                                         serverName
                                 })) ?? [];
                         } catch (e) {

@@ -430,7 +430,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                                 } else {
                                                         // Fallback: should not happen, but execute once if cache miss
                                                         this.logService.warn(`[AgentLoop] Cache miss for tool ${toolCall.id}, executing as fallback`);
-                                                        let input: any;
+                                                        let input: Record<string, unknown>;
                                                         try {
                                                                 input = JSON.parse(toolCall.arguments);
                                                         } catch (parseError) {

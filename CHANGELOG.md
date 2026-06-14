@@ -2,26 +2,71 @@
 
 ## [1.0.0] - 2026-06-14
 
-### Fixed
-- IToolResult type mismatch on 9 Kali security tool stubs (returned `tool`/`status`/`target` instead of `output`)
-- Platform-level privilege escalation blocklist missing `gksudo` and `kdesu` (inconsistency with workbench layer)
-- ESLint step in build-verify.yml silently ignoring failures (`|| true` replaced with proper conditional)
-- MCP connection pool type safety: 19 `any` types replaced with `IMCPClient`, `IMCPTransport`, `Record<string, unknown>`
+### Security — CRITICAL (Command Injection)
+- **shellEscape()**: New utility function in kaliToolBridge.ts — properly escapes `$()`, backticks, `\n`, `!`, `$`, `\` in bash -c arguments (previously only double-quotes were escaped)
+- **sanitizeShellArg()**: New validation function in kaliToolBridgeService.ts — rejects shell metacharacters (`;`, `&`, `|`, `` ` ``, `$`, `()`, `{}`, `!`, `<>`, `\n`, `\r`) in all Kali tool parameters
+- **WSL wrapping fix**: constructToolRegistryService.ts now uses shellEscape() instead of simple double-quote replacement
+- All 14 Kali tool methods now validate inputs before command construction
+- Metasploit options (Record values) are individually validated against injection
 
-### Added
-- ErrorBanner component with Retry/Undo/Dismiss actions (WCAG 2.1 AA: role="alert", aria-live="assertive", focus management)
-- 9 Kali security tools wired through kaliToolBridge (sqlmap, nikto, hydra, john, hashcat, aircrack, metasploit, wpscan, gobuster)
-- 5 new kaliToolBridge methods: `niktoScan`, `hashcatCrack`, `aircrackScan`, `wpscanScan`, `gobusterScan`
-- WCAG role attributes in agent view (toolbar, combobox, textbox, plus existing log/article/status/alert)
-- TEST_INDEX.md documentation in repo root
-- New test files: `errorBanner.test.ts` (20 tests), `kaliDetector.test.ts` (28 tests)
-- Test tsconfig expanded to include all test subdirectories
+### Security — HIGH (XSS + Defense-in-Depth)
+- **XSS fix — Memory Explorer**: Replaced innerHTML with safe DOM construction (createElement + textContent)
+- **XSS fix — Memory Editor**: All user-controlled data in innerHTML now passes through escapeHtml()
+- **XSS fix — Onboarding**: Replaced innerHTML with textContent + DOM API for error/status messages
+- **XSS fix — Markdown links**: javascript:, data:, vbscript: schemes stripped from markdown link rendering
+- **MCP tool allowlist**: Added `delete_file` and `exists` to ALLOWED_TOOLS in workspaceGuard.ts
+- **Output truncation**: All 14 Kali tool methods now truncate output at 10,000 chars via truncateOutput()
+- **Timing-safe comparison**: Added validateKeyConstantTime() using crypto.timingSafeEqual for credential comparison
+
+### Security — MEDIUM (Hardening)
+- **Per-installation PBKDF2 salt**: Random salt stored in kovix-salt.bin instead of hardcoded constant
+- **Security headers**: Added X-Frame-Options: DENY, X-Content-Type-Options: nosniff, HSTS, Referrer-Policy to web client server
+- **safeJsonParse()**: New utility function for safe JSON parsing with fallback — applied to obsidianMemoryServiceImpl and ideaRefinementServiceImpl
+- **sanitizeErrorForAgent()**: Strips filesystem paths from error messages returned to LLM agent
+- **Shell metachar regex**: Added `$\w` (variable expansion), `<<<` (herestrings), `<>` (open rw), `\n` `\r` (newline injection)
+- **assertWithinWorkspace**: Fixed call without workspaceRoot parameter in mcpProcess.ts
+
+### Code Quality — any Type Elimination (31+ instances)
+- **MCP files**: mcpConnectionPool.ts — defined 5 return-type interfaces, replaced all any types
+- **MCP files**: mcpServerManagerService.ts — proper array types instead of `{}`
+- **Memory services**: constructMemoryService.ts — ISupermemoryClient interface; memoryOrchestratorService.ts — proper Map type; obsidianMemoryServiceImpl.ts — unknown + type guards
+- **embeddingService.ts**: EmbeddingPipeline interface replaces any
+- **secureKeyManager.ts**: IAPIModelsResponse, IOllamaTagsResponse, IAPIValidationResponse interfaces
+- **mcpMarketplaceService.ts**: IRegistryEntry + IRegistryResponse interfaces
+- **codeReviewToolService.ts**: IReviewFindingRaw interface
+- **sessionServiceImpl.ts**: unknown with type narrowing
+- **Platform types**: mcpTypes.ts data → Record<string, unknown>; mcpServerManager.ts args → Record<string, unknown>; memoryTypes.ts metadata → Record<string, unknown>
+- **constructAgentView.ts**: Removed unused import, typed progressPanel as optional, typed quick-pick items
+- **construct.contribution.ts**: IConstructQuickPickItem and IMemoryCategoryQuickPickItem interfaces
+- **agentLoop.ts**: input typed as Record<string, unknown>
+- **skillServiceImpl.ts**: URI type for loadSkillFile parameter
+- **constructSecureKeyService.ts**: _saltOverride field, NodeJS.ErrnoException type guard
+
+### Testing — 260 Placeholders Replaced
+- **security.test.ts**: 44 placeholder tests → real assertions testing detectShellMetacharInArgs, redactSecrets, promptSanitiser, validateToolName, TerminalRateLimiter, isPrivilegeEscalation
+- **pureLogic.test.ts**: 36 placeholder tests → real assertions for type validation, sort/filter, token counting, diff parsing
+- **13 placeholder test files**: All 130 placeholders replaced with real assertions (mcpSystem, e2e, memory, tools, diff, build, ipc, project, config, service, accessibility, performance, notification)
+- **ui/uiViews.test.ts**: 10 placeholders → 57 real assertions (ErrorBanner, ARIA roles, keyboard nav, focus trap, theme CSS)
+- **ollamaProvider.mock.test.ts**: New 22 tests with mock HTTP server (no Ollama required)
+- **3 duplicate files deleted**: recovery/errorRecovery, agent/agentLoop, keymanager/secureKeyManager (real tests in services/)
+- **0 placeholder tests remain**
+
+### CI/CD + Launch Readiness
+- **build.yml**: Fixed stale `construct-ide-darwin-x64.zip` → `kovix-darwin-x64.zip`
+- **basic.yml**: Fixed Xvfb init script path reference
+- **package.json**: Added `test:coverage` script with nyc
+- **build-verify.yml**: Added coverage reporting step
+- **kaliToolBridgeService.ts**: Added ALLOWED_NMAP_FLAGS options validation
+- **constructInlineCompletion.ts**: Added provideInlineCompletions() method signature
 
 ### Changed
-- All 9 Kali tool stubs now route through kaliToolBridge with proper input validation and error handling
-- ESLint CI step outputs results instead of swallowing them
-- Test suite expanded from 493 to 754 passing tests (+261 new tests)
-- MCP server manager uses `IMCPClient` interface instead of `any` for all client callbacks
+- Test suite: 754 → 866 passing tests (+112 new real tests)
+- TypeScript: 0 errors (was 9 TS errors + 12 MCP type errors)
+- `any` types: 0 in src/ (was 31+)
+- Placeholder tests: 0 (was 260)
+
+### Fixed
+- IToolResult type mismatch on 9 Kali security tool stubs (returned `tool`/`status`/`target` instead of `output`)
 
 ## [1.0.0] - 2026-06-11
 

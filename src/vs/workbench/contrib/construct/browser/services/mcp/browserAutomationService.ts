@@ -209,7 +209,7 @@ export class BrowserAutomationService extends Disposable implements IBrowserAuto
                         'browser_get_current_url',
                         {}
                 );
-                return result.data?.url ?? this.sessions.get(sessionId)?.url ?? '';
+                return (result.data?.['url'] as string | undefined) ?? this.sessions.get(sessionId)?.url ?? '';
         }
 
         // =======================================================================
@@ -259,11 +259,11 @@ export class BrowserAutomationService extends Disposable implements IBrowserAuto
                         'browser_get_accessibility_tree',
                         {}
                 );
-                const tree = result.data?.tree ?? '';
+                const tree = (result.data?.['tree'] as string | undefined) ?? '';
 
                 const session = this.sessions.get(sessionId);
                 if (session) {
-                        (session as any).accessibilityTree = tree;
+                        (session as SessionInternal).accessibilityTree = tree;
                 }
 
                 return tree;
@@ -275,7 +275,7 @@ export class BrowserAutomationService extends Disposable implements IBrowserAuto
                         'browser_get_page_source',
                         {}
                 );
-                return result.data?.source ?? '';
+                return (result.data?.['source'] as string | undefined) ?? '';
         }
 
         async getConsoleLogs(sessionId: string): Promise<IBrowserConsoleEntry[]> {
@@ -285,7 +285,7 @@ export class BrowserAutomationService extends Disposable implements IBrowserAuto
                         {}
                 );
 
-                const rawLogs: Array<{ level: string; message: string; source: string }> = result.data?.logs ?? [];
+                const rawLogs: Array<{ level: string; message: string; source: string }> = (result.data?.['logs'] as Array<{ level: string; message: string; source: string }> | undefined) ?? [];
                 const logs: IBrowserConsoleEntry[] = rawLogs.map(entry => ({
                         level: (['log', 'warn', 'error', 'info'].includes(entry.level) ? entry.level : 'log') as IBrowserConsoleEntry['level'],
                         message: entry.message,
@@ -534,7 +534,7 @@ export class BrowserAutomationService extends Disposable implements IBrowserAuto
                         { fullPage }
                 );
 
-                const base64 = result.data?.screenshot ?? '';
+                const base64 = (result.data?.['screenshot'] as string | undefined) ?? '';
                 const screenshot: IBrowserScreenshot = {
                         sessionId,
                         base64,
@@ -551,7 +551,7 @@ export class BrowserAutomationService extends Disposable implements IBrowserAuto
                 }
 
                 // Update session screenshot reference
-                (session as any).screenshot = base64;
+                (session as SessionInternal).screenshot = base64;
                 session.lastActivity = Date.now();
 
                 this._onDidScreenshot.fire(screenshot);

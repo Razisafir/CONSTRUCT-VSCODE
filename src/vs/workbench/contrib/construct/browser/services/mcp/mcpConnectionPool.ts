@@ -45,15 +45,35 @@ interface IConnectionEntry {
  * Minimal MCP Client interface — captures the methods used by KOVIX.
  * The actual SDK Client or raw-stdio client satisfies this interface.
  */
+export interface IMCPListToolsResult {
+        tools?: Array<Record<string, unknown>>;
+}
+
+export interface IMCPListResourcesResult {
+        resources?: Array<Record<string, unknown>>;
+}
+
+export interface IMCPListPromptsResult {
+        prompts?: Array<Record<string, unknown>>;
+}
+
+export interface IMCPReadResourceResult {
+        contents?: Array<{ text?: string; mimeType?: string }>;
+}
+
+export interface IMCPGetPromptResult {
+        messages?: Array<Record<string, unknown>>;
+}
+
 export interface IMCPClient {
         connect(transport: IMCPTransport): Promise<void>;
         close(): Promise<void>;
-        listTools(): Promise<Record<string, unknown>>;
+        listTools(): Promise<IMCPListToolsResult>;
         callTool(params: Record<string, unknown>): Promise<Record<string, unknown>>;
-        listResources(): Promise<Record<string, unknown>>;
-        readResource(params: Record<string, unknown>): Promise<Record<string, unknown>>;
-        listPrompts(): Promise<Record<string, unknown>>;
-        getPrompt(params: Record<string, unknown>): Promise<Record<string, unknown>>;
+        listResources(): Promise<IMCPListResourcesResult>;
+        readResource(params: Record<string, unknown>): Promise<IMCPReadResourceResult>;
+        listPrompts(): Promise<IMCPListPromptsResult>;
+        getPrompt(params: Record<string, unknown>): Promise<IMCPGetPromptResult>;
 }
 
 /**
@@ -277,7 +297,7 @@ export class MCPConnectionPool extends Disposable {
                 }
 
                 const { Client } = await import('@modelcontextprotocol/sdk/client/index.js').catch(() => ({ Client: null }));
-                const client = Client ? new Client({ name: 'kovix', version: '1.0.0' }) : null;
+                const client: IMCPClient | null = Client ? new Client({ name: 'kovix', version: '1.0.0' }) as unknown as IMCPClient : null;
 
                 const entry: IConnectionEntry = {
                         client,
@@ -490,6 +510,9 @@ export class MCPConnectionPool extends Disposable {
                 });
 
                 try {
+                        if (!entry.client) {
+                                throw new Error(`Server ${serverName} has no active client. Cannot execute operation.`);
+                        }
                         const result = await Promise.race([operation(entry.client), timeoutPromise]);
                         entry.lastPing = Date.now();
                         entry.errorCount = Math.max(0, entry.errorCount - 1);
@@ -578,6 +601,10 @@ export class MCPConnectionPool extends Disposable {
                 }
 
                 entry.transport = transport;
+
+                if (!entry.client) {
+                        throw new Error(`Server ${serverName} has no active client. Cannot reconnect.`);
+                }
 
                 try {
                         await entry.client.connect(transport);

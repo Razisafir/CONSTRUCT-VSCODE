@@ -18,7 +18,10 @@ import {
         IConstructToolRegistry, IToolDefinition, IToolResult, assertWithinWorkspace
 } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
 import { ITerminalExecutor } from '../../../../../../platform/construct/common/terminal/terminalExecutor.js';
+import { shellEscape } from '../../../../../../platform/construct/common/terminal/kaliToolBridge.js';
 import { IPendingChangesService } from '../../../../../../platform/construct/common/diff/pendingChanges.js';
+// SEC-P5: Sanitize error messages returned to agent
+import { sanitizeErrorForAgent } from '../../../../../../platform/construct/common/security/workspaceGuard.js';
 import { nmapToolDefinition } from '../../tools/security/nmapTool.js';
 import { ghidraToolDefinition } from '../../tools/security/ghidraTool.js';
 import { nucleiToolDefinition } from '../../tools/security/nucleiTool.js';
@@ -161,7 +164,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
+                                output: sanitizeErrorForAgent(error, 'tool execution'),
                                 truncated: false,
                                 metadata: { durationMs: Date.now() - startTime },
                         };
@@ -603,7 +606,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to read file "${path}": ${error instanceof Error ? error.message : String(error)}`,
+                                output: `Failed to read file: ${sanitizeErrorForAgent(error, 'read_file')}`,
                                 truncated: false,
                         };
                 }
@@ -669,7 +672,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to write file "${path}": ${error instanceof Error ? error.message : String(error)}`,
+                                output: `Failed to write file: ${sanitizeErrorForAgent(error, 'write_file')}`,
                                 truncated: false,
                         };
                 }
@@ -698,7 +701,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 try {
                         // If Kali profile is selected, wrap command for WSL
                         const actualCommand = this._terminalProfile === 'kali' && this._kaliAvailable
-                                ? `wsl -d kali-linux -- bash -c "${command.replace(/"/g, '\\"')}"`
+                                ? `wsl -d kali-linux -- bash -c "${shellEscape(command)}"`
                                 : command;
 
                         // P0-4 FIX: child_process should not be used in browser layer.
@@ -729,7 +732,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to execute command: ${error instanceof Error ? error.message : String(error)}`,
+                                output: `Failed to execute command: ${sanitizeErrorForAgent(error, 'run_command')}`,
                                 truncated: false,
                         };
                 }
@@ -775,7 +778,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Search failed: ${error instanceof Error ? error.message : String(error)}`,
+                                output: `Search failed: ${sanitizeErrorForAgent(error, 'search_codebase')}`,
                                 truncated: false,
                         };
                 }
@@ -839,7 +842,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Web search failed: ${error instanceof Error ? error.message : String(error)}`,
+                                output: `Web search failed: ${sanitizeErrorForAgent(error, 'web_search')}`,
                                 truncated: false,
                         };
                 }
@@ -890,7 +893,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to list directory "${path}": ${error instanceof Error ? error.message : String(error)}`,
+                                output: `Failed to list directory: ${sanitizeErrorForAgent(error, 'list_directory')}`,
                                 truncated: false,
                         };
                 }
@@ -922,7 +925,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to create directory "${path}": ${error instanceof Error ? error.message : String(error)}`,
+                                output: `Failed to create directory: ${sanitizeErrorForAgent(error, 'create_directory')}`,
                                 truncated: false,
                         };
                 }
@@ -958,7 +961,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to stage edit for "${path}": ${error instanceof Error ? error.message : String(error)}`,
+                                output: `Failed to stage edit: ${sanitizeErrorForAgent(error, 'edit_file')}`,
                                 truncated: false,
                         };
                 }
@@ -1357,7 +1360,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                                 metadata: { bytesProcessed: 0 },
                         };
                 } catch (error) {
-                        return { success: false, output: `Test generation failed: ${error instanceof Error ? error.message : String(error)}`, truncated: false };
+                        return { success: false, output: `Test generation failed: ${sanitizeErrorForAgent(error, 'generate_tests')}`, truncated: false };
                 }
         }
 
@@ -1376,7 +1379,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                                 metadata: { bytesProcessed: diff ? diff.length : 0 },
                         };
                 } catch (error) {
-                        return { success: false, output: `Code review failed: ${error instanceof Error ? error.message : String(error)}`, truncated: false };
+                        return { success: false, output: `Code review failed: ${sanitizeErrorForAgent(error, 'review_code')}`, truncated: false };
                 }
         }
 
@@ -1388,7 +1391,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         // Delegate to the browser automation service
                         return { success: true, output: `Browser session opened for URL: ${url}. Use browser_screenshot, browser_click, and browser_read for interaction.`, truncated: false };
                 } catch (error) {
-                        return { success: false, output: `Browser open failed: ${error instanceof Error ? error.message : String(error)}`, truncated: false };
+                        return { success: false, output: `Browser open failed: ${sanitizeErrorForAgent(error, 'browser_open')}`, truncated: false };
                 }
         }
 
@@ -1399,7 +1402,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 try {
                         return { success: true, output: `Screenshot captured for session: ${sessionId}.`, truncated: false };
                 } catch (error) {
-                        return { success: false, output: `Screenshot failed: ${error instanceof Error ? error.message : String(error)}`, truncated: false };
+                        return { success: false, output: `Screenshot failed: ${sanitizeErrorForAgent(error, 'browser_screenshot')}`, truncated: false };
                 }
         }
 
@@ -1411,7 +1414,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 try {
                         return { success: true, output: `Clicked element "${selector}" in session: ${sessionId}.`, truncated: false };
                 } catch (error) {
-                        return { success: false, output: `Browser click failed: ${error instanceof Error ? error.message : String(error)}`, truncated: false };
+                        return { success: false, output: `Browser click failed: ${sanitizeErrorForAgent(error, 'browser_click')}`, truncated: false };
                 }
         }
 
@@ -1424,7 +1427,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         const selectorInfo = selector ? ` for selector "${selector}"` : '';
                         return { success: true, output: `DOM content read${selectorInfo} from session: ${sessionId}.`, truncated: false };
                 } catch (error) {
-                        return { success: false, output: `Browser read failed: ${error instanceof Error ? error.message : String(error)}`, truncated: false };
+                        return { success: false, output: `Browser read failed: ${sanitizeErrorForAgent(error, 'browser_read')}`, truncated: false };
                 }
         }
 

@@ -137,7 +137,7 @@ export class EpisodicMemoryService extends Disposable implements IEpisodicMemory
                 const ids = new Set<string>();
                 for (const e of episodes) {
                         if (e.entry.taskId) { ids.add(e.entry.taskId); }
-                        if (e.entry.metadata?.sessionId) { ids.add(e.entry.metadata.sessionId); }
+                        if (e.entry.metadata?.sessionId) { ids.add(e.entry.metadata.sessionId as string); }
                 }
                 return Array.from(ids);
         }

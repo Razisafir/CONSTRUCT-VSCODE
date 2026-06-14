@@ -141,7 +141,7 @@ export class MCPProcessService extends Disposable implements IMCPProcess {
          */
         private assertWorkspaceBoundary(path: string): void {
                 try {
-                        assertWithinWorkspace(path);
+                        assertWithinWorkspace(path, this._rootPath);
                 } catch (error) {
                         const msg = error instanceof Error ? error.message : String(error);
                         throw new Error(`Security: MCP operation rejected — ${msg}`);

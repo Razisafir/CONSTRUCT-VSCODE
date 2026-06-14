@@ -609,11 +609,23 @@ export class ObsidianMemoryTreePanel extends ViewPane {
                         font-size: 10px; color: var(--vscode-descriptionForeground);
                         padding: 4px 0;
                 `;
-                metaDiv.innerHTML = `
-                        Created: ${new Date(entry.createdAt).toLocaleString()}<br>
-                        Updated: ${new Date(entry.updatedAt).toLocaleString()}<br>
-                        Source: <span style="padding:1px 4px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);border-radius:2px;">${entry.source}</span>
-                `;
+                // Safe DOM construction — no innerHTML to prevent XSS
+                const createdEl = document.createElement('span');
+                createdEl.textContent = `Created: ${new Date(entry.createdAt).toLocaleString()}`;
+                metaDiv.appendChild(createdEl);
+                metaDiv.appendChild(document.createElement('br'));
+                const updatedEl = document.createElement('span');
+                updatedEl.textContent = `Updated: ${new Date(entry.updatedAt).toLocaleString()}`;
+                metaDiv.appendChild(updatedEl);
+                metaDiv.appendChild(document.createElement('br'));
+                const sourceLabel = document.createElement('span');
+                sourceLabel.textContent = 'Source: ';
+                sourceLabel.style.fontWeight = '600';
+                metaDiv.appendChild(sourceLabel);
+                const sourceEl = document.createElement('span');
+                sourceEl.textContent = entry.source;
+                sourceEl.style.cssText = 'padding:1px 4px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);border-radius:2px;';
+                metaDiv.appendChild(sourceEl);
                 form.appendChild(metaDiv);
 
                 // Action buttons

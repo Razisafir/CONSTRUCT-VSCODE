@@ -227,7 +227,7 @@ jobs:
               zip -r "../kovix-darwin-x64.zip" "$APP_NAME"
             else
               cd ..
-              zip -r "construct-ide-darwin-x64.zip" x64/
+              zip -r "kovix-darwin-x64.zip" x64/
             fi
           else
             echo "ERROR: Cannot find macOS build output directory"
@@ -238,5 +238,5 @@ jobs:
 
       - name: Generate SHA256 checksums
         run: |
-          shasum -a 256 construct-ide-darwin-x64.zip > checksums-sha256.txt
+          shasum -a 256 kovix-darwin-x64.zip > checksums-sha256.txt
           cat checksums-sha256.txt

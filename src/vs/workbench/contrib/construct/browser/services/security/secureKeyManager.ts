@@ -26,6 +26,29 @@ const MIGRATION_DONE_KEY = `${STORAGE_KEY_PREFIX}.migrationDone`;
 const SECRET_KEY_PREFIX = 'construct.apiKey';
 
 /**
+ * API response shape for OpenAI-compatible /v1/models endpoint.
+ */
+interface IAPIModelsResponse {
+        data?: Array<{ id?: string }>;
+}
+
+/**
+ * API response shape for Ollama /api/tags endpoint.
+ */
+interface IOllamaTagsResponse {
+        models?: Array<{ name?: string }>;
+}
+
+/**
+ * API response shape for key validation endpoint.
+ * Defined for future use when key validation endpoint is added.
+ */
+interface IAPIValidationResponse {
+        valid: boolean;
+        error?: string;
+}
+
+/**
  * Default endpoints per provider type.
  */
 const DEFAULT_ENDPOINTS: Record<LLMProvider, string> = {
@@ -201,7 +224,7 @@ export class SecureKeyManagerService extends Disposable implements ISecureKeyMan
 
         // ─── Validation ──────────────────────────────────────────────────────────────
 
-        validateKey(provider: LLMProvider, key: string): { valid: boolean; error?: string } {
+        validateKey(provider: LLMProvider, key: string): IAPIValidationResponse {
                 if (provider === 'ollama') {
                         // Ollama does not require an API key
                         return { valid: true };
@@ -466,7 +489,7 @@ export class SecureKeyManagerService extends Disposable implements ISecureKeyMan
                         }
 
                         if (response.status === 200) {
-                                const body = await response.json().catch(() => null) as any;
+                                const body = await response.json().catch(() => null) as IAPIModelsResponse | null;
                                 const models: string[] = [];
                                 if (body?.data && Array.isArray(body.data)) {
                                         for (const model of body.data) {
@@ -495,7 +518,7 @@ export class SecureKeyManagerService extends Disposable implements ISecureKeyMan
                         });
 
                         if (response.status === 200) {
-                                const body = await response.json().catch(() => null) as any;
+                                const body = await response.json().catch(() => null) as IOllamaTagsResponse | null;
                                 const models: string[] = [];
                                 if (body?.models && Array.isArray(body.models)) {
                                         for (const model of body.models) {
@@ -536,7 +559,7 @@ export class SecureKeyManagerService extends Disposable implements ISecureKeyMan
                         });
 
                         if (modelsResponse.status === 200) {
-                                const body = await modelsResponse.json().catch(() => null) as any;
+                                const body = await modelsResponse.json().catch(() => null) as IAPIModelsResponse | null;
                                 const models: string[] = [];
                                 if (body?.data && Array.isArray(body.data)) {
                                         for (const model of body.data) {

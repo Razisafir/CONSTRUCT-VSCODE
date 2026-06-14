@@ -83,11 +83,20 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
         /** Serialize writes to the key store file. */
         private readonly writeQueue = new Queue<void>();
 
+        /** Directory containing the key store file (derived from storePath). */
+        private get keyStoreDir(): string { return nodePath.dirname(this.storePath); }
+
         /** SEC-P2: PBKDF2-derived encryption key (zeroed on dispose). */
         private _derivedKey: Buffer | null = null;
 
-        /** SEC-P2: Salt for PBKDF2 key derivation. */
+        /** SEC-P2: Override salt from key rotation (takes precedence over static PBKDF2_SALT). */
+        private _saltOverride: string | null = null;
+
+        /** SEC-P2: Salt for PBKDF2 key derivation (static fallback — only used when per-installation salt file is missing). */
         private static readonly PBKDF2_SALT = 'kovix-encryption-key-v1';
+
+        /** SEC-P2: Per-installation random salt file name. */
+        private static readonly PBKDF2_SALT_FILE = 'kovix-salt.bin';
 
         /** SEC-P2: PBKDF2 iteration count. */
         private static readonly PBKDF2_ITERATIONS = 100_000;
@@ -138,15 +147,51 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
 
                 // Derive a 32-byte key using PBKDF2 with 100,000 iterations.
                 // This makes brute-force attacks impractical even if the machine-id is predictable.
+                const salt = this._saltOverride ?? SecureKeyNodeService.PBKDF2_SALT;
                 this._derivedKey = crypto.pbkdf2Sync(
                         machineId,
-                        SecureKeyNodeService.PBKDF2_SALT,
+                        salt,
                         SecureKeyNodeService.PBKDF2_ITERATIONS,
                         SecureKeyNodeService.KEY_LENGTH,
                         'sha256'
                 );
 
                 return this._derivedKey;
+        }
+
+        /**
+         * SEC-P2: Read or create a per-installation random salt file.
+         * Each installation gets a unique 32-byte random salt stored alongside
+         * the key store. This prevents cross-installation key derivation attacks
+         * where the same machine ID + static salt would produce identical keys.
+         */
+        private async getOrCreateSalt(): Promise<string> {
+                const saltPath = nodePath.join(this.keyStoreDir, SecureKeyNodeService.PBKDF2_SALT_FILE);
+                try {
+                        const { readFile } = await import('fs/promises');
+                        return await readFile(saltPath, 'utf-8');
+                } catch {
+                        const salt = crypto.randomBytes(32).toString('hex');
+                        const { mkdir, writeFile } = await import('fs/promises');
+                        await mkdir(this.keyStoreDir, { recursive: true });
+                        await writeFile(saltPath, salt, 'utf-8');
+                        return salt;
+                }
+        }
+
+        /**
+         * SEC-P2: Initialize the per-installation salt during store loading.
+         * Loads the salt from the file (or creates one) and sets _saltOverride
+         * so that getDerivedKey() uses it instead of the static PBKDF2_SALT.
+         */
+        private async initializeSalt(): Promise<void> {
+                if (this._saltOverride) { return; } // already initialized
+                try {
+                        this._saltOverride = await this.getOrCreateSalt();
+                        this.logService.info('[SecureKeyNode] Per-installation salt loaded');
+                } catch (error) {
+                        this.logService.warn('[SecureKeyNode] Failed to load per-installation salt, using static fallback: ' + (error instanceof Error ? error.message : String(error)));
+                }
         }
 
         /**
@@ -176,7 +221,7 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
 
                 // Generate new salt for the new key derivation
                 const newSalt = crypto.randomBytes(16).toString('hex');
-                (SecureKeyNodeService as any).PBKDF2_SALT = newSalt;
+                this._saltOverride = newSalt;
 
                 // Re-encrypt all keys with the new derived key
                 this.storeData.keys = {};
@@ -217,6 +262,13 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
                 this.keyCache.set(provider, key);
 
                 await this.persistStore();
+
+                // Verify key was stored correctly using timing-safe comparison
+                const verifyKey = this.keyCache.get(provider);
+                if (verifyKey && !this.validateKeyConstantTime(key, verifyKey)) {
+                        this.logService.error(`[SecureKeyNode] Key verification failed after storage for: ${provider}`);
+                }
+
                 this.logService.info(`[SecureKeyNode] Key stored (encrypted) for: ${provider}`);
                 this._onDidChangeKey.fire(provider);
         }
@@ -268,6 +320,20 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
         }
 
         // ─── Validation ──────────────────────────────────────────────────────────────
+
+        /**
+         * SEC-P2: Constant-time comparison of strings to prevent timing attacks.
+         * Uses Node.js crypto.timingSafeEqual for credential comparison.
+         * Public for use in key verification flows.
+         */
+        validateKeyConstantTime(provided: string, expected: string): boolean {
+                const providedBuf = Buffer.from(provided, 'utf-8');
+                const expectedBuf = Buffer.from(expected, 'utf-8');
+                if (providedBuf.length !== expectedBuf.length) {
+                        return false;
+                }
+                return crypto.timingSafeEqual(providedBuf, expectedBuf);
+        }
 
         validateKey(provider: LLMProvider, key: string): { valid: boolean; error?: string } {
                 if (!key || key.trim().length === 0) {
@@ -482,11 +548,16 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
                         this.logService.info('[SecureKeyNode] Key store loaded from disk (' + Object.keys(this.storeData.keys).length + ' keys)');
                 } catch (error) {
                         // File doesn't exist or is corrupt — start fresh
-                        if ((error as any).code !== 'ENOENT') {
+                        const errCode = (error instanceof Error && 'code' in error) ? (error as NodeJS.ErrnoException).code : undefined;
+                        if (errCode !== 'ENOENT') {
                                 this.logService.warn('[SecureKeyNode] Failed to load key store, starting fresh: ' + (error instanceof Error ? error.message : String(error)));
                         }
                         this.storeData = { keys: {}, activeProviderId: null, providers: [] };
                 }
+
+                // SEC-P2: Initialize per-installation salt before marking store as loaded
+                // so that getDerivedKey() uses the per-installation salt
+                await this.initializeSalt();
 
                 this.storeLoaded = true;
         }

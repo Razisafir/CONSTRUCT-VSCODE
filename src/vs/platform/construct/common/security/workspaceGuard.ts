@@ -105,7 +105,8 @@ export function assertWithinWorkspace(
 export function validateToolName(name: string): boolean {
         const ALLOWED_TOOLS = new Set([
                 'read_file', 'write_file', 'edit_file', 'list_directory',
-                'create_directory', 'search_files', 'run_command',
+                'create_directory', 'delete_file', 'exists',
+                'search_files', 'run_command',
                 'search_codebase', 'web_search', 'generate_tests', 'review_code'
         ]);
         return ALLOWED_TOOLS.has(name);
@@ -120,4 +121,16 @@ export function validateMcpMethod(method: string): boolean {
                 'resources/list', 'resources/read'
         ]);
         return ALLOWED_METHODS.has(method);
+}
+
+/**
+ * SEC-P5: Sanitize error messages before returning them to the agent.
+ * Removes file system paths (which may contain usernames, project names, etc.)
+ * to prevent information leakage in error messages sent to LLM providers.
+ */
+export function sanitizeErrorForAgent(error: unknown, operation: string): string {
+        const msg = error instanceof Error ? error.message : String(error);
+        return msg
+                .replace(/\/[^\s]+/g, '[path]')
+                .replace(/[A-Z]:\\[^\s]+/gi, '[path]');
 }

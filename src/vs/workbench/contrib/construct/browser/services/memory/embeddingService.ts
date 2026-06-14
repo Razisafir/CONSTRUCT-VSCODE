@@ -31,267 +31,275 @@ const BATCH_SIZE = 32;
  * If neither is available (should not happen in normal use), returns zero vectors
  * and fires an error event.
  */
+/**
+ * Minimal interface for a Xenova feature-extraction pipeline.
+ * Avoids importing the full @xenova/transformers types at compile time.
+ */
+interface EmbeddingPipeline {
+        (text: string | string[], options: { pooling: string; normalize: boolean }): Promise<{ data: Float32Array | number[]; dims: number[] }>;
+}
+
 export class EmbeddingService extends Disposable implements IEmbeddingService {
-	readonly _serviceBrand: undefined;
+        readonly _serviceBrand: undefined;
 
-	private _mode: 'ollama' | 'xenova' | 'unavailable' = 'ollama';
-	private _modeDetected = false;
-	private modelLoaded = false;
-	private loadPromise: Promise<void> | undefined;
-	private cache = new Map<string, number[]>();
-	private readonly maxCacheSize = 1000;
+        private _mode: 'ollama' | 'xenova' | 'unavailable' = 'ollama';
+        private _modeDetected = false;
+        private modelLoaded = false;
+        private loadPromise: Promise<void> | undefined;
+        private cache = new Map<string, number[]>();
+        private readonly maxCacheSize = 1000;
 
-	private embedModel: any;
+        private embedModel: EmbeddingPipeline | undefined;
 
-	private readonly _onDidLoadModel = this._register(new Emitter<void>());
-	readonly onDidLoadModel = this._onDidLoadModel.event;
+        private readonly _onDidLoadModel = this._register(new Emitter<void>());
+        readonly onDidLoadModel = this._onDidLoadModel.event;
 
-	private readonly _onDidError = this._register(new Emitter<string>());
-	readonly onDidError = this._onDidError.event;
+        private readonly _onDidError = this._register(new Emitter<string>());
+        readonly onDidError = this._onDidError.event;
 
-	constructor(
-		@ILogService private readonly logService: ILogService
-	) {
-		super();
-	}
+        constructor(
+                @ILogService private readonly logService: ILogService
+        ) {
+                super();
+        }
 
-	getConfig(): IEmbeddingConfig {
-		const dimension = this._mode === 'ollama' ? OLLAMA_DIMENSION : XENOVA_DIMENSION;
-		const model = this._mode === 'ollama' ? OLLAMA_MODEL : XENOVA_MODEL;
-		return {
-			dimension,
-			model,
-			local: true,
-			batchSize: BATCH_SIZE
-		};
-	}
+        getConfig(): IEmbeddingConfig {
+                const dimension = this._mode === 'ollama' ? OLLAMA_DIMENSION : XENOVA_DIMENSION;
+                const model = this._mode === 'ollama' ? OLLAMA_MODEL : XENOVA_MODEL;
+                return {
+                        dimension,
+                        model,
+                        local: true,
+                        batchSize: BATCH_SIZE
+                };
+        }
 
-	isLocal(): boolean {
-		return true;
-	}
+        isLocal(): boolean {
+                return true;
+        }
 
-	async embed(text: string): Promise<number[]> {
-		await this.detectMode();
+        async embed(text: string): Promise<number[]> {
+                await this.detectMode();
 
-		const cached = this.cache.get(text);
-		if (cached) { return cached; }
+                const cached = this.cache.get(text);
+                if (cached) { return cached; }
 
-		try {
-			if (this._mode === 'ollama') {
-				return await this.embedOllama(text);
-			} else if (this._mode === 'xenova') {
-				return await this.embedXenova(text);
-			} else {
-				// No embedding available — return zero vector
-				const dimension = XENOVA_DIMENSION;
-				return new Array(dimension).fill(0);
-			}
-		} catch (error) {
-			this.logService.error('[Embedding] Failed to embed:', error);
-			this._onDidError.fire(error instanceof Error ? error.message : String(error));
-			const dimension = this._mode === 'ollama' ? OLLAMA_DIMENSION : XENOVA_DIMENSION;
-			return new Array(dimension).fill(0);
-		}
-	}
+                try {
+                        if (this._mode === 'ollama') {
+                                return await this.embedOllama(text);
+                        } else if (this._mode === 'xenova') {
+                                return await this.embedXenova(text);
+                        } else {
+                                // No embedding available — return zero vector
+                                const dimension = XENOVA_DIMENSION;
+                                return new Array(dimension).fill(0);
+                        }
+                } catch (error) {
+                        this.logService.error('[Embedding] Failed to embed:', error);
+                        this._onDidError.fire(error instanceof Error ? error.message : String(error));
+                        const dimension = this._mode === 'ollama' ? OLLAMA_DIMENSION : XENOVA_DIMENSION;
+                        return new Array(dimension).fill(0);
+                }
+        }
 
-	async embedBatch(texts: string[]): Promise<number[][]> {
-		await this.detectMode();
+        async embedBatch(texts: string[]): Promise<number[][]> {
+                await this.detectMode();
 
-		const results: number[][] = [];
+                const results: number[][] = [];
 
-		if (this._mode === 'ollama') {
-			// Ollama doesn't have a batch endpoint, embed one by one
-			for (const text of texts) {
-				results.push(await this.embed(text));
-			}
-		} else {
-			// Xenova batch
-			for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-				const batch = texts.slice(i, i + BATCH_SIZE);
+                if (this._mode === 'ollama') {
+                        // Ollama doesn't have a batch endpoint, embed one by one
+                        for (const text of texts) {
+                                results.push(await this.embed(text));
+                        }
+                } else {
+                        // Xenova batch
+                        for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+                                const batch = texts.slice(i, i + BATCH_SIZE);
 
-				try {
-					await this.ensureXenovaModel();
-					const result = await this.embedModel(batch, { pooling: 'mean', normalize: true });
-					const embeddings = this.tensorToArrays(result, batch.length, XENOVA_DIMENSION);
+                                try {
+                                        await this.ensureXenovaModel();
+                                        const result = await this.embedModel!(batch, { pooling: 'mean', normalize: true });
+                                        const embeddings = this.tensorToArrays(result, batch.length, XENOVA_DIMENSION);
 
-					for (let j = 0; j < batch.length; j++) {
-						this.setCache(batch[j], embeddings[j]);
-						results.push(embeddings[j]);
-					}
-				} catch (error) {
-					this.logService.error('[Embedding] Batch failed:', error);
-					for (const text of batch) {
-						results.push(await this.embed(text));
-					}
-				}
-			}
-		}
+                                        for (let j = 0; j < batch.length; j++) {
+                                                this.setCache(batch[j], embeddings[j]);
+                                                results.push(embeddings[j]);
+                                        }
+                                } catch (error) {
+                                        this.logService.error('[Embedding] Batch failed:', error);
+                                        for (const text of batch) {
+                                                results.push(await this.embed(text));
+                                        }
+                                }
+                        }
+                }
 
-		return results;
-	}
+                return results;
+        }
 
-	// --- Mode Detection ---
+        // --- Mode Detection ---
 
-	/**
-	 * Auto-detect which embedding backend is available.
-	 * Priority: Ollama > Xenova > Unavailable
-	 */
-	private async detectMode(): Promise<void> {
-		if (this._modeDetected) { return; }
+        /**
+         * Auto-detect which embedding backend is available.
+         * Priority: Ollama > Xenova > Unavailable
+         */
+        private async detectMode(): Promise<void> {
+                if (this._modeDetected) { return; }
 
-		// Try Ollama first
-		try {
-			const response = await fetch('http://localhost:11434/api/tags', {
-				method: 'GET',
-				signal: AbortSignal.timeout(3000),
-			});
+                // Try Ollama first
+                try {
+                        const response = await fetch('http://localhost:11434/api/tags', {
+                                method: 'GET',
+                                signal: AbortSignal.timeout(3000),
+                        });
 
-			if (response.ok) {
-				const data = await response.json() as { models?: Array<{ name: string }> };
-				const modelNames = data.models?.map(m => m.name) ?? [];
-				const hasEmbedModel = modelNames.some(n => n.startsWith(OLLAMA_MODEL));
+                        if (response.ok) {
+                                const data = await response.json() as { models?: Array<{ name: string }> };
+                                const modelNames = data.models?.map(m => m.name) ?? [];
+                                const hasEmbedModel = modelNames.some(n => n.startsWith(OLLAMA_MODEL));
 
-				if (hasEmbedModel) {
-					this._mode = 'ollama';
-					this._modeDetected = true;
-					this.modelLoaded = true;
-					this.logService.info('[Embedding] Using Ollama embeddings (' + OLLAMA_MODEL + ')');
-					return;
-				}
+                                if (hasEmbedModel) {
+                                        this._mode = 'ollama';
+                                        this._modeDetected = true;
+                                        this.modelLoaded = true;
+                                        this.logService.info('[Embedding] Using Ollama embeddings (' + OLLAMA_MODEL + ')');
+                                        return;
+                                }
 
-				this.logService.warn('[Embedding] Ollama running but ' + OLLAMA_MODEL + ' not found. Pull it: ollama pull ' + OLLAMA_MODEL + '. Falling back to Xenova.');
-			}
-		} catch {
-			this.logService.info('[Embedding] Ollama not reachable, trying Xenova fallback');
-		}
+                                this.logService.warn('[Embedding] Ollama running but ' + OLLAMA_MODEL + ' not found. Pull it: ollama pull ' + OLLAMA_MODEL + '. Falling back to Xenova.');
+                        }
+                } catch {
+                        this.logService.info('[Embedding] Ollama not reachable, trying Xenova fallback');
+                }
 
-		// Fallback: Xenova
-		try {
-			await this.ensureXenovaModel();
-			this._mode = 'xenova';
-			this._modeDetected = true;
-			this.logService.info('[Embedding] Using Xenova in-process embeddings (' + XENOVA_MODEL + ')');
-			return;
-		} catch {
-			this.logService.error('[Embedding] Neither Ollama nor Xenova available for embeddings');
-			this._mode = 'unavailable';
-			this._modeDetected = true;
-			this._onDidError.fire('No embedding backend available. Install Ollama and pull nomic-embed-text, or ensure @xenova/transformers is installed.');
-		}
-	}
+                // Fallback: Xenova
+                try {
+                        await this.ensureXenovaModel();
+                        this._mode = 'xenova';
+                        this._modeDetected = true;
+                        this.logService.info('[Embedding] Using Xenova in-process embeddings (' + XENOVA_MODEL + ')');
+                        return;
+                } catch {
+                        this.logService.error('[Embedding] Neither Ollama nor Xenova available for embeddings');
+                        this._mode = 'unavailable';
+                        this._modeDetected = true;
+                        this._onDidError.fire('No embedding backend available. Install Ollama and pull nomic-embed-text, or ensure @xenova/transformers is installed.');
+                }
+        }
 
-	// --- Ollama Embedding ---
+        // --- Ollama Embedding ---
 
-	private async embedOllama(text: string): Promise<number[]> {
-		try {
-			const response = await fetch(OLLAMA_EMBED_URL, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					model: OLLAMA_MODEL,
-					prompt: text,
-				}),
-			});
+        private async embedOllama(text: string): Promise<number[]> {
+                try {
+                        const response = await fetch(OLLAMA_EMBED_URL, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                        model: OLLAMA_MODEL,
+                                        prompt: text,
+                                }),
+                        });
 
-			if (!response.ok) {
-				throw new Error('Ollama embedding API returned ' + response.status);
-			}
+                        if (!response.ok) {
+                                throw new Error('Ollama embedding API returned ' + response.status);
+                        }
 
-			const data = await response.json() as { embedding: number[] };
-			if (data.embedding && data.embedding.length > 0) {
-				this.setCache(text, data.embedding);
-				return data.embedding;
-			}
+                        const data = await response.json() as { embedding: number[] };
+                        if (data.embedding && data.embedding.length > 0) {
+                                this.setCache(text, data.embedding);
+                                return data.embedding;
+                        }
 
-			throw new Error('Empty embedding response');
-		} catch (error) {
-			this.logService.warn('[Embedding] Ollama embed failed, trying Xenova:', error instanceof Error ? error.message : String(error));
-			// Try Xenova as emergency fallback
-			try {
-				await this.ensureXenovaModel();
-				const result = await this.embedXenova(text);
-				return result;
-			} catch {
-				throw error; // Throw original Ollama error
-			}
-		}
-	}
+                        throw new Error('Empty embedding response');
+                } catch (error) {
+                        this.logService.warn('[Embedding] Ollama embed failed, trying Xenova:', error instanceof Error ? error.message : String(error));
+                        // Try Xenova as emergency fallback
+                        try {
+                                await this.ensureXenovaModel();
+                                const result = await this.embedXenova(text);
+                                return result;
+                        } catch {
+                                throw error; // Throw original Ollama error
+                        }
+                }
+        }
 
-	// --- Xenova Embedding ---
+        // --- Xenova Embedding ---
 
-	private async embedXenova(text: string): Promise<number[]> {
-		await this.ensureXenovaModel();
+        private async embedXenova(text: string): Promise<number[]> {
+                await this.ensureXenovaModel();
 
-		try {
-			const result = await this.embedModel(text, { pooling: 'mean', normalize: true });
-			const embedding = Array.from(result.data) as number[];
-			this.setCache(text, embedding);
-			return embedding;
-		} catch (error) {
-			this.logService.error('[Embedding] Xenova embed failed:', error);
-			this._onDidError.fire(error instanceof Error ? error.message : String(error));
-			return new Array(XENOVA_DIMENSION).fill(0);
-		}
-	}
+                try {
+                        const result = await this.embedModel!(text, { pooling: 'mean', normalize: true });
+                        const embedding = Array.from(result.data) as number[];
+                        this.setCache(text, embedding);
+                        return embedding;
+                } catch (error) {
+                        this.logService.error('[Embedding] Xenova embed failed:', error);
+                        this._onDidError.fire(error instanceof Error ? error.message : String(error));
+                        return new Array(XENOVA_DIMENSION).fill(0);
+                }
+        }
 
-	private async ensureXenovaModel(): Promise<void> {
-		if (this.modelLoaded) { return; }
-		if (this.loadPromise) { return this.loadPromise; }
+        private async ensureXenovaModel(): Promise<void> {
+                if (this.modelLoaded) { return; }
+                if (this.loadPromise) { return this.loadPromise; }
 
-		this.loadPromise = this.loadXenovaModel();
-		return this.loadPromise;
-	}
+                this.loadPromise = this.loadXenovaModel();
+                return this.loadPromise;
+        }
 
-	private async loadXenovaModel(): Promise<void> {
-		try {
-			this.logService.info('[Embedding] Loading Xenova model ' + XENOVA_MODEL + '...');
+        private async loadXenovaModel(): Promise<void> {
+                try {
+                        this.logService.info('[Embedding] Loading Xenova model ' + XENOVA_MODEL + '...');
 
-			const transformers = await import('@xenova/transformers');
-			const pipeline = transformers.pipeline;
+                        const transformers = await import('@xenova/transformers');
+                        const pipeline = transformers.pipeline;
 
-			this.embedModel = await pipeline('feature-extraction', XENOVA_MODEL, {
-				quantized: true
-			});
+                        this.embedModel = await pipeline('feature-extraction', XENOVA_MODEL, {
+                                quantized: true
+                        }) as EmbeddingPipeline;
 
-			this.modelLoaded = true;
-			this.logService.info('[Embedding] Xenova model loaded successfully');
-			this._onDidLoadModel.fire();
-		} catch (error) {
-			this.logService.error('[Embedding] Failed to load Xenova model:', error);
-			this._onDidError.fire(error instanceof Error ? error.message : String(error));
-			// No pseudo-embedding fallback — we'd rather report the error
-			this.modelLoaded = false;
-			throw error;
-		}
-	}
+                        this.modelLoaded = true;
+                        this.logService.info('[Embedding] Xenova model loaded successfully');
+                        this._onDidLoadModel.fire();
+                } catch (error) {
+                        this.logService.error('[Embedding] Failed to load Xenova model:', error);
+                        this._onDidError.fire(error instanceof Error ? error.message : String(error));
+                        // No pseudo-embedding fallback — we'd rather report the error
+                        this.modelLoaded = false;
+                        throw error;
+                }
+        }
 
-	// --- Helpers ---
+        // --- Helpers ---
 
-	private tensorToArrays(tensor: any, batchSize: number, dimension: number): number[][] {
-		const data = tensor.data ?? tensor;
-		const arrays: number[][] = [];
+        private tensorToArrays(tensor: { data?: Float32Array | number[] } | Float32Array | number[], batchSize: number, dimension: number): number[][] {
+                const src: Float32Array | number[] = ('data' in tensor && !(tensor instanceof Float32Array) && !Array.isArray(tensor)) ? (tensor.data ?? tensor as Float32Array | number[]) : (tensor as Float32Array | number[]);
+                const arrays: number[][] = [];
 
-		for (let i = 0; i < batchSize; i++) {
-			const start = i * dimension;
-			const end = start + dimension;
-			arrays.push(Array.from(data.slice(start, end)));
-		}
+                for (let i = 0; i < batchSize; i++) {
+                        const start = i * dimension;
+                        const end = start + dimension;
+                        arrays.push(Array.from(src.slice(start, end) as ArrayLike<number>));
+                }
 
-		return arrays;
-	}
+                return arrays;
+        }
 
-	private setCache(text: string, embedding: number[]): void {
-		if (this.cache.size >= this.maxCacheSize) {
-			const firstKey = this.cache.keys().next().value;
-			if (firstKey !== undefined) {
-				this.cache.delete(firstKey);
-			}
-		}
-		this.cache.set(text, embedding);
-	}
+        private setCache(text: string, embedding: number[]): void {
+                if (this.cache.size >= this.maxCacheSize) {
+                        const firstKey = this.cache.keys().next().value;
+                        if (firstKey !== undefined) {
+                                this.cache.delete(firstKey);
+                        }
+                }
+                this.cache.set(text, embedding);
+        }
 
-	override dispose(): void {
-		this.cache.clear();
-		super.dispose();
-	}
+        override dispose(): void {
+                this.cache.clear();
+                super.dispose();
+        }
 }

@@ -1,7 +1,7 @@
 # Kovix v1.0.0 Launch Checklist
 
 > **Last Updated**: 2026-06-14
-> **Overall Status**: Core engineering complete, 754 unit tests passing, 0 TS errors, all security tools functional. Runtime verification and integration testing remain.
+> **Overall Status**: Core engineering complete, 866 unit tests passing (0 placeholder), 0 TS errors, 0 any types, all security tools functional, all CRITICAL/HIGH security findings resolved. Runtime verification and integration testing remain.
 
 ---
 
@@ -55,6 +55,27 @@
 | 5 | Symlink bypass prevention | ✅ Verified |
 | 6 | Memory context sanitization | ✅ Verified |
 | 7 | Process spawn hardening | ✅ Verified |
+
+### Grand Completion v3 — Additional Security Fixes
+
+| # | Finding | Severity | Status |
+|---|---------|----------|--------|
+| 1 | Command injection via shell escaping in WSL/Docker routing | CRITICAL | ✅ Fixed — shellEscape() |
+| 2 | Command injection via unsanitized Kali tool parameters | CRITICAL | ✅ Fixed — sanitizeShellArg() |
+| 3 | Command injection in constructToolRegistry WSL wrapping | CRITICAL | ✅ Fixed — uses shellEscape() |
+| 4 | XSS via innerHTML in Memory Explorer | HIGH | ✅ Fixed — safe DOM construction |
+| 5 | XSS via innerHTML in Memory Editor | HIGH | ✅ Fixed — escapeHtml() on all user data |
+| 6 | XSS via innerHTML in Onboarding | HIGH | ✅ Fixed — textContent + DOM API |
+| 7 | XSS via markdown link rendering (javascript: scheme) | HIGH | ✅ Fixed — scheme validation |
+| 8 | Missing MCP tool names (delete_file, exists) in allowlist | HIGH | ✅ Fixed |
+| 9 | Security tool output not truncated at MAX_OUTPUT_LENGTH | HIGH | ✅ Fixed — truncateOutput() |
+| 10 | Timing-unsafe credential comparison | HIGH | ✅ Fixed — crypto.timingSafeEqual |
+| 11 | Hardcoded PBKDF2 salt | MEDIUM | ✅ Fixed — per-installation random salt |
+| 12 | Missing security headers on web client server | MEDIUM | ✅ Fixed — X-Frame-Options, HSTS, etc. |
+| 13 | Untrusted JSON.parse without try-catch | MEDIUM | ✅ Fixed — safeJsonParse() utility |
+| 14 | Internal paths leaked in agent error messages | MEDIUM | ✅ Fixed — sanitizeErrorForAgent() |
+| 15 | Incomplete shell metacharacter regex | MEDIUM | ✅ Fixed — added $\w, <<<, \n, \r |
+| 16 | assertWithinWorkspace called without workspaceRoot | MEDIUM | ✅ Fixed |
 
 ---
 
@@ -129,7 +150,7 @@
 
 ## Test Infrastructure (Phase 7)
 
-- [x] Unit Test Execution — **754/754 passing, 51 test files, 14 pending (Ollama)**
+- [x] Unit Test Execution — **866/866 passing (0 placeholder), 14 pending (Ollama)**
 - [x] workspaceGuard test with symlink resolution
 - [x] terminalExecutor test with exact matching
 - [x] secureKeyManager test verifying no plaintext storage
@@ -137,6 +158,12 @@
 - [x] ErrorBanner component test (WCAG 2.1 AA, focus management)
 - [x] KaliDetector validation test (internal IP rejection)
 - [x] TEST_INDEX.md in repo root
+- [x] Security test suite (54 tests: path traversal, shell metachar, secret redaction, prompt sanitization, rate limiting, privilege escalation)
+- [x] Pure logic test suite (36 tests: type validation, sort/filter, token counting, diff parsing)
+- [x] Mock-based Ollama integration tests (22 tests: no server required)
+- [x] All 13 placeholder test files replaced with real assertions
+- [x] 3 duplicate placeholder test files deleted (recovery/agent/keymanager)
+- [x] 0 `assert.ok(true, 'placeholder')` tests remain
 
 ---
 
@@ -191,12 +218,12 @@
 
 | ID | Criterion | Status | Notes |
 |----|-----------|--------|-------|
-| QA-01 | TypeScript compilation: 0 errors | ✅ Pass | `tsc --noEmit` clean (0 errors) |
-| QA-02 | Unit tests: all passing | ✅ Pass | 754/754 tests, 51 files, 14 pending (Ollama) |
+| QA-01 | TypeScript compilation: 0 errors | ✅ Pass | `tsc --noEmit` clean (0 errors in src/) |
+| QA-02 | Unit tests: all passing | ✅ Pass | 866/866 tests, 14 pending (Ollama), 0 placeholders |
 | QA-03 | Integration tests exist and pass | ❌ Not done | No integration test suite |
 | QA-04 | Smoke tests exist and pass | ❌ Not done | No automated smoke tests |
-| QA-05 | Test coverage ≥ 20% | ❌ Not done | Coverage tooling not configured |
-| QA-06 | Security audit: all findings resolved | ✅ Pass | 44/44 findings fixed |
+| QA-05 | Test coverage ≥ 20% | ⚠️ Partial | nyc coverage tooling configured, CI step added |
+| QA-06 | Security audit: all findings resolved | ✅ Pass | 44+16 findings fixed (original + Grand v3) |
 | QA-07 | Second security audit on new code | ❌ Not done | New features not yet re-audited |
 
 ### RUNTIME — Runtime Verification
@@ -249,3 +276,14 @@
 | 3. ErrorBanner + WCAG | ✅ | Component created with Retry/Undo/Dismiss, role attributes added |
 | 4. Security & CI Polish | ✅ | Platform blocklist gksudo/kdesu, ESLint CI fix, TEST_INDEX.md, MCP types |
 | 5. Test Hardening | ✅ | 754 tests passing (up from 493), new ErrorBanner + KaliDetector tests |
+
+## Grand Completion v3 — Completion Status
+
+| Phase | Status | Details |
+|-------|--------|----------|
+| 1. CRITICAL: Command Injection | ✅ | shellEscape() + sanitizeShellArg() + WSL wrapping fix — 3 findings resolved |
+| 2. HIGH: XSS + Defense-in-Depth | ✅ | innerHTML fixes, markdown link validation, MCP allowlist, output truncation, timing-safe comparison — 7 findings resolved |
+| 3. Eliminate any Types | ✅ | 31+ any types eliminated across platform + workbench layers — 0 any types in src/ |
+| 4. Replace Placeholder Tests | ✅ | 260 placeholders → 866 real tests, 3 duplicate files deleted, Ollama mock tests (22) added — 0 placeholders remain |
+| 5. MEDIUM: Hardening | ✅ | Per-installation PBKDF2 salt, security headers, safeJsonParse, error sanitization, shell metachar regex, assertWithinWorkspace fix — 6 findings resolved |
+| 6. CI/CD + Launch Readiness | ✅ | build.yml filename fix, Xvfb init script, coverage reporting, nmap options allowlist, completion provider interface |

@@ -40,6 +40,9 @@ export class MemoryOrchestratorService extends Disposable implements IMemoryOrch
         /** Timestamp of last successful consolidation, used by getMemoryStats(). */
         private _lastConsolidationTime: number = 0;
 
+        /** Per-project consolidation timestamps for idempotency checks. */
+        private _lastConsolidationPerProject: Map<string, number> | undefined;
+
         /** Rolling window of query durations (ms), kept to the last 10 queries. */
         private _queryTimes: number[] = [];
 
@@ -189,14 +192,14 @@ export class MemoryOrchestratorService extends Disposable implements IMemoryOrch
                 // P5: Make consolidation idempotent — track last consolidation time per project
                 const now = Date.now();
                 const minConsolidationInterval = 60_000; // 1 minute minimum between consolidations
-                if ((this as any)._lastConsolidationPerProject) {
-                        const lastTime = (this as any)._lastConsolidationPerProject.get(projectId) ?? 0;
+                if (this._lastConsolidationPerProject) {
+                        const lastTime = this._lastConsolidationPerProject.get(projectId) ?? 0;
                         if (now - lastTime < minConsolidationInterval) {
                                 this.logService.info(`[MemoryOrchestrator] Skipping consolidation for ${projectId} — last run was ${now - lastTime}ms ago (min interval: ${minConsolidationInterval}ms)`);
                                 return;
                         }
                 } else {
-                        (this as any)._lastConsolidationPerProject = new Map<string, number>();
+                        this._lastConsolidationPerProject = new Map<string, number>();
                 }
 
                 const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
@@ -254,7 +257,7 @@ export class MemoryOrchestratorService extends Disposable implements IMemoryOrch
                 }
 
                 this._lastConsolidationTime = Date.now();
-                (this as any)._lastConsolidationPerProject.set(projectId, now);
+                this._lastConsolidationPerProject.set(projectId, now);
 
                 const stats = this.getMemoryStats(projectId);
                 this._onDidConsolidate.fire({ projectId, stats });

@@ -222,6 +222,22 @@ export const IKaliToolBridge = createDecorator<IKaliToolBridge>('kaliToolBridge'
  * - WSL: Wrap with `wsl -d kali-linux -- <command>`
  * - Docker: Wrap with `docker run --rm kalilinux/kali-rolling <command>`
  */
+/**
+ * Escape a string for safe embedding in a bash -c "..." argument.
+ * Handles double-quote, backslash, dollar, backtick, newline, and exclamation.
+ * This prevents shell injection when user-controlled strings are interpolated
+ * into bash -c commands routed through WSL or Docker.
+ */
+export function shellEscape(str: string): string {
+        return str
+                .replace(/\\/g, '\\\\')
+                .replace(/"/g, '\\"')
+                .replace(/\$/g, '\\$')
+                .replace(/`/g, '\\`')
+                .replace(/\n/g, '\\n')
+                .replace(/!/g, '\\!');
+}
+
 export function routeCommand(distribution: ILinuxDistribution | null, command: string): string {
         if (!distribution || !distribution.available) {
                 return command;
@@ -231,9 +247,9 @@ export function routeCommand(distribution: ILinuxDistribution | null, command: s
                 case 'native':
                         return command;
                 case 'wsl':
-                        return `wsl -d kali-linux -- bash -c "${command.replace(/"/g, '\\"')}"`;
+                        return `wsl -d kali-linux -- bash -c "${shellEscape(command)}"`;
                 case 'docker':
-                        return `docker run --rm kalilinux/kali-rolling bash -c "${command.replace(/"/g, '\\"')}"`;
+                        return `docker run --rm kalilinux/kali-rolling bash -c "${shellEscape(command)}"`;
                 default:
                         return command;
         }

@@ -17,7 +17,7 @@ export interface IConstructMemoryItem {
         readonly content: string;
         readonly containerTag: string;
         readonly createdAt: number;
-        readonly metadata?: Record<string, string | number | boolean | string[]>;
+        readonly metadata?: Record<string, unknown>;
         readonly score?: number;
 }
 
@@ -54,7 +54,7 @@ export interface IConstructMemoryConfig {
 export interface IConstructMemoryAddEvent {
         readonly content: string;
         readonly containerTag: string;
-        readonly metadata?: Record<string, string | number | boolean | string[]>;
+        readonly metadata?: Record<string, unknown>;
 }
 
 /**
@@ -98,7 +98,7 @@ export interface IConstructMemoryService extends IDisposable {
          * @param content The fact or information to store
          * @param metadata Optional metadata (type, toolName, taskId, etc.)
          */
-        addMemory(content: string, metadata?: Record<string, string | number | boolean | string[]>): Promise<void>;
+        addMemory(content: string, metadata?: Record<string, unknown>): Promise<void>;
 
         /**
          * Get the user profile from Supermemory.

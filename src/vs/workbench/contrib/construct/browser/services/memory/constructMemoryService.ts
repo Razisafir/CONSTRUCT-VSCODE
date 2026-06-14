@@ -9,7 +9,7 @@ import { ILogService } from '../../../../../../platform/log/common/log.js';
 import { IStorageService, StorageScope, StorageTarget } from '../../../../../../platform/storage/common/storage.js';
 import { ISecureKeyManager } from '../../../../../../platform/construct/common/security/secureKeyManager.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
-import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
+import { IConfigurationService, IConfigurationChangeEvent } from '../../../../../../platform/configuration/common/configuration.js';
 import { IConstructMemoryService, IConstructMemoryProfile, IConstructMemoryItem, IConstructMemoryConfig, IConstructMemoryAddEvent, ConstructSearchMode } from '../../../../../../platform/construct/common/memory/constructMemory.js';
 
 // SUPERMEMORY_API_KEY_STORAGE_KEY removed — API keys now stored via ISecureKeyManager (OS keychain)
@@ -28,13 +28,28 @@ interface ISupermemorySearchResult {
                 score?: number;
                 containerTag?: string;
                 createdAt?: number;
-                metadata?: Record<string, string | number | boolean | string[]>;
+                metadata?: Record<string, unknown>;
+}
+
+/**
+ * Minimal interface for the Supermemory SDK client.
+ * Avoids importing the full SDK types at compile time.
+ */
+interface ISupermemoryClient {
+                add(params: { content: string; containerTag: string; metadata?: Record<string, unknown> }): Promise<unknown>;
+                profile(params: { containerTag: string; q?: string }): Promise<{ profile?: { static?: string[]; dynamic?: string[] } }>;
+                search: {
+                                memories(params: { q: string; containerTag: string; searchMode: string; limit: number }): Promise<{ results?: unknown[] }>;
+                };
+                memories: {
+                                forget(params: { id: string }): Promise<unknown>;
+                };
 }
 
 export class ConstructMemoryService extends Disposable implements IConstructMemoryService {
                 readonly _serviceBrand: undefined;
 
-                private client: any | null = null;
+                private client: ISupermemoryClient | null = null;
                 private _isInitialized = false;
                 private _config: IConstructMemoryConfig;
                 private containerTag: string;
@@ -79,7 +94,7 @@ export class ConstructMemoryService extends Disposable implements IConstructMemo
                                 this._config = { enabled, autoLearn };
 
                                 // Listen for configuration changes
-                                this._register(this.configurationService.onDidChangeConfiguration((e: any) => {
+                                this._register(this.configurationService.onDidChangeConfiguration((e: IConfigurationChangeEvent) => {
                                                 if (e.affectsConfiguration('construct.memory')) {
                                                                 this.onConfigurationChanged();
                                                 }
@@ -126,7 +141,7 @@ export class ConstructMemoryService extends Disposable implements IConstructMemo
                                                 const supermemoryModule = await import('supermemory');
                                                 const Supermemory = supermemoryModule.default ?? supermemoryModule.Supermemory;
 
-                                                this.client = new Supermemory({ apiKey });
+                                                this.client = new Supermemory({ apiKey }) as ISupermemoryClient;
 
                                                 // Test the connection with a profile call
                                                 await this.client.profile({

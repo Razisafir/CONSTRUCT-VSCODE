@@ -41,9 +41,13 @@ import { IKovixPlanStep, IApprovedPlan, IMilestone } from '../../../../platform/
 import { IExecutionModeConfig } from '../../../../platform/construct/common/agent/executionMode.js';
 import { ConstructStopModePicker } from './constructStopModePicker.js';
 import { IUniversalMemoryService } from '../../../../platform/construct/common/memory/universalMemoryService.js';
-import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
+import { IQuickInputService, IQuickPickItem } from '../../../../platform/quickinput/common/quickInput.js';
 import * as Nls from './constructNls.js';
-import { ErrorBanner, IErrorBannerOptions } from './components/errorBanner.js';
+import { ErrorBanner } from './components/errorBanner.js';
+
+interface ISessionQuickPickItem extends IQuickPickItem {
+        sessionId: string;
+}
 
 type ExecutionState = 'idle' | 'planning' | 'refining' | 'awaiting_approval' | 'executing' | 'paused_at_milestone' | 'complete' | 'error' | 'stopped';
 
@@ -84,7 +88,7 @@ export class ConstructAgentViewPane extends ViewPane {
         private stopBtn!: HTMLButtonElement;
         private statusIndicator!: HTMLElement;
         private planContainer: HTMLElement | null = null;
-        private progressPanel!: ConstructProgressPanel;
+        private progressPanel: ConstructProgressPanel | undefined;
         private messageCount = 0;
         private currentTaskId: string | null = null;
         private executionState: ExecutionState = 'idle';
@@ -1217,7 +1221,7 @@ export class ConstructAgentViewPane extends ViewPane {
                         // Clean up progress panel
                         if (this.progressPanel) {
                                 this.progressPanel.dispose();
-                                this.progressPanel = undefined as any;
+                                this.progressPanel = undefined;
                         }
                         // F-G-003: Remove error recovery bar when transitioning to idle
                         this.removeErrorRecoveryBar();
@@ -1992,7 +1996,7 @@ export class ConstructAgentViewPane extends ViewPane {
                         return;
                 }
 
-                const picks = sessions.map(s => ({
+                const picks: ISessionQuickPickItem[] = sessions.map(s => ({
                         label: s.title,
                         description: `${s.messageCount} messages`,
                         detail: `Last active: ${new Date(s.lastActiveAt).toLocaleString()}`,
@@ -2005,7 +2009,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 });
 
                 if (pick) {
-                        await this.sessionService.switchToSession((pick as any).sessionId);
+                        await this.sessionService.switchToSession(pick.sessionId);
                         this.notificationService.info(`Session restored: ${pick.label}`);
                 }
         }

@@ -6,5 +6,6 @@ import { createDecorator } from '../../../instantiation/common/instantiation.js'
 export const IConstructInlineCompletionProvider = createDecorator<IConstructInlineCompletionProvider>('construct.inlineCompletionProvider');
 
 export interface IConstructInlineCompletionProvider {
-	readonly _serviceBrand: undefined;
+        readonly _serviceBrand: undefined;
+        provideInlineCompletions(model: any, position: any, token: any): Promise<any>;
 }

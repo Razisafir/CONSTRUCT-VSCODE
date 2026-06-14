@@ -44,7 +44,7 @@ import { MemoryOrchestratorService } from './services/memory/memoryOrchestratorS
 import { EmbeddingService } from './services/memory/embeddingService.js';
 import { ConstructMemoryService } from './services/memory/constructMemoryService.js';
 import { INotificationService } from '../../../../platform/notification/common/notification.js';
-import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
+import { IQuickInputService, IQuickPickItem } from '../../../../platform/quickinput/common/quickInput.js';
 import { ILogService } from '../../../../platform/log/common/log.js';
 import { ICommandService } from '../../../../platform/commands/common/commands';
 import { IConstructAIService } from '../../../../platform/construct/common/llm/constructAIService.js';
@@ -96,7 +96,7 @@ import { IKaliToolBridge } from '../../../../platform/construct/common/terminal/
 import { DistributionDetectorService } from './services/kali/distributionDetectorService.js';
 import { KaliToolBridgeService } from './services/kali/kaliToolBridgeService.js';
 import { ObsidianMemoryTreePanel } from './constructMemoryExplorer.js';
-import { MEMORY_CATEGORIES, MEMORY_CATEGORY_LABELS } from '../../../../platform/construct/common/memory/obsidianMemoryTypes.js';
+import { MEMORY_CATEGORIES, MEMORY_CATEGORY_LABELS, MemoryCategory } from '../../../../platform/construct/common/memory/obsidianMemoryTypes.js';
 import './constructMemoryConfig';
 import './constructApiConfig';
 import './constructApiSettings';
@@ -125,6 +125,17 @@ import { AgentHookServiceImpl } from './services/hooks/agentHookServiceImpl.js';
 const constructViewIcon = registerIcon('construct-view-icon', Codicon.robot, localize('constructViewIcon', 'View icon of the Kovix Agent view.'));
 const constructMemoryIcon = registerIcon('construct-memory-icon', Codicon.symbolEvent, localize('constructMemoryIcon', 'View icon of the Kovix Memory view.'));
 const constructObsidianIcon = registerIcon('construct-obsidian-icon', Codicon.bookmark, localize('constructObsidianIcon', 'View icon of the Kovix Obsidian Memory Explorer view.'));
+
+// Typed quick-pick interfaces for Construct commands
+interface IConstructQuickPickItem extends IQuickPickItem {
+        sessionId?: string;
+        projectId?: string;
+        skillName?: string;
+}
+
+interface IMemoryCategoryQuickPickItem extends IQuickPickItem {
+        memoryCategory: MemoryCategory;
+}
 
 // Register the Kovix view container in the sidebar
 const constructViewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewContainersRegistry).registerViewContainer({
@@ -761,7 +772,7 @@ registerAction2(class LoadProjectAction extends Action2 {
                                 return;
                         }
 
-                        const picks = projects.map((p: { id: string; name: string; template?: string; status: string }) => ({
+                        const picks: IConstructQuickPickItem[] = projects.map((p: { id: string; name: string; template?: string; status: string }) => ({
                                 label: p.name,
                                 description: p.template,
                                 detail: `Status: ${p.status}`,
@@ -770,7 +781,7 @@ registerAction2(class LoadProjectAction extends Action2 {
 
                         const pick = await quickInput.pick(picks, { placeHolder: 'Select a project to load' });
                         if (pick) {
-                                await projectService.loadProject((pick as any).projectId);
+                                await projectService.loadProject(pick.projectId!);
                                 notificationService.info(`Project loaded: ${pick.label}`);
                         }
                 }
@@ -832,7 +843,7 @@ registerAction2(class AcceptAllDiffsAction extends Action2 {
         async run(accessor: ServicesAccessor): Promise<void> {
                 const viewsService = accessor.get(IViewsService);
                 const notificationService = accessor.get(INotificationService);
-                const view = viewsService.getActiveViewWithId('construct.agentPanel') as any;
+                const view = viewsService.getActiveViewWithId('construct.agentPanel') as ConstructAgentViewPane | null;
                 if (view && typeof view.acceptAllPendingDiffs === 'function') {
                         await view.acceptAllPendingDiffs();
                         notificationService.info('All pending diffs accepted.');
@@ -858,7 +869,7 @@ registerAction2(class RejectAllDiffsAction extends Action2 {
         run(accessor: ServicesAccessor): void {
                 const viewsService = accessor.get(IViewsService);
                 const notificationService = accessor.get(INotificationService);
-                const view = viewsService.getActiveViewWithId('construct.agentPanel') as any;
+                const view = viewsService.getActiveViewWithId('construct.agentPanel') as ConstructAgentViewPane | null;
                 if (view && typeof view.rejectAllPendingDiffs === 'function') {
                         view.rejectAllPendingDiffs();
                         notificationService.info('All pending diffs rejected.');
@@ -1135,7 +1146,8 @@ registerAction2(class AddObsidianMemoryAction extends Action2 {
                         MEMORY_CATEGORIES.map(cat => ({
                                 label: MEMORY_CATEGORY_LABELS[cat],
                                 description: cat,
-                        })),
+                                memoryCategory: cat,
+                        } as IMemoryCategoryQuickPickItem)),
                         { placeHolder: 'Select category' },
                 );
                 if (!categoryPick) { return; }
@@ -1150,7 +1162,7 @@ registerAction2(class AddObsidianMemoryAction extends Action2 {
                         await obsidianMemory.addMemory(
                                 title,
                                 content,
-                                categoryPick.description as any,
+                                categoryPick.memoryCategory,
                                 [],
                                 'user-created',
                         );
@@ -1446,7 +1458,7 @@ registerAction2(class ShowSkillsAction extends Action2 {
                         return;
                 }
 
-                const picks = skills.map(s => ({
+                const picks: IConstructQuickPickItem[] = skills.map(s => ({
                         label: `/${s.name}`,
                         description: s.description,
                         detail: `Tools: ${s.allowedTools.join(', ') || 'all'}`,
@@ -1456,9 +1468,9 @@ registerAction2(class ShowSkillsAction extends Action2 {
                 const pick = await quickInput.pick(picks, { placeHolder: 'Select a skill to execute' });
                 if (pick) {
                         // Execute the skill
-                        await skillService.executeSkill((pick as any).skillName, {
-                                userInput: `/${(pick as any).skillName}`,
-                                skillName: (pick as any).skillName,
+                        await skillService.executeSkill(pick.skillName!, {
+                                userInput: `/${pick.skillName!}`,
+                                skillName: pick.skillName!,
                                 args: [],
                         });
                 }

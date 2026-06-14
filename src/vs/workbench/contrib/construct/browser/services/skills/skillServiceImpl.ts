@@ -53,7 +53,7 @@ export class SkillServiceImpl extends Disposable implements ISkillService {
                 }
         }
 
-        private async loadSkillFile(uri: any): Promise<void> {
+        private async loadSkillFile(uri: URI): Promise<void> {
                 try {
                         const content = await this.fileService.readFile(uri);
                         const text = content.value.toString();

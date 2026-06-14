@@ -128,7 +128,7 @@ export interface IMCPMarketplaceItem {
 
 export interface IMCPExecutionResult {
         readonly success: boolean;
-        readonly data?: any;
+        readonly data?: Record<string, unknown>;
         readonly error?: string;
         readonly durationMs: number;
         readonly toolName: string;

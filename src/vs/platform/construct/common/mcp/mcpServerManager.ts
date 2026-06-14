@@ -51,7 +51,7 @@ export interface IMCPServerManager extends IDisposable {
         // --- Tool Execution -------------------------------------------------
 
         /** Execute an MCP tool. 30-second timeout enforced. */
-        executeTool(serverName: string, toolName: string, args: any, signal?: AbortSignal): Promise<IMCPExecutionResult>;
+        executeTool(serverName: string, toolName: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<IMCPExecutionResult>;
 
         /**
          * SEC-P2: Check if a tool from a given server requires user confirmation.

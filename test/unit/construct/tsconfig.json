@@ -2,7 +2,7 @@
         "compilerOptions": {
                 "target": "ES2022",
                 "module": "commonjs",
-                "moduleResolution": "bundler",
+                "moduleResolution": "node",
                 "esModuleInterop": true,
                 "strict": true,
                 "skipLibCheck": true,
@@ -14,7 +14,7 @@
                 "sourceMap": true,
                 "allowJs": false,
                 "noEmit": false,
-                "ignoreDeprecations": "6.0"
+                "ignoreDeprecations": "5.0"
         },
         "include": [
                 "./*.ts",
@@ -30,13 +30,11 @@
                 "./diff/**/*.ts",
                 "./e2e/**/*.ts",
                 "./ipc/**/*.ts",
-                "./keymanager/**/*.ts",
                 "./mcp/**/*.ts",
                 "./memory/**/*.ts",
                 "./notification/**/*.ts",
                 "./performance/**/*.ts",
                 "./project/**/*.ts",
-                "./recovery/**/*.ts",
                 "./service/**/*.ts",
                 "./unit/**/*.ts"
         ]
