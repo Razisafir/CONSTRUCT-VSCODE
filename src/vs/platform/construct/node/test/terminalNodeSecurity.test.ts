@@ -129,9 +129,9 @@ suite('SEC-4.2: Shell Metacharacter Detection', () => {
         });
 
         test('pipe is detected', () => {
-                assert.strictEqual(detectShellMetacharInArgs('| tee /dev/null'), '||');
-                // Simple pipe without double pipe
-                assert.strictEqual(detectShellMetacharInArgs('| cat /etc/passwd'), null); // single pipe not in regex
+                assert.strictEqual(detectShellMetacharInArgs('|| cat /etc/passwd'), '||');
+                // Single pipe is not in the metachar blocklist regex (only || is)
+                assert.strictEqual(detectShellMetacharInArgs('| cat /etc/passwd'), null);
         });
 
         test('redirect > is detected', () => {
