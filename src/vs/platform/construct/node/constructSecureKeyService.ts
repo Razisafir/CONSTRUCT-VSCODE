@@ -87,7 +87,7 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
         private _derivedKey: Buffer | null = null;
 
         /** SEC-P2: Salt for PBKDF2 key derivation. */
-        private static readonly PBKDF2_SALT = 'kovix-encryption-salt-v1';
+        private static readonly PBKDF2_SALT = 'kovix-encryption-key-v1';
 
         /** SEC-P2: PBKDF2 iteration count. */
         private static readonly PBKDF2_ITERATIONS = 100_000;
@@ -136,7 +136,8 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
                         machineId = os.hostname();
                 }
 
-                // Derive key using PBKDF2 with 100,000 iterations
+                // Derive a 32-byte key using PBKDF2 with 100,000 iterations.
+                // This makes brute-force attacks impractical even if the machine-id is predictable.
                 this._derivedKey = crypto.pbkdf2Sync(
                         machineId,
                         SecureKeyNodeService.PBKDF2_SALT,
@@ -371,6 +372,9 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
          * the machine ID if safeStorage is unavailable.
          * SEC-P2: There is NO base64 fallback — if both methods fail, throws an error.
          */
+        // NOTE: If you previously used SHA-256 key derivation and your keys are no longer
+        // decryptable, delete the .construct-enc-key file and re-enter your API keys.
+        // The new PBKDF2 derivation will generate a fresh key file.
         private async encryptValue(plaintext: string): Promise<string> {
                 try {
                         if (this.encryptionAvailable) {
