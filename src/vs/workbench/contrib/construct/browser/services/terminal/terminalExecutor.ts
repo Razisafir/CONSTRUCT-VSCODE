@@ -21,6 +21,13 @@ const BLOCKLIST_PATTERNS: RegExp[] = [
         /rm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|--)recursive.*\s+\//,         // rm -rf / or rm --recursive /
         /rm\s+-[a-zA-Z]*f[a-zA-Z]*\s+\//,                             // rm -rf /
         /\bsudo\b/,                                                      // any sudo
+        /\bpkexec\b/,      // PolicyKit execute (privilege escalation)
+        /\bdoas\b/,        // OpenBSD doas (privilege escalation)
+        /\bgksudo\b/,      // GNOME sudo frontend (privilege escalation)
+        /\bkdesu\b/,       // KDE su frontend (privilege escalation)
+        /\bgosu\b/,        // Docker gosu (privilege escalation)
+        /\brun0\b/,        // systemd-run0 (privilege escalation)
+        /\bsu\b/,          // switch user (privilege escalation)
         /curl\s+.*\|\s*(sh|bash)/,                                       // curl | sh / curl | bash
         /wget\s+.*\|\s*(sh|bash)/,                                       // wget | sh / wget | bash
         /\bmkfs\b/,                                                       // mkfs
