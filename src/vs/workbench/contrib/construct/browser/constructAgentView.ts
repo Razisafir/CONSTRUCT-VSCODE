@@ -43,6 +43,7 @@ import { ConstructStopModePicker } from './constructStopModePicker.js';
 import { IUniversalMemoryService } from '../../../../platform/construct/common/memory/universalMemoryService.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
 import * as Nls from './constructNls.js';
+import { ErrorBanner, IErrorBannerOptions } from './components/errorBanner.js';
 
 type ExecutionState = 'idle' | 'planning' | 'refining' | 'awaiting_approval' | 'executing' | 'paused_at_milestone' | 'complete' | 'error' | 'stopped';
 
@@ -150,6 +151,7 @@ export class ConstructAgentViewPane extends ViewPane {
         private planMilestones: IMilestone[] = [];
 
         // Phase 5 (Kovix): Milestone pause state
+        private errorBanner: ErrorBanner | null = null;
         private _executionPaused = false;
         private _resumeResolver: (() => void) | null = null;
 
@@ -205,6 +207,8 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 // --- Phase 2: Model Picker Header ---
                 const modelPickerBar = dom.$('.construct-model-picker-bar');
+                modelPickerBar.setAttribute('role', 'toolbar');
+                modelPickerBar.setAttribute('aria-label', 'Construct agent toolbar');
                 modelPickerBar.style.cssText = `
                         display: flex; align-items: center; justify-content: space-between;
                         padding: 6px 10px; border-bottom: 1px solid #1A1F2E;
@@ -212,6 +216,9 @@ export class ConstructAgentViewPane extends ViewPane {
                 `;
 
                 this.modelPickerBtn = dom.$('button.construct-model-picker') as HTMLButtonElement;
+                this.modelPickerBtn.setAttribute('role', 'combobox');
+                this.modelPickerBtn.setAttribute('aria-expanded', 'false');
+                this.modelPickerBtn.setAttribute('aria-haspopup', 'listbox');
                 this.modelPickerBtn.style.cssText = `
                         background: #141B2D; border: 1px solid #1A1F2E; border-radius: 4px;
                         color: #E0E7FF; font-size: 11px; padding: 4px 10px; cursor: pointer;
@@ -258,6 +265,9 @@ export class ConstructAgentViewPane extends ViewPane {
                 modelPickerBar.appendChild(settingsBtn);
                 modelPickerBar.appendChild(providerLabel);
                 container.appendChild(modelPickerBar);
+
+                // ErrorBanner instance for structured error display
+                this.errorBanner = new ErrorBanner(container);
 
                 // Messages area
                 this.messageContainer = dom.$('.construct-messages');
@@ -319,7 +329,9 @@ export class ConstructAgentViewPane extends ViewPane {
                 this.inputBox.className = 'construct-chat-input';
                 this.inputBox.rows = 1;
                 this.inputBox.placeholder = Nls.PLACEHOLDER_ASK;
+                this.inputBox.setAttribute('role', 'textbox');
                 this.inputBox.setAttribute('aria-label', 'Type your message to the AI agent');
+                this.inputBox.setAttribute('aria-multiline', 'true');
                 this.inputBox.style.cssText = `
                         flex: 1; background: #0A0E1A; border: 1px solid #1A1F2E;
                         border-radius: 4px; padding: 8px 10px; color: #E0E7FF;
@@ -1118,6 +1130,26 @@ export class ConstructAgentViewPane extends ViewPane {
                         // F-G-003: Store failed task for retry and show persistent error recovery bar
                         this._lastFailedTaskText = task;
                         this.showErrorRecoveryBar(msg);
+
+                        // Show structured ErrorBanner for tool execution failures
+                        this.errorBanner?.show({
+                                message: 'Agent execution failed',
+                                details: msg,
+                                canRetry: true,
+                                canUndo: this.pendingDiffs.length > 0,
+                                onRetry: async () => {
+                                        if (this._lastFailedTaskText) {
+                                                this.inputBox.value = this._lastFailedTaskText;
+                                                this._lastFailedTaskText = null;
+                                        }
+                                },
+                                onUndo: async () => {
+                                        this.commandService.executeCommand('construct.rejectAllPendingChanges');
+                                },
+                                onDismiss: () => {
+                                        this.setExecutionState('idle');
+                                },
+                        });
                 } finally {
                         // BUG 6 FIX: Clean up cancellation state to prevent stale references
                         this.currentCancellationToken?.dispose();
