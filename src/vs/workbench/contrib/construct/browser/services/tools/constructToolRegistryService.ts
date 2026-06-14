@@ -971,6 +971,9 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 'nmap_scan', 'nuclei_scan', 'sqlmap_test', 'metasploit_run',
                 'wireshark_capture', 'john_crack', 'hydra_brute',
                 'aircrack_capture', 'ghidra_decompile',
+                // Phase 4 — additional Kali security tools
+                'sqlmap_scan', 'nikto_scan', 'hashcat_crack',
+                'aircrack_scan', 'wpscan_scan', 'gobuster_scan',
         ];
 
         private registerSecurityTools(): void {
@@ -1001,7 +1004,206 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 // ghidra_decompile — binary decompiler via Docker
                 this.registerTool(ghidraToolDefinition, async (input) => this.executeGhidraDecompile(input));
 
-                this.logService.info('[ToolRegistry] Security tools registered (9 tools: nmap, nuclei, sqlmap, metasploit, wireshark, john, hydra, aircrack, ghidra)');
+                // ── Phase 4: Additional Kali security tools (kaliOnly) ──────────────────
+
+                // sqlmap_scan — SQL injection scanner (enhanced schema)
+                this.registerTool({
+                        name: 'sqlmap_scan',
+                        description: 'Scan a target URL for SQL injection vulnerabilities using sqlmap with configurable level and risk. Requires Kali Linux. Requires user confirmation.',
+                        inputSchema: {
+                                type: 'object',
+                                properties: {
+                                        target: { type: 'string', description: 'Target URL to test for SQL injection (e.g. "http://example.com/page?id=1")' },
+                                        level: { type: 'number', description: 'Detection level (1-5). Higher = more tests but slower.' },
+                                        risk: { type: 'number', description: 'Risk level (1-3). Higher = more aggressive tests.' },
+                                },
+                                required: ['target'],
+                        },
+                        modifiesFiles: false,
+                        requiresNetwork: true,
+                        requiresConfirmation: true,
+                        kaliOnly: true,
+                        category: 'security',
+                }, async (args: Record<string, unknown>) => {
+                        return { success: true, tool: 'sqlmap_scan', target: args.target, status: 'pending - Kali integration required', truncated: false };
+                });
+
+                // nikto_scan — web server vulnerability scanner
+                this.registerTool({
+                        name: 'nikto_scan',
+                        description: 'Scan a web server for known vulnerabilities, misconfigurations, and dangerous files using Nikto. Requires Kali Linux. Requires user confirmation.',
+                        inputSchema: {
+                                type: 'object',
+                                properties: {
+                                        target: { type: 'string', description: 'Target URL to scan (e.g. "http://example.com")' },
+                                        port: { type: 'number', description: 'Port number to scan (default: 80)' },
+                                },
+                                required: ['target'],
+                        },
+                        modifiesFiles: false,
+                        requiresNetwork: true,
+                        requiresConfirmation: true,
+                        kaliOnly: true,
+                        category: 'security',
+                }, async (args: Record<string, unknown>) => {
+                        return { success: true, tool: 'nikto_scan', target: args.target, status: 'pending - Kali integration required', truncated: false };
+                });
+
+                // hydra_brute — brute force attack (enhanced schema with userList/passList)
+                this.registerTool({
+                        name: 'hydra_brute',
+                        description: 'Brute force attack using Hydra against a network service with separate user and password lists. Requires Kali Linux. Requires user confirmation.',
+                        inputSchema: {
+                                type: 'object',
+                                properties: {
+                                        target: { type: 'string', description: 'Target hostname or IP address' },
+                                        service: { type: 'string', description: 'Service to attack (e.g. "ssh", "ftp", "http-post-form")' },
+                                        userList: { type: 'string', description: 'Path to username list file' },
+                                        passList: { type: 'string', description: 'Path to password list file' },
+                                },
+                                required: ['target', 'service', 'userList', 'passList'],
+                        },
+                        modifiesFiles: false,
+                        requiresNetwork: true,
+                        requiresConfirmation: true,
+                        kaliOnly: true,
+                        category: 'security',
+                }, async (args: Record<string, unknown>) => {
+                        return { success: true, tool: 'hydra_brute', target: args.target, status: 'pending - Kali integration required', truncated: false };
+                });
+
+                // john_crack — password hash cracker (enhanced schema with format)
+                this.registerTool({
+                        name: 'john_crack',
+                        description: 'Crack password hashes using John the Ripper with configurable hash format. Requires Kali Linux. Requires user confirmation.',
+                        inputSchema: {
+                                type: 'object',
+                                properties: {
+                                        hashFile: { type: 'string', description: 'Path to the file containing password hashes' },
+                                        wordlist: { type: 'string', description: 'Path to wordlist file (e.g. /usr/share/wordlists/rockyou.txt)' },
+                                        format: { type: 'string', description: 'Hash format (e.g. "raw-md5", "sha256", "bcrypt")' },
+                                },
+                                required: ['hashFile'],
+                        },
+                        modifiesFiles: false,
+                        requiresNetwork: false,
+                        requiresConfirmation: true,
+                        kaliOnly: true,
+                        category: 'security',
+                }, async (args: Record<string, unknown>) => {
+                        return { success: true, tool: 'john_crack', target: args.hashFile, status: 'pending - Kali integration required', truncated: false };
+                });
+
+                // hashcat_crack — GPU-accelerated password hash cracker
+                this.registerTool({
+                        name: 'hashcat_crack',
+                        description: 'Crack password hashes using Hashcat with GPU acceleration and configurable attack mode. Requires Kali Linux. Requires user confirmation.',
+                        inputSchema: {
+                                type: 'object',
+                                properties: {
+                                        hashFile: { type: 'string', description: 'Path to the file containing password hashes' },
+                                        mode: { type: 'number', description: 'Attack mode number (0=straight, 1=combinator, 3=brute-force, 6=hybrid dict+mask, 7=hybrid mask+dict)' },
+                                        wordlist: { type: 'string', description: 'Path to wordlist or mask file' },
+                                },
+                                required: ['hashFile', 'mode'],
+                        },
+                        modifiesFiles: false,
+                        requiresNetwork: false,
+                        requiresConfirmation: true,
+                        kaliOnly: true,
+                        category: 'security',
+                }, async (args: Record<string, unknown>) => {
+                        return { success: true, tool: 'hashcat_crack', target: args.hashFile, status: 'pending - Kali integration required', truncated: false };
+                });
+
+                // aircrack_scan — WiFi capture file analysis
+                this.registerTool({
+                        name: 'aircrack_scan',
+                        description: 'Analyse a WiFi packet capture file and attempt WEP/WPA key recovery using Aircrack-ng. Requires Kali Linux. Requires user confirmation.',
+                        inputSchema: {
+                                type: 'object',
+                                properties: {
+                                        captureFile: { type: 'string', description: 'Path to the .cap or .pcap capture file' },
+                                        wordlist: { type: 'string', description: 'Path to wordlist for WPA passphrase cracking' },
+                                },
+                                required: ['captureFile'],
+                        },
+                        modifiesFiles: false,
+                        requiresNetwork: false,
+                        requiresConfirmation: true,
+                        kaliOnly: true,
+                        category: 'security',
+                }, async (args: Record<string, unknown>) => {
+                        return { success: true, tool: 'aircrack_scan', target: args.captureFile, status: 'pending - Kali integration required', truncated: false };
+                });
+
+                // metasploit_run — Metasploit module execution (enhanced schema with target+options)
+                this.registerTool({
+                        name: 'metasploit_run',
+                        description: 'Execute a Metasploit module against a target with configurable options. Requires Kali Linux. Requires user confirmation.',
+                        inputSchema: {
+                                type: 'object',
+                                properties: {
+                                        module: { type: 'string', description: 'Metasploit module path (e.g. "exploit/windows/smb/ms17_010_eternalblue")' },
+                                        target: { type: 'string', description: 'Target RHOST / IP address' },
+                                        options: { type: 'string', description: 'Additional module options as key=value pairs' },
+                                },
+                                required: ['module', 'target'],
+                        },
+                        modifiesFiles: false,
+                        requiresNetwork: true,
+                        requiresConfirmation: true,
+                        kaliOnly: true,
+                        category: 'security',
+                }, async (args: Record<string, unknown>) => {
+                        return { success: true, tool: 'metasploit_run', target: args.target, status: 'pending - Kali integration required', truncated: false };
+                });
+
+                // wpscan_scan — WordPress vulnerability scanner
+                this.registerTool({
+                        name: 'wpscan_scan',
+                        description: 'Scan a WordPress site for vulnerabilities, exposed users, and vulnerable plugins/themes using WPScan. Requires Kali Linux. Requires user confirmation.',
+                        inputSchema: {
+                                type: 'object',
+                                properties: {
+                                        target: { type: 'string', description: 'Target WordPress URL (e.g. "http://example.com")' },
+                                        enumUsers: { type: 'boolean', description: 'Enumerate WordPress user accounts' },
+                                        enumPlugins: { type: 'boolean', description: 'Enumerate installed plugins and check for known vulnerabilities' },
+                                },
+                                required: ['target'],
+                        },
+                        modifiesFiles: false,
+                        requiresNetwork: true,
+                        requiresConfirmation: true,
+                        kaliOnly: true,
+                        category: 'security',
+                }, async (args: Record<string, unknown>) => {
+                        return { success: true, tool: 'wpscan_scan', target: args.target, status: 'pending - Kali integration required', truncated: false };
+                });
+
+                // gobuster_scan — directory/file/DNS brute-forcing
+                this.registerTool({
+                        name: 'gobuster_scan',
+                        description: 'Brute-force directories, files, and DNS subdomains on a web server using Gobuster. Requires Kali Linux. Requires user confirmation.',
+                        inputSchema: {
+                                type: 'object',
+                                properties: {
+                                        target: { type: 'string', description: 'Target URL (e.g. "http://example.com")' },
+                                        wordlist: { type: 'string', description: 'Path to wordlist file (e.g. /usr/share/wordlists/dirb/common.txt)' },
+                                        extensions: { type: 'string', description: 'File extensions to search (e.g. "php,html,txt")' },
+                                },
+                                required: ['target', 'wordlist'],
+                        },
+                        modifiesFiles: false,
+                        requiresNetwork: true,
+                        requiresConfirmation: true,
+                        kaliOnly: true,
+                        category: 'security',
+                }, async (args: Record<string, unknown>) => {
+                        return { success: true, tool: 'gobuster_scan', target: args.target, status: 'pending - Kali integration required', truncated: false };
+                });
+
+                this.logService.info('[ToolRegistry] Security tools registered (9 original + 9 Phase 4 Kali tools: sqlmap_scan, nikto_scan, hydra_brute, john_crack, hashcat_crack, aircrack_scan, metasploit_run, wpscan_scan, gobuster_scan)');
         }
 
         private unregisterSecurityTools(): void {

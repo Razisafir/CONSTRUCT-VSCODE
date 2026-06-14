@@ -46,6 +46,8 @@ export interface IToolDefinition {
         requiresNetwork: boolean;
         /** Whether this tool requires explicit user confirmation before execution */
         requiresConfirmation?: boolean;
+        /** Whether this tool is only available when Kali Linux is detected */
+        kaliOnly?: boolean;
         /** Category for UI grouping */
         category: 'file' | 'terminal' | 'search' | 'network' | 'system' | 'security';
 }
