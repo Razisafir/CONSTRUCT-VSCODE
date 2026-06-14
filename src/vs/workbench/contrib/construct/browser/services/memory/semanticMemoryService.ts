@@ -41,7 +41,7 @@ export class SemanticMemoryService extends Disposable implements ISemanticMemory
 
         async storeKnowledge(entry: Omit<ISemanticMemoryEntry, 'id' | 'layer' | 'timestamp'>): Promise<void> {
                 const now = Date.now();
-                const id = `semantic-${entry.projectId}-${now}-${Math.random().toString(36).slice(2, 8)}`;
+                const id = `semantic-${entry.projectId}-${now}-${(() => { const b = new Uint8Array(4); globalThis.crypto.getRandomValues(b); return Array.from(b, (x: number) => x.toString(36)).join('').substring(0, 6); })()}`;
 
                 let embedding = entry.embedding;
                 if (!embedding || embedding.length === 0) {
