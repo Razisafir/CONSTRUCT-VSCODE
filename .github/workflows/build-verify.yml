@@ -64,7 +64,7 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
 
       - name: ESLint Check (Construct files only)
-        run: npx eslint src/vs/platform/construct/ src/vs/workbench/contrib/construct/ --max-warnings=0 || true
+        run: npx eslint src/vs/platform/construct/ src/vs/workbench/contrib/construct/ --max-warnings=0 --no-error-on-unmatched-pattern 2>&1 || echo "ESLint check completed with warnings (non-blocking for v1.0)"
 
   construct-tests:
     name: Construct Unit Tests

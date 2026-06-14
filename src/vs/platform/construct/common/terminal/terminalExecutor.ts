@@ -55,7 +55,7 @@ export const DEFAULT_COMMAND_ALLOWLIST: string[] = [
  * explicit user confirmation.
  */
 export const PRIVILEGE_ESCALATION_BLOCKLIST: readonly string[] = [
-        'sudo', 'su', 'pkexec', 'doas', 'gosu', 'run0',
+        'sudo', 'su', 'pkexec', 'doas', 'gosu', 'run0', 'gksudo', 'kdesu',
 ];
 
 /**

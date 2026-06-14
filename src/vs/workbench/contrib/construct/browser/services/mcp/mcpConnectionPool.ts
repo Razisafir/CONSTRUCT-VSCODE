@@ -28,8 +28,8 @@ import {
 } from '../../../../../../platform/construct/common/mcp/mcpPermissions';
 
 interface IConnectionEntry {
-        client: any; // MCP Client instance
-        transport: any; // MCP Transport instance
+        client: IMCPClient | null; // MCP Client instance
+        transport: IMCPTransport | null; // MCP Transport instance
         definition: IMCPServerDefinition;
         state: MCPConnectionState;
         lastPing: number;
@@ -39,6 +39,28 @@ interface IConnectionEntry {
         disposables: IDisposable[];
         enforcer: MCPPermissionEnforcer;
         consecutiveHealthCheckFailures: number; // P5: track health check failures
+}
+
+/**
+ * Minimal MCP Client interface — captures the methods used by KOVIX.
+ * The actual SDK Client or raw-stdio client satisfies this interface.
+ */
+export interface IMCPClient {
+        connect(transport: IMCPTransport): Promise<void>;
+        close(): Promise<void>;
+        listTools(): Promise<Record<string, unknown>>;
+        callTool(params: Record<string, unknown>): Promise<Record<string, unknown>>;
+        listResources(): Promise<Record<string, unknown>>;
+        readResource(params: Record<string, unknown>): Promise<Record<string, unknown>>;
+        listPrompts(): Promise<Record<string, unknown>>;
+        getPrompt(params: Record<string, unknown>): Promise<Record<string, unknown>>;
+}
+
+/**
+ * Minimal MCP Transport interface.
+ */
+export interface IMCPTransport {
+        close(): Promise<void>;
 }
 
 export class MCPConnectionPool extends Disposable {
@@ -185,7 +207,7 @@ export class MCPConnectionPool extends Disposable {
          * - Both: an enforcer is stored on the connection entry for later
          *   runtime checks (filesystem, network, subprocess) by tool execution
          */
-        async connect(def: IMCPServerDefinition, permissionConfig?: MCPPermissionConfig): Promise<any> {
+        async connect(def: IMCPServerDefinition, permissionConfig?: MCPPermissionConfig): Promise<IMCPClient | null> {
                 if (this.connections.size >= this.maxConcurrentServers && !this.connections.has(def.name)) {
                         throw new Error(`Connection pool full (max ${this.maxConcurrentServers}). Stop another server first.`);
                 }
@@ -219,7 +241,7 @@ export class MCPConnectionPool extends Disposable {
 
                 this.logService.info(`[MCP] Connecting to ${def.name} via ${def.transport} (permission: ${effectiveConfig.level})`);
 
-                let transport: any;
+                let transport: IMCPTransport | null = null;
 
                 try {
                         if (def.transport === MCPTransportType.Stdio) {
@@ -343,7 +365,7 @@ export class MCPConnectionPool extends Disposable {
                         // Only pass MCP-server-specific env vars from the definition
                         ...(def.env || {}),
                 };
-                const childProcess: any = spawn(def.command, def.args, {
+                const childProcess: ReturnType<typeof import('child_process').spawn> = spawn(def.command, def.args, {
                         env: minimalEnv,
                         stdio: ['pipe', 'pipe', 'pipe']
                 });
@@ -361,7 +383,7 @@ export class MCPConnectionPool extends Disposable {
 
                 // Create a minimal client wrapper
                 let messageId = 0;
-                const pending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>();
+                const pending = new Map<number, { resolve: (v: Record<string, unknown>) => void; reject: (e: Error) => void }>();
                 let buffer = '';
 
                 if (childProcess.stdout) {
@@ -391,7 +413,7 @@ export class MCPConnectionPool extends Disposable {
                 }
 
                 entry.client = {
-                        callTool: (params: any) => new Promise((resolve, reject) => {
+                        callTool: (params: Record<string, unknown>) => new Promise((resolve, reject) => {
                                 const id = ++messageId;
                                 pending.set(id, { resolve, reject });
                                 childProcess.stdin?.write(JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call', params }) + '\n');
@@ -409,7 +431,7 @@ export class MCPConnectionPool extends Disposable {
                                 childProcess.stdin?.write(JSON.stringify({ jsonrpc: '2.0', id, method: 'resources/list', params: {} }) + '\n');
                                 setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(new Error('Request timed out')); } }, 30_000);
                         }),
-                        readResource: (params: any) => new Promise((resolve, reject) => {
+                        readResource: (params: Record<string, unknown>) => new Promise((resolve, reject) => {
                                 const id = ++messageId;
                                 pending.set(id, { resolve, reject });
                                 childProcess.stdin?.write(JSON.stringify({ jsonrpc: '2.0', id, method: 'resources/read', params }) + '\n');
@@ -421,7 +443,7 @@ export class MCPConnectionPool extends Disposable {
                                 childProcess.stdin?.write(JSON.stringify({ jsonrpc: '2.0', id, method: 'prompts/list', params: {} }) + '\n');
                                 setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(new Error('Request timed out')); } }, 30_000);
                         }),
-                        getPrompt: (params: any) => new Promise((resolve, reject) => {
+                        getPrompt: (params: Record<string, unknown>) => new Promise((resolve, reject) => {
                                 const id = ++messageId;
                                 pending.set(id, { resolve, reject });
                                 childProcess.stdin?.write(JSON.stringify({ jsonrpc: '2.0', id, method: 'prompts/get', params }) + '\n');
@@ -453,7 +475,7 @@ export class MCPConnectionPool extends Disposable {
         // P5: Configurable timeout per tool (falls back to default 30s)
         async executeWithRetry<T>(
                 serverName: string,
-                operation: (client: any) => Promise<T>,
+                operation: (client: IMCPClient) => Promise<T>,
                 timeoutMs: number = this.defaultTimeoutMs
         ): Promise<T> {
                 const entry = this.connections.get(serverName);
@@ -516,7 +538,7 @@ export class MCPConnectionPool extends Disposable {
 
                 // Recreate transport
                 const def = entry.definition;
-                let transport: any;
+                let transport: IMCPTransport | null = null;
 
                 if (def.transport === MCPTransportType.Stdio) {
                         // Re-validate subprocess permission on reconnect
@@ -570,7 +592,7 @@ export class MCPConnectionPool extends Disposable {
                 }
         }
 
-        private isConnectionError(error: any): boolean {
+        private isConnectionError(error: unknown): boolean {
                 const message = error instanceof Error ? error.message : String(error);
                 return message.includes('ECONNREFUSED') ||
                         message.includes('ENOTFOUND') ||
@@ -585,7 +607,7 @@ export class MCPConnectionPool extends Disposable {
 
         // --- Accessors --------------------------------------------------------
 
-        getClient(serverName: string): any | undefined {
+        getClient(serverName: string): IMCPClient | null | undefined {
                 return this.connections.get(serverName)?.client;
         }
 

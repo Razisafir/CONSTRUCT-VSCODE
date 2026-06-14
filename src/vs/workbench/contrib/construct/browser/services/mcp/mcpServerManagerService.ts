@@ -22,7 +22,7 @@ import {
         MCPTransportType,
         MCP_RESOURCE_CACHE_TTL_MS
 } from '../../../../../../platform/construct/common/mcp/mcpTypes';
-import { MCPConnectionPool } from './mcpConnectionPool.js';
+import { MCPConnectionPool, IMCPClient } from './mcpConnectionPool.js';
 import { ITerminalExecutor } from '../../../../../../platform/construct/common/terminal/terminalExecutor.js';
 import { MCPServerRegistry } from './mcpServerRegistry.js';
 
@@ -221,7 +221,7 @@ export class MCPServerManagerService extends Disposable implements IMCPServerMan
 
         // --- Tool Execution ---------------------------------------------------
 
-        async executeTool(serverName: string, toolName: string, args: any, signal?: AbortSignal): Promise<IMCPExecutionResult> {
+        async executeTool(serverName: string, toolName: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<IMCPExecutionResult> {
                 const startTime = Date.now();
                 this.logService.info(`[MCP Manager] Executing tool ${toolName} on ${serverName}`);
 
@@ -229,7 +229,7 @@ export class MCPServerManagerService extends Disposable implements IMCPServerMan
                         const MCP_TOOL_TIMEOUT_MS = 30_000; // SEC: MCP tool execution must not hang indefinitely
                         const mcpToolCall = this.connectionPool.executeWithRetry(
                                 serverName,
-                                async (client: any) => {
+                                async (client: IMCPClient) => {
                                         return await client.callTool({
                                                 name: toolName,
                                                 arguments: args
@@ -274,13 +274,13 @@ export class MCPServerManagerService extends Disposable implements IMCPServerMan
                         try {
                                 const result = await this.connectionPool.executeWithRetry(
                                         serverName,
-                                        async (c: any) => await c.listTools()
+                                        async (c: IMCPClient) => await c.listTools()
                                 );
 
-                                return result.tools?.map((t: any) => ({
-                                        name: t.name,
-                                        description: t.description ?? '',
-                                        inputSchema: t.inputSchema ?? {},
+                                return result.tools?.map((t: Record<string, unknown>) => ({
+                                        name: t.name as string,
+                                        description: (t.description ?? '') as string,
+                                        inputSchema: (t.inputSchema ?? {}) as Record<string, unknown>,
                                         serverName
                                 })) ?? [];
                         } catch (e) {
@@ -321,7 +321,7 @@ export class MCPServerManagerService extends Disposable implements IMCPServerMan
                 try {
                         const result = await this.connectionPool.executeWithRetry(
                                 serverName,
-                                async (client: any) => await client.readResource({ uri })
+                                async (client: IMCPClient) => await client.readResource({ uri })
                         );
 
                         const content = result.contents?.[0]?.text ?? '';
@@ -358,14 +358,14 @@ export class MCPServerManagerService extends Disposable implements IMCPServerMan
                         try {
                                 const result = await this.connectionPool.executeWithRetry(
                                         serverName,
-                                        async (c: any) => await c.listResources()
+                                        async (c: IMCPClient) => await c.listResources()
                                 );
 
-                                return result.resources?.map((r: any) => ({
-                                        uri: r.uri,
-                                        mimeType: r.mimeType ?? 'text/plain',
-                                        name: r.name,
-                                        description: r.description ?? '',
+                                return result.resources?.map((r: Record<string, unknown>) => ({
+                                        uri: r.uri as string,
+                                        mimeType: (r.mimeType ?? 'text/plain') as string,
+                                        name: r.name as string,
+                                        description: (r.description ?? '') as string,
                                         serverName
                                 })) ?? [];
                         } catch (e) {
@@ -396,13 +396,13 @@ export class MCPServerManagerService extends Disposable implements IMCPServerMan
                         try {
                                 const result = await this.connectionPool.executeWithRetry(
                                         serverName,
-                                        async (c: any) => await c.listPrompts()
+                                        async (c: IMCPClient) => await c.listPrompts()
                                 );
 
-                                return result.prompts?.map((p: any) => ({
-                                        name: p.name,
-                                        description: p.description ?? '',
-                                        arguments: p.arguments,
+                                return result.prompts?.map((p: Record<string, unknown>) => ({
+                                        name: p.name as string,
+                                        description: (p.description ?? '') as string,
+                                        arguments: p.arguments as Record<string, unknown>[] | undefined,
                                         serverName
                                 })) ?? [];
                         } catch (e) {
@@ -426,10 +426,10 @@ export class MCPServerManagerService extends Disposable implements IMCPServerMan
         async getPrompt(serverName: string, promptName: string, args?: Record<string, string>): Promise<string> {
                 const result = await this.connectionPool.executeWithRetry(
                         serverName,
-                        async (client: any) => await client.getPrompt({ name: promptName, arguments: args })
+                        async (client: IMCPClient) => await client.getPrompt({ name: promptName, arguments: args })
                 );
 
-                return result.messages?.map((m: any) => m.content?.text ?? '').join('\n') ?? '';
+                return result.messages?.map((m: Record<string, unknown>) => ((m.content as Record<string, unknown>)?.text ?? '') as string).join('\n') ?? '';
         }
 
         // --- Bulk Operations --------------------------------------------------
