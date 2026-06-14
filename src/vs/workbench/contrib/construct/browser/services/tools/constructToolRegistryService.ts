@@ -1024,8 +1024,13 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         requiresConfirmation: true,
                         kaliOnly: true,
                         category: 'security',
-                }, async (args: Record<string, unknown>) => {
-                        return { success: true, output: 'sqlmap_scan requires Kali Linux. Enable construct.security.kaliIntegration and ensure Kali is available (native, WSL, or Docker). Target: ' + String(args.target ?? ''), truncated: false };
+                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
+                        const target = String(args.target ?? '');
+                        if (!target) { return { success: false, output: 'Error: target is required', truncated: false }; }
+                        const level = args.level ? ` --level=${args.level}` : '';
+                        const risk = args.risk ? ` --risk=${args.risk}` : '';
+                        const result = await this.kaliToolBridge.sqlmapTest(target, `${level}${risk}`.trim() || undefined);
+                        return { success: result.success, output: result.output, truncated: false };
                 });
 
                 // nikto_scan — web server vulnerability scanner
@@ -1045,8 +1050,12 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         requiresConfirmation: true,
                         kaliOnly: true,
                         category: 'security',
-                }, async (args: Record<string, unknown>) => {
-                        return { success: true, output: 'nikto_scan requires Kali Linux. Enable construct.security.kaliIntegration and ensure Kali is available (native, WSL, or Docker). Target: ' + String(args.target ?? ''), truncated: false };
+                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
+                        const target = String(args.target ?? '');
+                        if (!target) { return { success: false, output: 'Error: target is required', truncated: false }; }
+                        const port = args.port as number | undefined;
+                        const result = await this.kaliToolBridge.niktoScan(target, port);
+                        return { success: result.success, output: result.output, truncated: false };
                 });
 
                 // hydra_brute — brute force attack (enhanced schema with userList/passList)
@@ -1068,8 +1077,14 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         requiresConfirmation: true,
                         kaliOnly: true,
                         category: 'security',
-                }, async (args: Record<string, unknown>) => {
-                        return { success: true, output: 'hydra_brute requires Kali Linux. Enable construct.security.kaliIntegration and ensure Kali is available (native, WSL, or Docker). Target: ' + String(args.target ?? ''), truncated: false };
+                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
+                        const target = String(args.target ?? '');
+                        const service = String(args.service ?? '');
+                        const userList = String(args.userList ?? '');
+                        const passList = String(args.passList ?? '');
+                        if (!target || !service || !userList || !passList) { return { success: false, output: 'Error: target, service, userList, and passList are required', truncated: false }; }
+                        const result = await this.kaliToolBridge.hydraBrute(target, service, `${userList},${passList}`);
+                        return { success: result.success, output: result.output, truncated: false };
                 });
 
                 // john_crack — password hash cracker (enhanced schema with format)
@@ -1090,8 +1105,12 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         requiresConfirmation: true,
                         kaliOnly: true,
                         category: 'security',
-                }, async (args: Record<string, unknown>) => {
-                        return { success: true, output: 'john_crack requires Kali Linux. Enable construct.security.kaliIntegration and ensure Kali is available (native, WSL, or Docker). Hash file: ' + String(args.hashFile ?? ''), truncated: false };
+                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
+                        const hashFile = String(args.hashFile ?? '');
+                        if (!hashFile) { return { success: false, output: 'Error: hashFile is required', truncated: false }; }
+                        const wordlist = args.wordlist as string | undefined;
+                        const result = await this.kaliToolBridge.johnCrack(hashFile, wordlist);
+                        return { success: result.success, output: result.output, truncated: false };
                 });
 
                 // hashcat_crack — GPU-accelerated password hash cracker
@@ -1112,8 +1131,13 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         requiresConfirmation: true,
                         kaliOnly: true,
                         category: 'security',
-                }, async (args: Record<string, unknown>) => {
-                        return { success: true, output: 'hashcat_crack requires Kali Linux. Enable construct.security.kaliIntegration and ensure Kali is available (native, WSL, or Docker). Hash file: ' + String(args.hashFile ?? ''), truncated: false };
+                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
+                        const hashFile = String(args.hashFile ?? '');
+                        const mode = args.mode as number | undefined;
+                        if (!hashFile || mode === undefined) { return { success: false, output: 'Error: hashFile and mode are required', truncated: false }; }
+                        const wordlist = args.wordlist as string | undefined;
+                        const result = await this.kaliToolBridge.hashcatCrack(hashFile, mode, wordlist);
+                        return { success: result.success, output: result.output, truncated: false };
                 });
 
                 // aircrack_scan — WiFi capture file analysis
@@ -1133,8 +1157,12 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         requiresConfirmation: true,
                         kaliOnly: true,
                         category: 'security',
-                }, async (args: Record<string, unknown>) => {
-                        return { success: true, output: 'aircrack_scan requires Kali Linux. Enable construct.security.kaliIntegration and ensure Kali is available (native, WSL, or Docker). Capture file: ' + String(args.captureFile ?? ''), truncated: false };
+                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
+                        const captureFile = String(args.captureFile ?? '');
+                        if (!captureFile) { return { success: false, output: 'Error: captureFile is required', truncated: false }; }
+                        const wordlist = args.wordlist as string | undefined;
+                        const result = await this.kaliToolBridge.aircrackScan(captureFile, wordlist);
+                        return { success: result.success, output: result.output, truncated: false };
                 });
 
                 // metasploit_run — Metasploit module execution (enhanced schema with target+options)
@@ -1155,8 +1183,16 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         requiresConfirmation: true,
                         kaliOnly: true,
                         category: 'security',
-                }, async (args: Record<string, unknown>) => {
-                        return { success: true, output: 'metasploit_run requires Kali Linux. Enable construct.security.kaliIntegration and ensure Kali is available (native, WSL, or Docker). Target: ' + String(args.target ?? ''), truncated: false };
+                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
+                        const mod = String(args.module ?? '');
+                        const target = String(args.target ?? '');
+                        if (!mod || !target) { return { success: false, output: 'Error: module and target are required', truncated: false }; }
+                        const optionsStr = args.options as string | undefined;
+                        const options: Record<string, string> = {};
+                        if (optionsStr) { options['RHOSTS'] = target; if (optionsStr) { const pairs = optionsStr.split(' '); for (const pair of pairs) { const [k, v] = pair.split('='); if (k && v) { options[k] = v; } } } }
+                        else { options['RHOSTS'] = target; }
+                        const result = await this.kaliToolBridge.metasploitRun(mod, options);
+                        return { success: result.success, output: result.output, truncated: false };
                 });
 
                 // wpscan_scan — WordPress vulnerability scanner
@@ -1177,8 +1213,13 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         requiresConfirmation: true,
                         kaliOnly: true,
                         category: 'security',
-                }, async (args: Record<string, unknown>) => {
-                        return { success: true, output: 'wpscan_scan requires Kali Linux. Enable construct.security.kaliIntegration and ensure Kali is available (native, WSL, or Docker). Target: ' + String(args.target ?? ''), truncated: false };
+                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
+                        const target = String(args.target ?? '');
+                        if (!target) { return { success: false, output: 'Error: target is required', truncated: false }; }
+                        const enumUsers = args.enumUsers as boolean | undefined;
+                        const enumPlugins = args.enumPlugins as boolean | undefined;
+                        const result = await this.kaliToolBridge.wpscanScan(target, enumUsers, enumPlugins);
+                        return { success: result.success, output: result.output, truncated: false };
                 });
 
                 // gobuster_scan — directory/file/DNS brute-forcing
@@ -1199,8 +1240,13 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         requiresConfirmation: true,
                         kaliOnly: true,
                         category: 'security',
-                }, async (args: Record<string, unknown>) => {
-                        return { success: true, output: 'gobuster_scan requires Kali Linux. Enable construct.security.kaliIntegration and ensure Kali is available (native, WSL, or Docker). Target: ' + String(args.target ?? ''), truncated: false };
+                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
+                        const target = String(args.target ?? '');
+                        const wordlist = String(args.wordlist ?? '');
+                        if (!target || !wordlist) { return { success: false, output: 'Error: target and wordlist are required', truncated: false }; }
+                        const extensions = args.extensions as string | undefined;
+                        const result = await this.kaliToolBridge.gobusterScan(target, wordlist, extensions);
+                        return { success: result.success, output: result.output, truncated: false };
                 });
 
                 this.logService.info('[ToolRegistry] Security tools registered (9 original + 9 Phase 4 Kali tools: sqlmap_scan, nikto_scan, hydra_brute, john_crack, hashcat_crack, aircrack_scan, metasploit_run, wpscan_scan, gobuster_scan)');
