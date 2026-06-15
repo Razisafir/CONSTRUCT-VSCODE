@@ -15,7 +15,7 @@ import { INotificationService } from '../../../../platform/notification/common/n
 import { EditorInput } from '../../../../workbench/common/editor/editorInput.js';
 // import { IEditorPane } from '../../../../workbench/common/editor.js';
 import { Event, Emitter } from '../../../../base/common/event.js';
-import { IDisposable, Disposable } from '../../../../base/common/lifecycle.js';
+import { Disposable } from '../../../../base/common/lifecycle.js';
 import * as dom from '../../../../base/browser/dom.js';
 
 /**
