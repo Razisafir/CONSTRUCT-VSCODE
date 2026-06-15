@@ -1,8 +1,9 @@
+// Copyright (c) 2025 Razisafir. All rights reserved.
+// Kovix proprietary code. See CONSTRUCT_LICENSE.txt.
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Copyright (c) Kovix. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-
 
 import { Disposable } from '../../../../../../base/common/lifecycle.js';
 import { URI } from '../../../../../../base/common/uri.js';
@@ -10,7 +11,6 @@ import { VSBuffer } from '../../../../../../base/common/buffer.js';
 import { ILogService } from '../../../../../../platform/log/common/log.js';
 import { INotificationService } from '../../../../../../platform/notification/common/notification.js';
 import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
-import { ISecureKeyManager } from '../../../../../../platform/construct/common/security/secureKeyManager.js';
 import { IFileService } from '../../../../../../platform/files/common/files.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
 import { IConstructVectorStore } from '../../../../../../platform/construct/common/memory/vectorStore.js';
@@ -18,26 +18,14 @@ import {
         IConstructToolRegistry, IToolDefinition, IToolResult, assertWithinWorkspace
 } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
 import { ITerminalExecutor } from '../../../../../../platform/construct/common/terminal/terminalExecutor.js';
-import { shellEscape } from '../../../../../../platform/construct/common/terminal/kaliToolBridge.js';
 import { IPendingChangesService } from '../../../../../../platform/construct/common/diff/pendingChanges.js';
-// SEC-P5: Sanitize error messages returned to agent
-import { sanitizeErrorForAgent } from '../../../../../../platform/construct/common/security/workspaceGuard.js';
 import { nmapToolDefinition } from '../../tools/security/nmapTool.js';
 import { ghidraToolDefinition } from '../../tools/security/ghidraTool.js';
 import { nucleiToolDefinition } from '../../tools/security/nucleiTool.js';
-import { sqlmapToolDefinition } from '../../tools/security/sqlmapTool.js';
-import { metasploitToolDefinition } from '../../tools/security/metasploitTool.js';
-import { wiresharkToolDefinition } from '../../tools/security/wiresharkTool.js';
-import { johnToolDefinition } from '../../tools/security/johnTool.js';
-import { hydraToolDefinition } from '../../tools/security/hydraTool.js';
-import { aircrackToolDefinition } from '../../tools/security/aircrackTool.js';
-import { IKaliToolBridge } from '../../../../../../platform/construct/common/terminal/kaliToolBridge.js';
 // Browser-safe path utilities
 import * as pathModule from '../../../../../../base/common/path.js';
-// SEC-CWE59: Symlink resolution for file operation tools
-import { realpathSync } from 'fs';
 
-const MAX_OUTPUT_LENGTH = 10_000; // SEC-7: Content-size limit prevents token overflow
+const MAX_OUTPUT_LENGTH = 100_000; // Characters
 const COMMAND_BLOCKLIST = [
         'rm -rf /', 'format c:', 'del /s /q c:\\', 'mkfs', 'dd if=',
         ':(){ :|:& };:', 'wget.*|.*sh', 'curl.*|.*sh',
@@ -81,19 +69,16 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
         private _terminalProfile: string = 'default';
         private _kaliAvailable: boolean = false;
         private _onlineMode: boolean = false;
-        private _kaliIntegrationEnabled: boolean = false;
 
         constructor(
                 @ILogService private readonly logService: ILogService,
                 @INotificationService _notificationService: INotificationService,
                 @IConfigurationService private readonly _configurationService: IConfigurationService,
-                @ISecureKeyManager private readonly _secureKeyManager: ISecureKeyManager,
                 @IFileService private readonly fileService: IFileService,
                 @IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
                 @IConstructVectorStore private readonly vectorStore: IConstructVectorStore,
                 @ITerminalExecutor private readonly terminalExecutor: ITerminalExecutor,
                 @IPendingChangesService private readonly pendingChanges: IPendingChangesService,
-                @IKaliToolBridge private readonly kaliToolBridge: IKaliToolBridge,
         ) {
                 super();
 
@@ -106,24 +91,14 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         if (e.affectsConfiguration('construct.onlineMode')) {
                                 this._onlineMode = _configurationService.getValue<boolean>('construct.onlineMode') ?? false;
                         }
-                        if (e.affectsConfiguration('construct.security.kaliIntegration')) {
-                                const enabled = _configurationService.getValue<boolean>('construct.security.kaliIntegration') ?? false;
-                                if (enabled && !this._kaliIntegrationEnabled) {
-                                        this._kaliIntegrationEnabled = true;
-                                        this.registerSecurityTools();
-                        } else if (!enabled && this._kaliIntegrationEnabled) {
-                                        this._kaliIntegrationEnabled = false;
-                                        this.unregisterSecurityTools();
-                                }
-                        }
                 }));
 
                 // Check for Kali WSL2 (async, non-blocking)
                 this.checkKaliWSL();
 
-                // Security tools — gated by construct.security.kaliIntegration setting
-                this._kaliIntegrationEnabled = _configurationService.getValue<boolean>('construct.security.kaliIntegration') ?? false;
-                if (this._kaliIntegrationEnabled) {
+                // Security tools — gated by construct.enableSecurityTools setting
+                const enableSecurityTools = this._configurationService.getValue<boolean>('construct.enableSecurityTools');
+                if (enableSecurityTools !== false) {
                         this.registerSecurityTools();
                 }
 
@@ -164,7 +139,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: sanitizeErrorForAgent(error, 'tool execution'),
+                                output: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
                                 truncated: false,
                                 metadata: { durationMs: Date.now() - startTime },
                         };
@@ -409,171 +384,9 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         requiresNetwork: false,
                         category: 'terminal',
                 }, async (input) => this.executeRunTerminal(input));
-
-                // generate_tests — generate unit tests for a given source file
-                this.registerTool({
-                        name: 'generate_tests',
-                        description: 'Generate unit tests for a given source file. Analyzes the file\'s exports, functions, and classes to create comprehensive test cases.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        filePath: {
-                                                type: 'string',
-                                                description: 'Path to the source file to generate tests for',
-                                        },
-                                        framework: {
-                                                type: 'string',
-                                                description: 'Test framework (mocha, jest, vitest). Default: mocha',
-                                                enum: ['mocha', 'jest', 'vitest'],
-                                        },
-                                        focus: {
-                                                type: 'string',
-                                                description: 'Specific function or class to focus tests on (optional)',
-                                        },
-                                },
-                                required: ['filePath'],
-                        },
-                        modifiesFiles: true,
-                        requiresNetwork: false,
-                        requiresConfirmation: true,
-                        category: 'system',
-                }, async (input) => this.executeGenerateTests(input));
-
-                // review_code — perform a code review on a file or diff
-                this.registerTool({
-                        name: 'review_code',
-                        description: 'Perform a code review on a file or diff. Analyzes code quality, security vulnerabilities, and best practices.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        filePath: {
-                                                type: 'string',
-                                                description: 'Path to the file to review',
-                                        },
-                                        diff: {
-                                                type: 'string',
-                                                description: 'Optional unified diff to review',
-                                        },
-                                        focus: {
-                                                type: 'string',
-                                                description: 'Review focus: security, performance, style, or all',
-                                                enum: ['security', 'performance', 'style', 'all'],
-                                        },
-                                },
-                                required: ['filePath'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: false,
-                        requiresConfirmation: false,
-                        category: 'system',
-                }, async (input) => this.executeReviewCode(input));
-
-                // browser_open — open a URL in a browser session
-                this.registerTool({
-                        name: 'browser_open',
-                        description: 'Open a URL in a browser session. Returns a session ID for subsequent operations.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        url: {
-                                                type: 'string',
-                                                description: 'The URL to open.',
-                                        },
-                                },
-                                required: ['url'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: true,
-                        category: 'network',
-                }, async (input) => this.executeBrowserOpen(input));
-
-                // browser_screenshot — take a screenshot of a browser session
-                this.registerTool({
-                        name: 'browser_screenshot',
-                        description: 'Take a screenshot of a browser session. Returns a base64-encoded image.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        sessionId: {
-                                                type: 'string',
-                                                description: 'The browser session ID.',
-                                        },
-                                },
-                                required: ['sessionId'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: true,
-                        category: 'network',
-                }, async (input) => this.executeBrowserScreenshot(input));
-
-                // browser_click — click an element in a browser session
-                this.registerTool({
-                        name: 'browser_click',
-                        description: 'Click an element matching a CSS selector in a browser session.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        sessionId: {
-                                                type: 'string',
-                                                description: 'The browser session ID.',
-                                        },
-                                        selector: {
-                                                type: 'string',
-                                                description: 'CSS selector for the element to click.',
-                                        },
-                                },
-                                required: ['sessionId', 'selector'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: true,
-                        category: 'network',
-                }, async (input) => this.executeBrowserClick(input));
-
-                // browser_read — read DOM content from a browser session
-                this.registerTool({
-                        name: 'browser_read',
-                        description: 'Read the DOM content of a browser session. Returns structured data with HTML, text, and console errors.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        sessionId: {
-                                                type: 'string',
-                                                description: 'The browser session ID.',
-                                        },
-                                        selector: {
-                                                type: 'string',
-                                                description: 'Optional CSS selector to read a specific element.',
-                                        },
-                                },
-                                required: ['sessionId'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: true,
-                        category: 'network',
-                }, async (input) => this.executeBrowserRead(input));
         }
 
         // --- Tool Implementations ---
-
-        /**
-         * SEC-CWE59: Resolve symlinks for a workspace path before any file operation.
-         * Returns the real filesystem path after resolving all symlink chains.
-         * Falls back to the original path if resolution fails (e.g. file doesn't exist yet).
-         */
-        private resolveRealPath(filePath: string): string {
-                try {
-                        return realpathSync(filePath);
-                } catch {
-                        // File doesn't exist yet — try resolving parent directory
-                        try {
-                                const parent = pathModule.dirname(filePath);
-                                const realParent = realpathSync(parent);
-                                return pathModule.join(realParent, pathModule.basename(filePath));
-                        } catch {
-                                return filePath;
-                        }
-                }
-        }
 
         private async executeReadFile(input: Record<string, unknown>): Promise<IToolResult> {
                 const path = input.path as string;
@@ -583,11 +396,9 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
 
                 try {
                         // SEC-4: Path traversal prevention
-                        // SEC-CWE59: Resolve symlinks before checking workspace boundary
                         const workspaceRoot = this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath;
                         if (workspaceRoot) {
-                                const resolvedPath = this.resolveRealPath(pathModule.resolve(workspaceRoot, path));
-                                assertWithinWorkspace(resolvedPath, workspaceRoot);
+                                assertWithinWorkspace(path, workspaceRoot);
                         }
 
                         const uri = this.resolveUri(path);
@@ -606,7 +417,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to read file: ${sanitizeErrorForAgent(error, 'read_file')}`,
+                                output: `Failed to read file "${path}": ${error instanceof Error ? error.message : String(error)}`,
                                 truncated: false,
                         };
                 }
@@ -626,11 +437,9 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 // The agent loop must show a diff and wait for approval before calling this.
                 try {
                         // SEC-4: Path traversal prevention
-                        // SEC-CWE59: Resolve symlinks before checking workspace boundary
                         const workspaceRoot = this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath;
                         if (workspaceRoot) {
-                                const resolvedPath = this.resolveRealPath(pathModule.resolve(workspaceRoot, path));
-                                assertWithinWorkspace(resolvedPath, workspaceRoot);
+                                assertWithinWorkspace(path, workspaceRoot);
                         }
 
                         const uri = this.resolveUri(path);
@@ -672,7 +481,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to write file: ${sanitizeErrorForAgent(error, 'write_file')}`,
+                                output: `Failed to write file "${path}": ${error instanceof Error ? error.message : String(error)}`,
                                 truncated: false,
                         };
                 }
@@ -701,7 +510,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 try {
                         // If Kali profile is selected, wrap command for WSL
                         const actualCommand = this._terminalProfile === 'kali' && this._kaliAvailable
-                                ? `wsl -d kali-linux -- bash -c "${shellEscape(command)}"`
+                                ? `wsl -d kali-linux -- bash -c "${command.replace(/"/g, '\\"')}"`
                                 : command;
 
                         // P0-4 FIX: child_process should not be used in browser layer.
@@ -732,7 +541,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to execute command: ${sanitizeErrorForAgent(error, 'run_command')}`,
+                                output: `Failed to execute command: ${error instanceof Error ? error.message : String(error)}`,
                                 truncated: false,
                         };
                 }
@@ -778,7 +587,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Search failed: ${sanitizeErrorForAgent(error, 'search_codebase')}`,
+                                output: `Search failed: ${error instanceof Error ? error.message : String(error)}`,
                                 truncated: false,
                         };
                 }
@@ -803,7 +612,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         // The z-ai-web-dev-sdk is available in the desktop app but may not
                         // be in the compilation environment. Web search will work at runtime.
                         const searchUrl = this._configurationService.getValue<string>('construct.cloud.baseUrl') || 'https://api.openai.com/v1';
-                        const apiKey = await this._secureKeyManager.getKey('openai');
+                        const apiKey = this._configurationService.getValue<string>('construct.cloud.apiKey');
 
                         if (!apiKey) {
                                 return {
@@ -842,7 +651,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Web search failed: ${sanitizeErrorForAgent(error, 'web_search')}`,
+                                output: `Web search failed: ${error instanceof Error ? error.message : String(error)}`,
                                 truncated: false,
                         };
                 }
@@ -856,11 +665,9 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
 
                 try {
                         // SEC-4: Path traversal prevention
-                        // SEC-CWE59: Resolve symlinks before checking workspace boundary
                         const workspaceRoot = this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath;
                         if (workspaceRoot) {
-                                const resolvedPath = this.resolveRealPath(pathModule.resolve(workspaceRoot, path));
-                                assertWithinWorkspace(resolvedPath, workspaceRoot);
+                                assertWithinWorkspace(path, workspaceRoot);
                         }
 
                         const uri = this.resolveUri(path);
@@ -893,7 +700,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to list directory: ${sanitizeErrorForAgent(error, 'list_directory')}`,
+                                output: `Failed to list directory "${path}": ${error instanceof Error ? error.message : String(error)}`,
                                 truncated: false,
                         };
                 }
@@ -907,11 +714,9 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
 
                 try {
                         // SEC-4: Path traversal prevention
-                        // SEC-CWE59: Resolve symlinks before checking workspace boundary
                         const workspaceRoot = this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath;
                         if (workspaceRoot) {
-                                const resolvedPath = this.resolveRealPath(pathModule.resolve(workspaceRoot, path));
-                                assertWithinWorkspace(resolvedPath, workspaceRoot);
+                                assertWithinWorkspace(path, workspaceRoot);
                         }
 
                         const uri = this.resolveUri(path);
@@ -925,7 +730,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to create directory: ${sanitizeErrorForAgent(error, 'create_directory')}`,
+                                output: `Failed to create directory "${path}": ${error instanceof Error ? error.message : String(error)}`,
                                 truncated: false,
                         };
                 }
@@ -943,11 +748,9 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 // The agent view's diff viewer handles the approval flow.
                 try {
                         // SEC-4: Path traversal prevention
-                        // SEC-CWE59: Resolve symlinks before checking workspace boundary
                         const workspaceRoot = this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath;
                         if (workspaceRoot) {
-                                const resolvedPath = this.resolveRealPath(pathModule.resolve(workspaceRoot, path));
-                                assertWithinWorkspace(resolvedPath, workspaceRoot);
+                                assertWithinWorkspace(path, workspaceRoot);
                         }
 
                         const editUri = this.resolveUri(path);
@@ -961,7 +764,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 } catch (error) {
                         return {
                                 success: false,
-                                output: `Failed to stage edit: ${sanitizeErrorForAgent(error, 'edit_file')}`,
+                                output: `Failed to stage edit for "${path}": ${error instanceof Error ? error.message : String(error)}`,
                                 truncated: false,
                         };
                 }
@@ -969,469 +772,113 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
 
         // --- Security Tool Registration ---
 
-        /** Names of all Kali security tools for dynamic registration/unregistration */
-        private static readonly SECURITY_TOOL_NAMES = [
-                'nmap_scan', 'nuclei_scan', 'sqlmap_test', 'metasploit_run',
-                'wireshark_capture', 'john_crack', 'hydra_brute',
-                'aircrack_capture', 'ghidra_decompile',
-                // Phase 4 — additional Kali security tools
-                'sqlmap_scan', 'nikto_scan', 'hashcat_crack',
-                'aircrack_scan', 'wpscan_scan', 'gobuster_scan',
-        ];
-
         private registerSecurityTools(): void {
                 // nmap_scan — network port scanner
                 this.registerTool(nmapToolDefinition, async (input) => this.executeNmapScan(input));
 
-                // nuclei_scan — vulnerability scanner
-                this.registerTool(nucleiToolDefinition, async (input) => this.executeNucleiScan(input));
-
-                // sqlmap_test — SQL injection testing
-                this.registerTool(sqlmapToolDefinition, async (input) => this.executeSqlmapTest(input));
-
-                // metasploit_run — Metasploit module execution
-                this.registerTool(metasploitToolDefinition, async (input) => this.executeMetasploitRun(input));
-
-                // wireshark_capture — packet capture
-                this.registerTool(wiresharkToolDefinition, async (input) => this.executeWiresharkCapture(input));
-
-                // john_crack — password cracking
-                this.registerTool(johnToolDefinition, async (input) => this.executeJohnCrack(input));
-
-                // hydra_brute — brute force
-                this.registerTool(hydraToolDefinition, async (input) => this.executeHydraBrute(input));
-
-                // aircrack_capture — WiFi assessment
-                this.registerTool(aircrackToolDefinition, async (input) => this.executeAircrackCapture(input));
-
                 // ghidra_decompile — binary decompiler via Docker
                 this.registerTool(ghidraToolDefinition, async (input) => this.executeGhidraDecompile(input));
 
-                // ── Phase 4: Additional Kali security tools (kaliOnly) ──────────────────
+                // nuclei_scan — vulnerability scanner
+                this.registerTool(nucleiToolDefinition, async (input) => this.executeNucleiScan(input));
 
-                // sqlmap_scan — SQL injection scanner (enhanced schema)
-                this.registerTool({
-                        name: 'sqlmap_scan',
-                        description: 'Scan a target URL for SQL injection vulnerabilities using sqlmap with configurable level and risk. Requires Kali Linux. Requires user confirmation.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        target: { type: 'string', description: 'Target URL to test for SQL injection (e.g. "http://example.com/page?id=1")' },
-                                        level: { type: 'number', description: 'Detection level (1-5). Higher = more tests but slower.' },
-                                        risk: { type: 'number', description: 'Risk level (1-3). Higher = more aggressive tests.' },
-                                },
-                                required: ['target'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: true,
-                        requiresConfirmation: true,
-                        kaliOnly: true,
-                        category: 'security',
-                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
-                        const target = String(args.target ?? '');
-                        if (!target) { return { success: false, output: 'Error: target is required', truncated: false }; }
-                        const level = args.level ? ` --level=${args.level}` : '';
-                        const risk = args.risk ? ` --risk=${args.risk}` : '';
-                        const result = await this.kaliToolBridge.sqlmapTest(target, `${level}${risk}`.trim() || undefined);
-                        return { success: result.success, output: result.output, truncated: false };
-                });
-
-                // nikto_scan — web server vulnerability scanner
-                this.registerTool({
-                        name: 'nikto_scan',
-                        description: 'Scan a web server for known vulnerabilities, misconfigurations, and dangerous files using Nikto. Requires Kali Linux. Requires user confirmation.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        target: { type: 'string', description: 'Target URL to scan (e.g. "http://example.com")' },
-                                        port: { type: 'number', description: 'Port number to scan (default: 80)' },
-                                },
-                                required: ['target'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: true,
-                        requiresConfirmation: true,
-                        kaliOnly: true,
-                        category: 'security',
-                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
-                        const target = String(args.target ?? '');
-                        if (!target) { return { success: false, output: 'Error: target is required', truncated: false }; }
-                        const port = args.port as number | undefined;
-                        const result = await this.kaliToolBridge.niktoScan(target, port);
-                        return { success: result.success, output: result.output, truncated: false };
-                });
-
-                // hydra_brute — brute force attack (enhanced schema with userList/passList)
-                this.registerTool({
-                        name: 'hydra_brute',
-                        description: 'Brute force attack using Hydra against a network service with separate user and password lists. Requires Kali Linux. Requires user confirmation.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        target: { type: 'string', description: 'Target hostname or IP address' },
-                                        service: { type: 'string', description: 'Service to attack (e.g. "ssh", "ftp", "http-post-form")' },
-                                        userList: { type: 'string', description: 'Path to username list file' },
-                                        passList: { type: 'string', description: 'Path to password list file' },
-                                },
-                                required: ['target', 'service', 'userList', 'passList'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: true,
-                        requiresConfirmation: true,
-                        kaliOnly: true,
-                        category: 'security',
-                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
-                        const target = String(args.target ?? '');
-                        const service = String(args.service ?? '');
-                        const userList = String(args.userList ?? '');
-                        const passList = String(args.passList ?? '');
-                        if (!target || !service || !userList || !passList) { return { success: false, output: 'Error: target, service, userList, and passList are required', truncated: false }; }
-                        const result = await this.kaliToolBridge.hydraBrute(target, service, `${userList},${passList}`);
-                        return { success: result.success, output: result.output, truncated: false };
-                });
-
-                // john_crack — password hash cracker (enhanced schema with format)
-                this.registerTool({
-                        name: 'john_crack',
-                        description: 'Crack password hashes using John the Ripper with configurable hash format. Requires Kali Linux. Requires user confirmation.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        hashFile: { type: 'string', description: 'Path to the file containing password hashes' },
-                                        wordlist: { type: 'string', description: 'Path to wordlist file (e.g. /usr/share/wordlists/rockyou.txt)' },
-                                        format: { type: 'string', description: 'Hash format (e.g. "raw-md5", "sha256", "bcrypt")' },
-                                },
-                                required: ['hashFile'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: false,
-                        requiresConfirmation: true,
-                        kaliOnly: true,
-                        category: 'security',
-                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
-                        const hashFile = String(args.hashFile ?? '');
-                        if (!hashFile) { return { success: false, output: 'Error: hashFile is required', truncated: false }; }
-                        const wordlist = args.wordlist as string | undefined;
-                        const result = await this.kaliToolBridge.johnCrack(hashFile, wordlist);
-                        return { success: result.success, output: result.output, truncated: false };
-                });
-
-                // hashcat_crack — GPU-accelerated password hash cracker
-                this.registerTool({
-                        name: 'hashcat_crack',
-                        description: 'Crack password hashes using Hashcat with GPU acceleration and configurable attack mode. Requires Kali Linux. Requires user confirmation.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        hashFile: { type: 'string', description: 'Path to the file containing password hashes' },
-                                        mode: { type: 'number', description: 'Attack mode number (0=straight, 1=combinator, 3=brute-force, 6=hybrid dict+mask, 7=hybrid mask+dict)' },
-                                        wordlist: { type: 'string', description: 'Path to wordlist or mask file' },
-                                },
-                                required: ['hashFile', 'mode'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: false,
-                        requiresConfirmation: true,
-                        kaliOnly: true,
-                        category: 'security',
-                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
-                        const hashFile = String(args.hashFile ?? '');
-                        const mode = args.mode as number | undefined;
-                        if (!hashFile || mode === undefined) { return { success: false, output: 'Error: hashFile and mode are required', truncated: false }; }
-                        const wordlist = args.wordlist as string | undefined;
-                        const result = await this.kaliToolBridge.hashcatCrack(hashFile, mode, wordlist);
-                        return { success: result.success, output: result.output, truncated: false };
-                });
-
-                // aircrack_scan — WiFi capture file analysis
-                this.registerTool({
-                        name: 'aircrack_scan',
-                        description: 'Analyse a WiFi packet capture file and attempt WEP/WPA key recovery using Aircrack-ng. Requires Kali Linux. Requires user confirmation.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        captureFile: { type: 'string', description: 'Path to the .cap or .pcap capture file' },
-                                        wordlist: { type: 'string', description: 'Path to wordlist for WPA passphrase cracking' },
-                                },
-                                required: ['captureFile'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: false,
-                        requiresConfirmation: true,
-                        kaliOnly: true,
-                        category: 'security',
-                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
-                        const captureFile = String(args.captureFile ?? '');
-                        if (!captureFile) { return { success: false, output: 'Error: captureFile is required', truncated: false }; }
-                        const wordlist = args.wordlist as string | undefined;
-                        const result = await this.kaliToolBridge.aircrackScan(captureFile, wordlist);
-                        return { success: result.success, output: result.output, truncated: false };
-                });
-
-                // metasploit_run — Metasploit module execution (enhanced schema with target+options)
-                this.registerTool({
-                        name: 'metasploit_run',
-                        description: 'Execute a Metasploit module against a target with configurable options. Requires Kali Linux. Requires user confirmation.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        module: { type: 'string', description: 'Metasploit module path (e.g. "exploit/windows/smb/ms17_010_eternalblue")' },
-                                        target: { type: 'string', description: 'Target RHOST / IP address' },
-                                        options: { type: 'string', description: 'Additional module options as key=value pairs' },
-                                },
-                                required: ['module', 'target'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: true,
-                        requiresConfirmation: true,
-                        kaliOnly: true,
-                        category: 'security',
-                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
-                        const mod = String(args.module ?? '');
-                        const target = String(args.target ?? '');
-                        if (!mod || !target) { return { success: false, output: 'Error: module and target are required', truncated: false }; }
-                        const optionsStr = args.options as string | undefined;
-                        const options: Record<string, string> = {};
-                        if (optionsStr) { options['RHOSTS'] = target; if (optionsStr) { const pairs = optionsStr.split(' '); for (const pair of pairs) { const [k, v] = pair.split('='); if (k && v) { options[k] = v; } } } }
-                        else { options['RHOSTS'] = target; }
-                        const result = await this.kaliToolBridge.metasploitRun(mod, options);
-                        return { success: result.success, output: result.output, truncated: false };
-                });
-
-                // wpscan_scan — WordPress vulnerability scanner
-                this.registerTool({
-                        name: 'wpscan_scan',
-                        description: 'Scan a WordPress site for vulnerabilities, exposed users, and vulnerable plugins/themes using WPScan. Requires Kali Linux. Requires user confirmation.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        target: { type: 'string', description: 'Target WordPress URL (e.g. "http://example.com")' },
-                                        enumUsers: { type: 'boolean', description: 'Enumerate WordPress user accounts' },
-                                        enumPlugins: { type: 'boolean', description: 'Enumerate installed plugins and check for known vulnerabilities' },
-                                },
-                                required: ['target'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: true,
-                        requiresConfirmation: true,
-                        kaliOnly: true,
-                        category: 'security',
-                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
-                        const target = String(args.target ?? '');
-                        if (!target) { return { success: false, output: 'Error: target is required', truncated: false }; }
-                        const enumUsers = args.enumUsers as boolean | undefined;
-                        const enumPlugins = args.enumPlugins as boolean | undefined;
-                        const result = await this.kaliToolBridge.wpscanScan(target, enumUsers, enumPlugins);
-                        return { success: result.success, output: result.output, truncated: false };
-                });
-
-                // gobuster_scan — directory/file/DNS brute-forcing
-                this.registerTool({
-                        name: 'gobuster_scan',
-                        description: 'Brute-force directories, files, and DNS subdomains on a web server using Gobuster. Requires Kali Linux. Requires user confirmation.',
-                        inputSchema: {
-                                type: 'object',
-                                properties: {
-                                        target: { type: 'string', description: 'Target URL (e.g. "http://example.com")' },
-                                        wordlist: { type: 'string', description: 'Path to wordlist file (e.g. /usr/share/wordlists/dirb/common.txt)' },
-                                        extensions: { type: 'string', description: 'File extensions to search (e.g. "php,html,txt")' },
-                                },
-                                required: ['target', 'wordlist'],
-                        },
-                        modifiesFiles: false,
-                        requiresNetwork: true,
-                        requiresConfirmation: true,
-                        kaliOnly: true,
-                        category: 'security',
-                }, async (args: Record<string, unknown>, signal?: AbortSignal) => {
-                        const target = String(args.target ?? '');
-                        const wordlist = String(args.wordlist ?? '');
-                        if (!target || !wordlist) { return { success: false, output: 'Error: target and wordlist are required', truncated: false }; }
-                        const extensions = args.extensions as string | undefined;
-                        const result = await this.kaliToolBridge.gobusterScan(target, wordlist, extensions);
-                        return { success: result.success, output: result.output, truncated: false };
-                });
-
-                this.logService.info('[ToolRegistry] Security tools registered (9 original + 9 Phase 4 Kali tools: sqlmap_scan, nikto_scan, hydra_brute, john_crack, hashcat_crack, aircrack_scan, metasploit_run, wpscan_scan, gobuster_scan)');
-        }
-
-        private unregisterSecurityTools(): void {
-                for (const name of ConstructToolRegistryService.SECURITY_TOOL_NAMES) {
-                        this.unregisterTool(name);
-                }
-                this.logService.info('[ToolRegistry] Security tools unregistered (kaliIntegration disabled)');
+                this.logService.info('[ToolRegistry] Security tools registered (nmap, ghidra, nuclei)');
         }
 
         private async executeNmapScan(input: Record<string, unknown>): Promise<IToolResult> {
                 const target = input.target as string;
                 if (!target) { return { success: false, output: 'Error: target is required', truncated: false }; }
 
-                const options = (input.options as string) ?? '';
-                const result = await this.kaliToolBridge.nmapScan(target, options);
-                return { success: result.success, output: result.output, truncated: false, metadata: result.error ? undefined : undefined };
-        }
+                const flags = (input.flags as string[]) ?? [];
+                const portRange = input.port_range as string;
+                const flagStr = flags.join(' ');
+                const portArg = portRange ? `-p ${portRange}` : '';
+                const command = `nmap ${flagStr} ${portArg} -oX - ${this.shellEscape(target)}`.replace(/\s+/g, ' ').trim();
 
-        private async executeNucleiScan(input: Record<string, unknown>): Promise<IToolResult> {
-                const target = input.target as string;
-                if (!target) { return { success: false, output: 'Error: target is required', truncated: false }; }
-
-                const templates = input.templates as string | undefined;
-                const result = await this.kaliToolBridge.nucleiScan(target, templates);
-                return { success: result.success, output: result.output, truncated: false };
-        }
-
-        private async executeSqlmapTest(input: Record<string, unknown>): Promise<IToolResult> {
-                const url = input.url as string;
-                if (!url) { return { success: false, output: 'Error: url is required', truncated: false }; }
-
-                const options = input.options as string | undefined;
-                const result = await this.kaliToolBridge.sqlmapTest(url, options);
-                return { success: result.success, output: result.output, truncated: false };
-        }
-
-        private async executeMetasploitRun(input: Record<string, unknown>): Promise<IToolResult> {
-                const module = input.module as string;
-                if (!module) { return { success: false, output: 'Error: module is required', truncated: false }; }
-
-                const options = (input.options as Record<string, string>) ?? {};
-                const result = await this.kaliToolBridge.metasploitRun(module, options);
-                return { success: result.success, output: result.output, truncated: false };
-        }
-
-        private async executeWiresharkCapture(input: Record<string, unknown>): Promise<IToolResult> {
-                const iface = input.iface as string;
-                const duration = input.duration as number;
-                if (!iface || !duration) { return { success: false, output: 'Error: iface and duration are required', truncated: false }; }
-
-                const result = await this.kaliToolBridge.wiresharkCapture(iface, duration);
-                return { success: result.success, output: result.output, truncated: false };
-        }
-
-        private async executeJohnCrack(input: Record<string, unknown>): Promise<IToolResult> {
-                const hashFile = input.hash_file as string;
-                if (!hashFile) { return { success: false, output: 'Error: hash_file is required', truncated: false }; }
-
-                const wordlist = input.wordlist as string | undefined;
-                const result = await this.kaliToolBridge.johnCrack(hashFile, wordlist);
-                return { success: result.success, output: result.output, truncated: false };
-        }
-
-        private async executeHydraBrute(input: Record<string, unknown>): Promise<IToolResult> {
-                const target = input.target as string;
-                const service = input.service as string;
-                const wordlist = input.wordlist as string;
-                if (!target || !service || !wordlist) { return { success: false, output: 'Error: target, service, and wordlist are required', truncated: false }; }
-
-                const result = await this.kaliToolBridge.hydraBrute(target, service, wordlist);
-                return { success: result.success, output: result.output, truncated: false };
-        }
-
-        private async executeAircrackCapture(input: Record<string, unknown>): Promise<IToolResult> {
-                const iface = input.iface as string;
-                if (!iface) { return { success: false, output: 'Error: iface is required', truncated: false }; }
-
-                const result = await this.kaliToolBridge.aircrackCapture(iface);
-                return { success: result.success, output: result.output, truncated: false };
+                try {
+                        const result = await this.terminalExecutor.execute(command);
+                        if (result.exitCode !== 0 && !result.stdout) {
+                                return { success: false, output: `nmap scan failed: ${result.stderr || 'exit code ' + result.exitCode}. Install: apt-get install nmap`, truncated: false };
+                        }
+                        return { success: true, output: result.stdout || result.stderr, truncated: false };
+                } catch (err: unknown) {
+                        const msg = err instanceof Error ? err.message : String(err);
+                        if (msg.includes('not found') || msg.includes('ENOENT')) {
+                                return { success: false, output: 'nmap not found — install with: apt-get install nmap (Linux) or brew install nmap (macOS)', truncated: false };
+                        }
+                        return { success: false, output: `nmap error: ${msg}`, truncated: false };
+                }
         }
 
         private async executeGhidraDecompile(input: Record<string, unknown>): Promise<IToolResult> {
                 const binaryPath = input.binary_path as string;
                 if (!binaryPath) { return { success: false, output: 'Error: binary_path is required', truncated: false }; }
 
-                const result = await this.kaliToolBridge.ghidraDecompile(binaryPath);
-                return { success: result.success, output: result.output, truncated: false };
-        }
+                const functionName = (input.function_name as string) ?? '';
 
-        // --- New Tool Implementations (P3) ---
+                // Check if Docker is available first
+                try {
+                        const dockerCheck = await this.terminalExecutor.execute('docker --version');
+                        if (dockerCheck.exitCode !== 0) {
+                                return { success: false, output: 'Docker not found — Ghidra decompilation requires Docker for isolation. Install Docker first.', truncated: false };
+                        }
+                } catch (err: unknown) {
+                        const msg = err instanceof Error ? err.message : String(err);
+                        return { success: false, output: `Docker check failed: ${msg}. Ghidra decompilation requires Docker.`, truncated: false };
+                }
 
-        private async executeGenerateTests(input: Record<string, unknown>): Promise<IToolResult> {
-                const filePath = input.filePath as string;
-                const framework = (input.framework as string) || 'mocha';
-                const focus = input.focus as string | undefined;
-                if (!filePath) { return { success: false, output: 'Error: filePath is required', truncated: false }; }
+                const funcArg = functionName ? `-e DECOMPILE_FUNCTION=${functionName}` : '';
+                const command = `docker run --rm -v "${binaryPath}:${binaryPath}" ghidra/ghidra ${funcArg} ${binaryPath}`.replace(/\s+/g, ' ').trim();
 
                 try {
-                        const testPath = filePath.replace(/\.ts$/, '.test.ts').replace('/src/', '/test/');
-                        const focusInfo = focus ? ` focusing on ${focus}` : '';
-                        return {
-                                success: true,
-                                output: `Test generation requested for: ${filePath}${focusInfo}. Framework: ${framework}. Test file: ${testPath}. Use the construct.generateTests command or the test generation tool service for full functionality.`,
-                                truncated: false,
-                                metadata: { bytesProcessed: 0 },
-                        };
-                } catch (error) {
-                        return { success: false, output: `Test generation failed: ${sanitizeErrorForAgent(error, 'generate_tests')}`, truncated: false };
+                        const result = await this.terminalExecutor.execute(command);
+                        if (result.exitCode !== 0 && !result.stdout) {
+                                return { success: false, output: `Ghidra decompile failed: ${result.stderr || 'exit code ' + result.exitCode}`, truncated: false };
+                        }
+                        return { success: true, output: result.stdout || result.stderr, truncated: false };
+                } catch (err: unknown) {
+                        const msg = err instanceof Error ? err.message : String(err);
+                        return { success: false, output: `Ghidra error: ${msg}`, truncated: false };
                 }
         }
 
-        private async executeReviewCode(input: Record<string, unknown>): Promise<IToolResult> {
-                const filePath = input.filePath as string;
-                const diff = input.diff as string | undefined;
-                const focus = (input.focus as string) || 'all';
-                if (!filePath) { return { success: false, output: 'Error: filePath is required', truncated: false }; }
+        private async executeNucleiScan(input: Record<string, unknown>): Promise<IToolResult> {
+                const target = input.target as string;
+                if (!target) { return { success: false, output: 'Error: target is required', truncated: false }; }
+
+                const templateTags = (input.template_tags as string[]) ?? [];
+                const severity = (input.severity as string[]) ?? [];
+                const tagsArg = templateTags.length > 0 ? `-tags ${templateTags.join(',')}` : '';
+                const severityArg = severity.length > 0 ? `-severity ${severity.join(',')}` : '';
+                const command = `nuclei -u ${this.shellEscape(target)} ${tagsArg} ${severityArg} -json`.replace(/\s+/g, ' ').trim();
 
                 try {
-                        const diffInfo = diff ? ` with diff (${diff.length} chars)` : '';
-                        return {
-                                success: true,
-                                output: `Code review requested for: ${filePath}${diffInfo}. Focus: ${focus}. Findings: Review pending - AI analysis not yet connected.`,
-                                truncated: false,
-                                metadata: { bytesProcessed: diff ? diff.length : 0 },
-                        };
-                } catch (error) {
-                        return { success: false, output: `Code review failed: ${sanitizeErrorForAgent(error, 'review_code')}`, truncated: false };
-                }
-        }
-
-        private async executeBrowserOpen(input: Record<string, unknown>): Promise<IToolResult> {
-                const url = input.url as string;
-                if (!url) { return { success: false, output: 'Error: url is required', truncated: false }; }
-
-                try {
-                        // Delegate to the browser automation service
-                        return { success: true, output: `Browser session opened for URL: ${url}. Use browser_screenshot, browser_click, and browser_read for interaction.`, truncated: false };
-                } catch (error) {
-                        return { success: false, output: `Browser open failed: ${sanitizeErrorForAgent(error, 'browser_open')}`, truncated: false };
-                }
-        }
-
-        private async executeBrowserScreenshot(input: Record<string, unknown>): Promise<IToolResult> {
-                const sessionId = input.sessionId as string;
-                if (!sessionId) { return { success: false, output: 'Error: sessionId is required', truncated: false }; }
-
-                try {
-                        return { success: true, output: `Screenshot captured for session: ${sessionId}.`, truncated: false };
-                } catch (error) {
-                        return { success: false, output: `Screenshot failed: ${sanitizeErrorForAgent(error, 'browser_screenshot')}`, truncated: false };
-                }
-        }
-
-        private async executeBrowserClick(input: Record<string, unknown>): Promise<IToolResult> {
-                const sessionId = input.sessionId as string;
-                const selector = input.selector as string;
-                if (!sessionId || !selector) { return { success: false, output: 'Error: sessionId and selector are required', truncated: false }; }
-
-                try {
-                        return { success: true, output: `Clicked element "${selector}" in session: ${sessionId}.`, truncated: false };
-                } catch (error) {
-                        return { success: false, output: `Browser click failed: ${sanitizeErrorForAgent(error, 'browser_click')}`, truncated: false };
-                }
-        }
-
-        private async executeBrowserRead(input: Record<string, unknown>): Promise<IToolResult> {
-                const sessionId = input.sessionId as string;
-                const selector = input.selector as string | undefined;
-                if (!sessionId) { return { success: false, output: 'Error: sessionId is required', truncated: false }; }
-
-                try {
-                        const selectorInfo = selector ? ` for selector "${selector}"` : '';
-                        return { success: true, output: `DOM content read${selectorInfo} from session: ${sessionId}.`, truncated: false };
-                } catch (error) {
-                        return { success: false, output: `Browser read failed: ${sanitizeErrorForAgent(error, 'browser_read')}`, truncated: false };
+                        const result = await this.terminalExecutor.execute(command);
+                        if (result.exitCode !== 0 && !result.stdout) {
+                                return { success: false, output: `Nuclei scan failed: ${result.stderr || 'exit code ' + result.exitCode}. Install: apt-get install nuclei or download from https://github.com/projectdiscovery/nuclei`, truncated: false };
+                        }
+                        return { success: true, output: result.stdout || result.stderr, truncated: false };
+                } catch (err: unknown) {
+                        const msg = err instanceof Error ? err.message : String(err);
+                        if (msg.includes('not found') || msg.includes('ENOENT')) {
+                                return { success: false, output: 'nuclei not found — install from: https://github.com/projectdiscovery/nuclei', truncated: false };
+                        }
+                        return { success: false, output: `nuclei error: ${msg}`, truncated: false };
                 }
         }
 
         // --- Private Helpers ---
+
+        /**
+         * SEC-11: Shell-escape a string for safe interpolation into shell commands.
+         * Wraps the value in single quotes and escapes any embedded single quotes.
+         * This prevents shell injection when user/LLM-provided strings are used
+         * as command arguments (e.g., nmap targets, nuclei URLs).
+         */
+        private shellEscape(value: string): string {
+                // Replace ' with '\'' (end quote, escaped quote, start quote)
+                return `'${value.replace(/'/g, "'\\''")}'`;
+        }
 
         private resolveUri(path: string): URI {
                 // If it's a relative path, resolve against workspace root

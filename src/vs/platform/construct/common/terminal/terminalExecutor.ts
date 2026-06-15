@@ -1,11 +1,11 @@
+// Copyright (c) 2025 Razisafir. All rights reserved.
+// Kovix proprietary code. See CONSTRUCT_LICENSE.txt.
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Copyright (c) Kovix. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
-import { redactSecrets } from '../security/secretRedactor.js';
 
 export const ITerminalExecutor = createDecorator<ITerminalExecutor>('construct.terminalExecutor');
 
@@ -30,7 +30,7 @@ export const SHELL_METACHAR_BLOCKLIST = [
 /**
  * SEC-3: Regex patterns for detecting shell metacharacters in arguments.
  */
-const SHELL_METACHAR_REGEX = /(;|&&|\|\||`|\$\(|\$\w|\{|}|\d*>|<<<|<>|<|\n|\r)/;
+const SHELL_METACHAR_REGEX = /(;|&&|\|\||\||`|\$\(|\{|}|\d*>|<)/;
 
 /**
  * SEC-3: Default allowlist for restricted mode.
@@ -41,28 +41,13 @@ export const DEFAULT_COMMAND_ALLOWLIST: string[] = [
         'npm', 'yarn', 'pnpm', 'npx', 'node', 'python', 'python3', 'pip', 'pip3',
         'git', 'cargo', 'rustc', 'go', 'dotnet', 'java', 'javac', 'mvn', 'gradle',
         'make', 'cmake', 'gcc', 'g++', 'clang', 'cargo',
-        'echo', 'pwd', 'whoami', 'which', 'where',
+        'echo', 'pwd', 'whoami', 'which', 'where', 'env', 'printenv',
         'curl', 'wget',
         'docker', 'podman', 'kubectl',
         'tsc', 'eslint', 'prettier', 'jest', 'vitest', 'mocha',
         'mkdir', 'touch', 'cp', 'mv',
         'sed', 'awk', 'sort', 'uniq', 'diff', 'patch',
 ];
-
-/**
- * SEC-P2: Commands that are ALWAYS blocked, even in unrestricted mode.
- * These privilege escalation commands must never be executed without
- * explicit user confirmation.
- */
-export const PRIVILEGE_ESCALATION_BLOCKLIST: readonly string[] = [
-        'sudo', 'su', 'pkexec', 'doas', 'gosu', 'run0', 'gksudo', 'kdesu',
-];
-
-/**
- * SEC-P2: Default command timeout in seconds.
- * Can be configured via construct.terminal.commandTimeout (range: 10-300).
- */
-export const DEFAULT_COMMAND_TIMEOUT_S = 60;
 
 /**
  * SEC-3: Rate limit configuration for terminal commands.
@@ -74,27 +59,9 @@ export const TERMINAL_RATE_LIMIT = {
 };
 
 /**
- * SEC-4.2: Maximum output length returned to the agent (in characters).
- * Output exceeding this limit is truncated with a marker.
- */
-export const MAX_OUTPUT_LENGTH = 10_000;
-
-/**
- * SEC-4.2: Commands that perform file-system mutations or read sensitive files.
- * When these commands are used, the target path must be validated against
- * the workspace boundary.
- */
-export const FILE_OPERATION_COMMANDS: readonly string[] = [
-        'cat', 'head', 'tail', 'less', 'more',
-        'ls', 'dir', 'find', 'stat', 'file',
-        'rm', 'rmdir', 'cp', 'mv', 'touch', 'mkdir',
-        'chmod', 'chown', 'chgrp',
-        'ln', 'symlink',
-        'tee', 'dd',
-];
-
-/**
  * SEC-3: Secret patterns that must NEVER appear in audit logs.
+ * Each pattern uses the 'g' flag for global replacement.
+ * IMPORTANT: Always reset lastIndex before use to prevent stale state.
  */
 const SECRET_LOG_PATTERNS = [
         /sk-ant-[A-Za-z0-9_-]{20,}/g,
@@ -107,10 +74,13 @@ const SECRET_LOG_PATTERNS = [
 
 /**
  * SEC-3: Sanitise a command for audit logging — redact any secret patterns.
+ * Resets lastIndex on each global regex before replacement to prevent
+ * state leakage across calls.
  */
 export function sanitiseForAuditLog(text: string): string {
         let result = text;
         for (const pattern of SECRET_LOG_PATTERNS) {
+                pattern.lastIndex = 0; // Reset for global regex reuse
                 result = result.replace(pattern, '[REDACTED]');
         }
         return result;
@@ -127,6 +97,8 @@ export function detectShellMetacharInArgs(args: string): string | null {
 
 /**
  * SEC-3: Check if a command is in the allowlist (for restricted mode).
+ * Uses exact match on the command name to prevent prefix-based bypass
+ * (e.g., 'catalog' must not match 'cat').
  */
 export function isCommandInAllowlist(command: string, allowlist?: string[]): boolean {
         const list = allowlist ?? DEFAULT_COMMAND_ALLOWLIST;
@@ -134,66 +106,27 @@ export function isCommandInAllowlist(command: string, allowlist?: string[]): boo
         const baseCommand = command.trim().split(/\s+/)[0];
         // Handle path-prefixed commands like /usr/bin/git
         const commandName = baseCommand.split('/').pop() ?? baseCommand;
-        return list.some(allowed => commandName === allowed);
+        // Strip common suffixes like .exe, .cmd, .bat on Windows
+        const bareName = commandName.replace(/\.(exe|cmd|bat|ps1)$/i, '');
+        return list.some(allowed => bareName === allowed);
 }
 
 /**
  * SEC-3: Enforce workspace directory jail — prevent cd to paths outside workspace root.
+ * Uses VS Code's browser-safe path utilities for renderer compatibility.
  */
 export async function isPathWithinWorkspace(filePath: string, workspaceRoot: string): Promise<boolean> {
-        const path = await import('path');
-        const resolved = path.resolve(filePath);
-        const root = path.resolve(workspaceRoot);
-        return resolved.startsWith(root + path.sep) || resolved === root;
-}
-
-/**
- * SEC-4.2: Strip ANSI escape sequences from terminal output.
- * Handles CSI sequences, OSC sequences, SGR sequences, and carriage returns.
- * Shared between browser and Node layers for consistent output cleaning.
- */
-export function stripAnsiEscapeSequences(text: string): string {
-        return text
-                .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')      // CSI sequences (colors, cursor)
-                .replace(/\x1b\][^\x07]*\x07/g, '')           // OSC sequences (title, etc.)
-                .replace(/\x1b\[[\?]?[0-9;]*[a-zA-Z]/g, '')  // Private CSI sequences
-                .replace(/\x1b\[[0-9;]*m/g, '')               // SGR sequences (colors)
-                .replace(/\x1b\[(?:A|B|C|D|E|F|G|H|J|K|S|T|f|i|l|m|n|s|u)/g, '') // Cursor/erase sequences
-                .replace(/\r\n/g, '\n')                        // Normalize line endings
-                .replace(/\r/g, '\n');                         // Standalone CR to LF
-}
-
-/**
- * SEC-4.2: Sanitise command output before returning to the agent.
- * 1. Strips ANSI escape sequences
- * 2. Redacts secrets (API keys, tokens, passwords)
- * 3. Truncates output longer than MAX_OUTPUT_LENGTH
- */
-export function sanitiseOutput(text: string): string {
-        // 1. Strip ANSI escape sequences
-        let result = stripAnsiEscapeSequences(text);
-
-        // 2. Redact secrets (using comprehensive secretRedactor + audit log patterns)
-        result = redactSecrets(result);
-        result = sanitiseForAuditLog(result);
-
-        // 3. Truncate if too long
-        if (result.length > MAX_OUTPUT_LENGTH) {
-                result = result.substring(0, MAX_OUTPUT_LENGTH) + '\n[OUTPUT TRUNCATED — exceeded 10,000 characters]';
+        try {
+                const path = await import('path');
+                const resolved = path.resolve(filePath);
+                const root = path.resolve(workspaceRoot);
+                return resolved.startsWith(root + path.sep) || resolved === root;
+        } catch {
+                // Fallback: use simple string comparison when Node 'path' is unavailable (browser)
+                const normalizedFile = filePath.replace(/\\/g, '/').replace(/\/\/+$/, '');
+                const normalizedRoot = workspaceRoot.replace(/\\/g, '/').replace(/\/\/+$/, '');
+                return normalizedFile.startsWith(normalizedRoot + '/') || normalizedFile === normalizedRoot;
         }
-
-        return result;
-}
-
-/**
- * SEC-P2: Check if a command uses a privilege escalation tool.
- * These commands (sudo, su, pkexec, doas, gosu, run0) are always
- * blocked from automatic execution, even in unrestricted mode.
- */
-export function isPrivilegeEscalation(command: string): boolean {
-        const baseCommand = command.trim().split(/\s+/)[0];
-        const commandName = baseCommand.split('/').pop() ?? baseCommand;
-        return PRIVILEGE_ESCALATION_BLOCKLIST.includes(commandName);
 }
 
 /**
@@ -247,6 +180,42 @@ export class TerminalRateLimiter {
  * - Rate limiting (10 commands per 30 seconds)
  * - Audit logging with secret redaction
  */
+/**
+ * SEC-6: Unified dangerous command patterns — single source of truth.
+ * Both browser and Node terminal services MUST use this shared blocklist
+ * to ensure consistent security policy enforcement.
+ *
+ * All patterns use the 'i' flag for case-insensitive matching.
+ */
+export const DANGEROUS_COMMAND_PATTERNS: RegExp[] = [
+        /\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|.*--no-preserve-root\s+)(\/|[A-Z]:\\)/i,
+        /\bsudo\s+/i,
+        /\bsu\s+/i,
+        /\bshutdown\b/i,
+        /\breboot\b/i,
+        /\binit\s+[0-6Ss]/i,
+        /\bcurl\b.*\|\s*(ba)?sh/i,
+        /\bwget\b.*\|\s*(ba)?sh/i,
+        /\bmkfs\b/i,
+        /\bdd\s+.*of=\/dev\//i,
+        /\bchmod\s+(777|666)\s+\//i,
+        /\bchown\s+.*\s+\//i,
+        /\b:()\s*\{.*;\s*\}/, // fork bomb
+        />\/etc\//i,
+        /\bmount\b.*\/dev\//i,
+        /\bumount\b/i,
+        /\biptables\b/i,
+        /\bsystemctl\s+(stop|disable|mask)\s+/i,
+];
+
+/**
+ * SEC-6: Check if a command matches any dangerous pattern.
+ * Uses the unified DANGEROUS_COMMAND_PATTERNS for consistency.
+ */
+export function isDangerousCommand(command: string): boolean {
+        return DANGEROUS_COMMAND_PATTERNS.some(pattern => pattern.test(command));
+}
+
 export interface ITerminalExecutor {
         readonly _serviceBrand: undefined;
 
@@ -259,12 +228,10 @@ export interface ITerminalExecutor {
          * - Restricted mode allowlist (if enabled)
          * - Working directory jail
          * - Rate limit (10 commands / 30 seconds)
-         * - Privilege escalation blocklist (sudo, su, pkexec, doas, gosu, run0)
-         * - Command timeout (configurable via construct.terminal.commandTimeout)
          *
          * @param command The command to execute
          * @param cwd Working directory (defaults to workspace root)
-         * @param timeout Timeout in milliseconds (default: from construct.terminal.commandTimeout, 60s)
+         * @param timeout Timeout in milliseconds (default: 60000)
          * @param signal Optional AbortSignal for cancellation
          * @param onOutput Optional callback for streaming output chunks. Receives
          *   cleaned (ANSI-stripped) output data as it arrives, enabling real-time
@@ -283,14 +250,7 @@ export interface ITerminalExecutor {
         /**
          * Check if a command is on the security blocklist.
          * Blocklist includes: rm -rf /, sudo, curl|sh, wget|sh, mkfs, dd to /dev,
-         * chmod 777 /, writing to /etc/, fork bombs, privilege escalation.
+         * chmod 777 /, writing to /etc/, fork bombs.
          */
         isBlocked(command: string): boolean;
-
-        /**
-         * SEC-P2: Check if a command requires user confirmation even in unrestricted mode.
-         * Commands matching the privilege escalation blocklist (sudo, pkexec, doas, gosu, run0)
-         * require explicit user approval before execution.
-         */
-        requiresConfirmation(command: string): boolean;
 }

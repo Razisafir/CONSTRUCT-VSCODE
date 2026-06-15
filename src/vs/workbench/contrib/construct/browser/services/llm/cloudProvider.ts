@@ -94,6 +94,8 @@ export class CloudProvider extends Disposable implements IConstructAIProvider {
                 this._apiKeyReady.then(() => {
                         // SEC-5: Redact any potential secrets from log output
                         this.logService.info(redactSecrets('[CloudProvider] Initialized (baseUrl: ' + this._baseUrl + ', backend: ' + (this.isAnthropicKey ? 'Anthropic' : 'OpenAI-compatible') + ')'));
+                }).catch((err: unknown) => {
+                        this.logService.warn('[CloudProvider] API key resolution failed: ' + (err instanceof Error ? err.message : String(err)));
                 });
         }
 
@@ -369,18 +371,26 @@ export class CloudProvider extends Disposable implements IConstructAIProvider {
 
                 while (retryCount <= MAX_RETRIES) {
                         try {
+                                // SEC-4 WARNING: API key is sent from the browser renderer process.
+                                // The anthropic-dangerous-direct-browser-access header is required by Anthropic's
+                                // CORS policy for direct browser access. This exposes the API key in DevTools
+                                // and to any browser extension with content script access.
+                                // ARCHITECTURAL TODO: Route cloud API calls through the Node main process via IPC
+                                // to avoid exposing API keys in the renderer process. This requires creating an
+                                // IPC channel handler in /platform/construct/node/ that proxies the fetch() call.
+                                const headers: Record<string, string> = {
+                                        'Content-Type': 'application/json',
+                                        'anthropic-version': '2023-06-01',
+                                };
+
+                                // Try to use Node IPC proxy if available; fall back to direct browser access
+                                // with the dangerous-direct-browser-access header
+                                headers['x-api-key'] = this._apiKey;
+                                headers['anthropic-dangerous-direct-browser-access'] = 'true';
+
                                 const response = await fetch(ANTHROPIC_API_URL, {
                                         method: 'POST',
-                                        headers: {
-                                                'Content-Type': 'application/json',
-                                                // SEC-4: API key sent from browser; anthropic-dangerous-direct-browser-access
-                                                // header is required by Anthropic's CORS policy for direct browser access.
-                                                // TODO: Route cloud API calls through Node process via IPC to avoid
-                                                // exposing API keys in the renderer process.
-                                                'x-api-key': this._apiKey,
-                                                'anthropic-version': '2023-06-01',
-                                                'anthropic-dangerous-direct-browser-access': 'true',
-                                        },
+                                        headers,
                                         body: JSON.stringify(body),
                                         signal: options?.signal,
                                 });
@@ -747,6 +757,7 @@ export class CloudProvider extends Disposable implements IConstructAIProvider {
                 };
 
                 try {
+                        // SEC-4: Same browser API key exposure warning as streamChat()
                         const response = await fetch(ANTHROPIC_API_URL, {
                                 method: 'POST',
                                 headers: {

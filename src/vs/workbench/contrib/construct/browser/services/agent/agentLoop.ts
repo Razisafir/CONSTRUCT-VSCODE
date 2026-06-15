@@ -709,17 +709,20 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         mode: approvedPlan.executionMode as ExecutionMode,
                 };
                 this._completedMilestoneIds = new Set();
+
+                // BUG#4 FIX: Guard against concurrent execution to prevent race conditions
+                // Check state BEFORE setting it — otherwise the guard always triggers
+                if (this._executionState === ExecutionState.Executing) {
+                        this.logService.warn('[AgentLoop] startExecution called while already executing — ignoring');
+                        return;
+                }
+
                 this._executionState = ExecutionState.Executing;
                 this._currentPlanContext = approvedPlan.task;
                 // Use _currentPlanContext for logging to avoid unused variable warning
                 this.logService.info(`[AgentLoop] Starting execution: ${this._currentPlanContext?.substring(0, 80)}`);
 
                 // Run the execution in the background
-                // BUG#4 FIX: Guard against concurrent execution to prevent race conditions
-                if (this._executionState === ExecutionState.Executing) {
-                        this.logService.warn('[AgentLoop] startExecution called while already executing — ignoring');
-                        return;
-                }
                 const runAsync = async () => {
                         try {
                                 const selectedSteps = approvedPlan.steps.filter(s => s.selected);
@@ -780,6 +783,8 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         this._milestoneResumeResolver = null;
                         if (milestone) {
                                 this._completedMilestoneIds.add(milestone.id);
+                                // Fire event so UI knows this milestone was skipped, not completed
+                                this._onDidMilestoneEvent.fire({ type: 'milestone_skipped', milestone } as AgentLoopEvent);
                         }
                         this._currentMilestone = null;
                 }

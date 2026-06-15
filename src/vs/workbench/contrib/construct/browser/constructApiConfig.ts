@@ -17,7 +17,7 @@ const apiConfiguration: IConfigurationNode = {
                                 'construct.anthropic.apiKey': {
                                                 type: 'string',
                                                 default: '',
-                                                description: localize('construct.anthropic.apiKey', "Anthropic API key for the Construct agent. Get your key at https://console.anthropic.com/. This is required for the agent to function."),
+                                                description: localize('construct.anthropic.apiKey', "[DEPRECATED — use OS keychain] Anthropic API key. Storing keys in settings.json is insecure. Use the 'Construct: Set API Key' command instead, which stores in your OS keychain."),
                                                 scope: 1 /* ConfigurationScope.APPLICATION */
                                 },
                                 'construct.anthropic.model': {
@@ -100,7 +100,7 @@ const cloudConfiguration: IConfigurationNode = {
                                 'construct.cloud.apiKey': {
                                                 type: 'string',
                                                 default: '',
-                                                description: localize('construct.cloud.apiKey', "API key for the cloud provider. Required for cloud inference."),
+                                                description: localize('construct.cloud.apiKey', "[DEPRECATED — use OS keychain] API key for the cloud provider. Storing keys in settings.json is insecure. Use the 'Construct: Set API Key' command instead."),
                                                 scope: 1 /* ConfigurationScope.APPLICATION */
                                 },
                                 'construct.cloud.model': {
