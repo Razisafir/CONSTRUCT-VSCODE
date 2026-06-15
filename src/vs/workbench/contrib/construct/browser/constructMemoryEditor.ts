@@ -1,19 +1,22 @@
+// Copyright (c) 2025 Razisafir. All rights reserved.
+// Kovix proprietary code. See CONSTRUCT_LICENSE.txt.
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-// Copyright (c) 2025 Razisafir. All rights reserved. See CONSTRUCT_LICENSE.txt.
 
 import { IObsidianMemoryService } from '../../../../platform/construct/common/memory/obsidianMemoryService.js';
 import { IObsidianMemoryEntry, MemoryCategory, MEMORY_CATEGORIES, MEMORY_CATEGORY_LABELS } from '../../../../platform/construct/common/memory/obsidianMemoryTypes.js';
 import { ILogService } from '../../../../platform/log/common/log.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { INotificationService } from '../../../../platform/notification/common/notification.js';
+// import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
+// import { IEditorService } from '../../../../workbench/services/editor/common/editorService.js';
 import { EditorInput } from '../../../../workbench/common/editor/editorInput.js';
+// import { IEditorPane } from '../../../../workbench/common/editor.js';
 import { Event, Emitter } from '../../../../base/common/event.js';
-import { Disposable } from '../../../../base/common/lifecycle.js';
+import { IDisposable, Disposable } from '../../../../base/common/lifecycle.js';
 import * as dom from '../../../../base/browser/dom.js';
-import * as Nls from './constructNls.js';
 
 /**
  * Editor input for a single Obsidian memory entry.
@@ -31,7 +34,7 @@ export class ObsidianMemoryEditorInput extends EditorInput {
         constructor(
                 entry: IObsidianMemoryEntry,
                 @IObsidianMemoryService private readonly obsidianMemory: IObsidianMemoryService,
-                @ILogService logService: ILogService,
+                @ILogService private readonly logService: ILogService,
         ) {
                 super();
                 this._entry = entry;
@@ -88,21 +91,6 @@ export class ObsidianMemoryEditorPane extends Disposable {
         private isDirty = false;
         private showPreview = false;
 
-        /**
-         * Create a styled label element for a form field.
-         */
-        private createFieldLabel(text: string): HTMLElement {
-                const label = document.createElement('label');
-                label.textContent = text;
-                label.className = 'memory-editor-field-label';
-                label.style.fontWeight = '600';
-                label.style.fontSize = '12px';
-                label.style.color = 'var(--vscode-foreground)';
-                label.style.marginBottom = '4px';
-                label.style.display = 'block';
-                return label;
-        }
-
         // Form elements
         private titleInput!: HTMLInputElement;
         private categorySelect!: HTMLSelectElement;
@@ -136,8 +124,6 @@ export class ObsidianMemoryEditorPane extends Disposable {
          */
         render(container: HTMLElement): void {
                 this.container = container;
-                container.setAttribute('role', 'form');
-                container.setAttribute('aria-label', 'Memory editor');
                 container.style.display = 'flex';
                 container.style.flexDirection = 'column';
                 container.style.height = '100%';
@@ -192,8 +178,7 @@ export class ObsidianMemoryEditorPane extends Disposable {
                 // Title (editable inline)
                 this.titleInput = dom.$('input') as HTMLInputElement;
                 this.titleInput.type = 'text';
-                this.titleInput.placeholder = Nls.MEMORY_TITLE_PLACEHOLDER;
-                this.titleInput.setAttribute('aria-label', 'Memory title');
+                this.titleInput.placeholder = 'Memory title...';
                 this.titleInput.style.cssText = `
                         flex: 1; background: transparent; border: none; outline: none;
                         color: var(--vscode-foreground); font-size: 14px; font-weight: 600;
@@ -214,9 +199,8 @@ export class ObsidianMemoryEditorPane extends Disposable {
 
                 // Preview toggle
                 this.previewToggleBtn = dom.$('button') as HTMLButtonElement;
-                this.previewToggleBtn.textContent = Nls.PREVIEW;
+                this.previewToggleBtn.textContent = 'Preview';
                 this.previewToggleBtn.title = 'Toggle markdown preview';
-                this.previewToggleBtn.setAttribute('aria-label', 'Toggle markdown preview');
                 this.previewToggleBtn.style.cssText = `
                         background: none; border: 1px solid var(--vscode-editorWidget-border);
                         color: var(--vscode-foreground); border-radius: 2px;
@@ -238,11 +222,10 @@ export class ObsidianMemoryEditorPane extends Disposable {
                 const catRow = dom.$('.obsidian-editor-cat-row');
                 catRow.style.cssText = `display: flex; gap: 12px; align-items: center; margin-bottom: 12px;`;
 
-                const catLabel = this.createFieldLabel(Nls.CATEGORY);
+                const catLabel = this.createFieldLabel('Category');
                 catRow.appendChild(catLabel);
 
                 this.categorySelect = dom.$('select') as HTMLSelectElement;
-                this.categorySelect.setAttribute('aria-label', 'Memory category');
                 this.categorySelect.style.cssText = `
                         padding: 4px 8px; background: var(--vscode-input-background);
                         border: 1px solid var(--vscode-input-border); border-radius: 2px;
@@ -259,13 +242,12 @@ export class ObsidianMemoryEditorPane extends Disposable {
                 catRow.appendChild(this.categorySelect);
 
                 // Tags section
-                const tagsLabel = this.createFieldLabel(Nls.TAGS);
+                const tagsLabel = this.createFieldLabel('Tags');
                 catRow.appendChild(tagsLabel);
 
                 this.tagsInput = dom.$('input') as HTMLInputElement;
                 this.tagsInput.type = 'text';
-                this.tagsInput.placeholder = Nls.ADD_TAG_PLACEHOLDER;
-                this.tagsInput.setAttribute('aria-label', 'Add tags');
+                this.tagsInput.placeholder = 'Add tag, press Enter...';
                 this.tagsInput.style.cssText = `
                         flex: 1; padding: 4px 8px; background: var(--vscode-input-background);
                         border: 1px solid var(--vscode-input-border); border-radius: 2px;
@@ -296,8 +278,7 @@ export class ObsidianMemoryEditorPane extends Disposable {
 
                 // Textarea for editing
                 this.contentArea = dom.$('textarea') as HTMLTextAreaElement;
-                this.contentArea.placeholder = Nls.MEMORY_CONTENT_PLACEHOLDER;
-                this.contentArea.setAttribute('aria-label', 'Memory content');
+                this.contentArea.placeholder = 'Write your memory content here... (Markdown supported)';
                 this.contentArea.style.cssText = `
                         flex: 1; width: 100%; box-sizing: border-box; padding: 12px;
                         background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border);
@@ -356,8 +337,7 @@ export class ObsidianMemoryEditorPane extends Disposable {
 
                 // Save button
                 this.saveBtn = dom.$('button') as HTMLButtonElement;
-                this.saveBtn.textContent = Nls.SAVE;
-                this.saveBtn.setAttribute('aria-label', 'Save memory');
+                this.saveBtn.textContent = 'Save';
                 this.saveBtn.style.cssText = `
                         background: var(--vscode-button-background); border: none;
                         color: var(--vscode-button-foreground); border-radius: 2px;
@@ -372,8 +352,7 @@ export class ObsidianMemoryEditorPane extends Disposable {
 
                 // Discard button
                 this.discardBtn = dom.$('button') as HTMLButtonElement;
-                this.discardBtn.textContent = Nls.DISCARD_CHANGES;
-                this.discardBtn.setAttribute('aria-label', 'Discard changes');
+                this.discardBtn.textContent = 'Discard Changes';
                 this.discardBtn.style.cssText = `
                         background: none; border: 1px solid var(--vscode-editorWidget-border);
                         color: var(--vscode-foreground); border-radius: 2px;
@@ -390,8 +369,7 @@ export class ObsidianMemoryEditorPane extends Disposable {
                 footer.appendChild(spacer);
 
                 const deleteBtn = dom.$('button') as HTMLButtonElement;
-                deleteBtn.textContent = Nls.DELETE_MEMORY;
-                deleteBtn.setAttribute('aria-label', 'Delete memory');
+                deleteBtn.textContent = 'Delete Memory';
                 deleteBtn.style.cssText = `
                         background: var(--vscode-errorBackground, #5a1d1d); border: none;
                         color: var(--vscode-errorForeground, #f48771); border-radius: 2px;
@@ -529,12 +507,11 @@ export class ObsidianMemoryEditorPane extends Disposable {
         }
 
         private updateMetadata(entry: IObsidianMemoryEntry): void {
-                // Safe DOM construction — use escapeHtml for innerHTML content
                 this.metaEl.innerHTML = `
-                        ID: <code style="font-size:10px;color:var(--vscode-textPreformat-foreground);background:var(--vscode-textPreformat-background);padding:1px 3px;border-radius:2px;">${this.escapeHtml(entry.id.substring(0, 8))}...</code>
-                        &nbsp;·&nbsp; Source: <span style="padding:1px 4px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);border-radius:2px;">${this.escapeHtml(entry.source)}</span>
-                        &nbsp;·&nbsp; Created: ${this.escapeHtml(new Date(entry.createdAt).toLocaleString())}
-                        &nbsp;·&nbsp; Updated: ${this.escapeHtml(new Date(entry.updatedAt).toLocaleString())}
+                        ID: <code style="font-size:10px;color:var(--vscode-textPreformat-foreground);background:var(--vscode-textPreformat-background);padding:1px 3px;border-radius:2px;">${entry.id.substring(0, 8)}...</code>
+                        &nbsp;·&nbsp; Source: <span style="padding:1px 4px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);border-radius:2px;">${entry.source}</span>
+                        &nbsp;·&nbsp; Created: ${new Date(entry.createdAt).toLocaleString()}
+                        &nbsp;·&nbsp; Updated: ${new Date(entry.updatedAt).toLocaleString()}
                 `;
         }
 
@@ -546,13 +523,13 @@ export class ObsidianMemoryEditorPane extends Disposable {
                         this.previewArea.innerHTML = this.renderMarkdown(this.contentArea.value);
                         this.contentArea.style.display = 'none';
                         this.previewArea.style.display = 'block';
-                        this.previewToggleBtn.textContent = Nls.EDIT;
+                        this.previewToggleBtn.textContent = 'Edit';
                         this.previewToggleBtn.style.background = 'var(--vscode-button-background)';
                         this.previewToggleBtn.style.color = 'var(--vscode-button-foreground)';
                 } else {
                         this.contentArea.style.display = 'block';
                         this.previewArea.style.display = 'none';
-                        this.previewToggleBtn.textContent = Nls.PREVIEW;
+                        this.previewToggleBtn.textContent = 'Preview';
                         this.previewToggleBtn.style.background = 'none';
                         this.previewToggleBtn.style.color = 'var(--vscode-foreground)';
                 }
@@ -583,14 +560,8 @@ export class ObsidianMemoryEditorPane extends Disposable {
                 html = html.replace(/`([^`]+)`/g,
                         '<code style="background:var(--vscode-textCodeBlock-background);padding:1px 4px;border-radius:2px;font-size:12px;">$1</code>');
 
-                // Links — validate href scheme to prevent XSS
-                html = html.replace(/\[(.+?)\]\((.+?)\)/g, (_match, text, href) => {
-                        const safeHref = href.trim().toLowerCase();
-                        if (safeHref.startsWith('javascript:') || safeHref.startsWith('data:') || safeHref.startsWith('vbscript:')) {
-                                return `<span style="color:var(--vscode-foreground);">${text}</span>`; // Strip dangerous links
-                        }
-                        return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:var(--vscode-textLink-foreground);">${text}</a>`;
-                });
+                // Links
+                html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" style="color:var(--vscode-textLink-foreground);">$1</a>');
 
                 // Bullet lists
                 html = html.replace(/^[-*] (.+)$/gm, '<li style="margin-left:16px;">$1</li>');
@@ -627,6 +598,19 @@ export class ObsidianMemoryEditorPane extends Disposable {
                         }
                 }
                 return [...tags].sort();
+        }
+
+        /**
+         * Create a styled label element for form fields.
+         */
+        private createFieldLabel(text: string): HTMLElement {
+                const label = dom.$('label');
+                label.textContent = text;
+                label.style.cssText = `
+                        font-size: 11px; font-weight: 600; color: var(--vscode-descriptionForeground);
+                        min-width: 70px; text-transform: uppercase; letter-spacing: 0.5px;
+                `;
+                return label;
         }
 
         // ─── CRUD Actions ───────────────────────────────────────────────────
@@ -695,7 +679,7 @@ export class ConstructMemoryEditor {
                 @IObsidianMemoryService private readonly obsidianMemory: IObsidianMemoryService,
                 @ILogService private readonly logService: ILogService,
                 @INotificationService private readonly notificationService: INotificationService,
-                @IInstantiationService instantiationService: IInstantiationService,
+                @IInstantiationService private readonly instantiationService: IInstantiationService,
         ) {
                 this.logService.info('[ObsidianMemoryEditor] Editor helper initialized');
         }

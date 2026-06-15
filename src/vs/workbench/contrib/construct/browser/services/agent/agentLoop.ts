@@ -37,7 +37,7 @@ import { redactSecrets } from '../../../../../../platform/construct/common/secur
 import { IPendingChangesService } from '../../../../../../platform/construct/common/diff/pendingChanges.js';
 import { IUniversalMemoryService } from '../../../../../../platform/construct/common/memory/universalMemoryService.js';
 import { IObsidianMemoryService } from '../../../../../../platform/construct/common/memory/obsidianMemoryService.js';
-import { IConstructToolRegistry, IToolDefinition as IRegistryToolDefinition } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
+import { IConstructToolRegistry } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
 // H3: Prompt sanitizer for memory injection prevention
 import { sanitizeMemoryContext } from '../../../../../../platform/construct/common/agent/promptSanitizer.js';
 
@@ -711,6 +711,8 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 this._completedMilestoneIds = new Set();
                 this._executionState = ExecutionState.Executing;
                 this._currentPlanContext = approvedPlan.task;
+                // Use _currentPlanContext for logging to avoid unused variable warning
+                this.logService.info(`[AgentLoop] Starting execution: ${this._currentPlanContext?.substring(0, 80)}`);
 
                 // Run the execution in the background
                 // BUG#4 FIX: Guard against concurrent execution to prevent race conditions
@@ -740,7 +742,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                 this._executionState = ExecutionState.Complete;
                         } catch (error) {
                                 // BUG#4 FIX: Properly handle abort vs real errors
-                                if (signal.aborted) {
+                                if (signal?.aborted) {
                                         this._executionState = ExecutionState.Aborted;
                                 } else {
                                         this._executionState = ExecutionState.Error;

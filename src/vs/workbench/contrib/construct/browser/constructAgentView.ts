@@ -1,8 +1,9 @@
+// Copyright (c) 2025 Razisafir. All rights reserved.
+// Kovix proprietary code. See CONSTRUCT_LICENSE.txt.
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-// Copyright (c) 2025 Razisafir. All rights reserved. See CONSTRUCT_LICENSE.txt.
 
 import { IViewPaneOptions, ViewPane } from '../../../../workbench/browser/parts/views/viewPane.js';
 import * as dom from '../../../../base/browser/dom.js';
@@ -33,32 +34,15 @@ import { ITelemetryService } from '../../../../platform/telemetry/common/telemet
 import { IHoverService } from '../../../../platform/hover/browser/hover.js';
 import { ConstructProgressPanel } from './constructProgressPanel.js';
 import { LoadingState, FileChangeEntry, TaskMetrics } from '../../../../platform/construct/common/agent/loadingState.js';
-import { IRefinedIdea } from '../../../../platform/construct/common/agent/ideaRefinementTypes.js';
+import { IRefinedIdea, IRefinementQuestion, IRefinementAnswer } from '../../../../platform/construct/common/agent/ideaRefinementTypes.js';
 import { IIdeaRefinementService } from '../../../../platform/construct/common/agent/ideaRefinementService.js';
 import { IConstructSessionService } from '../../../../platform/construct/common/session/constructSessionService.js';
-import { IConstructProjectService } from '../../../../platform/construct/common/project/constructProjectService.js';
-import { IKovixPlanStep, IApprovedPlan, IMilestone } from '../../../../platform/construct/common/agent/milestoneStateMachine.js';
-import { IExecutionModeConfig } from '../../../../platform/construct/common/agent/executionMode.js';
-import { ConstructStopModePicker } from './constructStopModePicker.js';
-import { IUniversalMemoryService } from '../../../../platform/construct/common/memory/universalMemoryService.js';
-import { IQuickInputService, IQuickPickItem } from '../../../../platform/quickinput/common/quickInput.js';
-import * as Nls from './constructNls.js';
-import { ErrorBanner } from './components/errorBanner.js';
+import { ISelectablePlanStep, IApprovedPlan, IMilestone } from '../../../../platform/construct/common/agent/milestoneStateMachine.js';
+import { showStopModePicker } from './constructStopModePicker.js';
+// import { ExecutionMode } from '../../../../platform/construct/common/agent/executionMode.js';
+import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
 
-interface ISessionQuickPickItem extends IQuickPickItem {
-        sessionId: string;
-}
-
-type ExecutionState = 'idle' | 'planning' | 'refining' | 'awaiting_approval' | 'executing' | 'paused_at_milestone' | 'complete' | 'error' | 'stopped';
-
-type PlanStepStatus = 'pending' | 'in-progress' | 'complete' | 'error';
-
-interface PlanStepVisual {
-        index: number;
-        label: string;
-        status: PlanStepStatus;
-        element?: HTMLElement;
-}
+type ExecutionState = 'idle' | 'planning' | 'refining' | 'awaiting_approval' | 'executing' | 'paused_at_milestone' | 'complete' | 'error' | 'aborted';
 
 type ContextScope = 'currentFile' | 'workspace' | 'selectedText';
 
@@ -88,28 +72,12 @@ export class ConstructAgentViewPane extends ViewPane {
         private stopBtn!: HTMLButtonElement;
         private statusIndicator!: HTMLElement;
         private planContainer: HTMLElement | null = null;
-        private progressPanel: ConstructProgressPanel | undefined;
+        private progressPanel!: ConstructProgressPanel;
         private messageCount = 0;
         private currentTaskId: string | null = null;
         private executionState: ExecutionState = 'idle';
         private currentCancellationToken: CancellationTokenSource | null = null;
         private _abortController: AbortController | null = null;
-
-        // F-G-003: Store last task for crash recovery / retry
-        private _lastFailedTaskText: string | null = null;
-        private _errorRecoveryBar: HTMLElement | null = null;
-
-        // P7: Streaming progress state
-        private _streamingStatusBar: HTMLElement | null = null;
-        private _streamingTokenCount = 0;
-        private _streamingToolCallCount = 0;
-        private _streamingTimerInterval: number | undefined;
-        private _streamingStartTime = 0;
-
-        // P7: Plan visualization state
-        private _planStepVisuals: PlanStepVisual[] = [];
-        private _planTimelineContainer: HTMLElement | null = null;
-        private _currentPlanStepIndex = -1;
 
         // Performance metrics tracking
         private taskStartTime = 0;
@@ -143,22 +111,6 @@ export class ConstructAgentViewPane extends ViewPane {
         private pendingDiffs: PendingDiff[] = [];
         private diffCounter = 0;
 
-        // Phase 2 (Kovix): Idea refinement state
-        private _ideaRefinementProjectId: string | null = null;
-        private _refinedIdea: IRefinedIdea | null = null;
-        private _skipRefinement = false;
-
-        // Phase 3-4 (Kovix): Plan with checkboxes + stop mode
-        private approvedPlan: IApprovedPlan | null = null;
-        private stopModePicker: ConstructStopModePicker | null = null;
-        private planCheckboxes: HTMLInputElement[] = [];
-        private planMilestones: IMilestone[] = [];
-
-        // Phase 5 (Kovix): Milestone pause state
-        private errorBanner: ErrorBanner | null = null;
-        private _executionPaused = false;
-        private _resumeResolver: (() => void) | null = null;
-
         constructor(
                 options: IViewPaneOptions,
                 @IKeybindingService keybindingService: IKeybindingService,
@@ -186,33 +138,19 @@ export class ConstructAgentViewPane extends ViewPane {
                 @IIdeaRefinementService private readonly ideaRefinementService: IIdeaRefinementService,
                 @IConstructSessionService private readonly sessionService: IConstructSessionService,
                 @IQuickInputService private readonly quickInputService: IQuickInputService,
-                @IConstructProjectService private readonly projectService: IConstructProjectService,
-                @IUniversalMemoryService private readonly _universalMemoryService: IUniversalMemoryService,
         ) {
                 super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, telemetryService, hoverService);
-
-                // Suppress TS6133/TS6138 — these fields are placeholders for Phase 2/5 functionality
-                void this._ideaRefinementProjectId;
-                void this._refinedIdea;
-                void this._skipRefinement;
-                void this._executionPaused;
-                void this._resumeResolver;
-                void this._universalMemoryService;
         }
 
         protected override renderBody(container: HTMLElement): void {
                 super.renderBody(container);
 
-                container.setAttribute('role', 'region');
-                container.setAttribute('aria-label', 'Construct Agent Chat');
                 container.style.display = 'flex';
                 container.style.flexDirection = 'column';
                 container.style.height = '100%';
 
                 // --- Phase 2: Model Picker Header ---
                 const modelPickerBar = dom.$('.construct-model-picker-bar');
-                modelPickerBar.setAttribute('role', 'toolbar');
-                modelPickerBar.setAttribute('aria-label', 'Construct agent toolbar');
                 modelPickerBar.style.cssText = `
                         display: flex; align-items: center; justify-content: space-between;
                         padding: 6px 10px; border-bottom: 1px solid #1A1F2E;
@@ -220,9 +158,6 @@ export class ConstructAgentViewPane extends ViewPane {
                 `;
 
                 this.modelPickerBtn = dom.$('button.construct-model-picker') as HTMLButtonElement;
-                this.modelPickerBtn.setAttribute('role', 'combobox');
-                this.modelPickerBtn.setAttribute('aria-expanded', 'false');
-                this.modelPickerBtn.setAttribute('aria-haspopup', 'listbox');
                 this.modelPickerBtn.style.cssText = `
                         background: #141B2D; border: 1px solid #1A1F2E; border-radius: 4px;
                         color: #E0E7FF; font-size: 11px; padding: 4px 10px; cursor: pointer;
@@ -240,7 +175,6 @@ export class ConstructAgentViewPane extends ViewPane {
                 // --- Phase 4: Settings gear icon ---
                 const settingsBtn = dom.$('button.construct-settings-btn') as HTMLButtonElement;
                 settingsBtn.textContent = '\u2699'; // ⚙
-                settingsBtn.setAttribute('aria-label', 'API Settings');
                 settingsBtn.style.cssText = `
                         background: transparent; border: none; color: #4A5568;
                         cursor: pointer; font-size: 14px; padding: 2px 4px;
@@ -256,13 +190,12 @@ export class ConstructAgentViewPane extends ViewPane {
                 // Session history button
                 const sessionHistoryBtn = dom.$('button.construct-session-history-btn') as HTMLButtonElement;
                 sessionHistoryBtn.textContent = '\uD83D\uDCDC'; // 📜
-                sessionHistoryBtn.setAttribute('aria-label', Nls.SESSION_HISTORY);
                 sessionHistoryBtn.style.cssText = `
                         background: transparent; border: none; color: #4A5568;
                         cursor: pointer; font-size: 13px; padding: 2px 4px;
                         border-radius: 3px;
                 `;
-                sessionHistoryBtn.title = Nls.SESSION_HISTORY;
+                sessionHistoryBtn.title = 'Session History';
                 sessionHistoryBtn.onclick = () => { this.showSessionHistory(); };
                 modelPickerBar.appendChild(sessionHistoryBtn);
 
@@ -270,14 +203,8 @@ export class ConstructAgentViewPane extends ViewPane {
                 modelPickerBar.appendChild(providerLabel);
                 container.appendChild(modelPickerBar);
 
-                // ErrorBanner instance for structured error display
-                this.errorBanner = new ErrorBanner(container);
-
                 // Messages area
                 this.messageContainer = dom.$('.construct-messages');
-                this.messageContainer.setAttribute('role', 'log');
-                this.messageContainer.setAttribute('aria-live', 'polite');
-                this.messageContainer.setAttribute('aria-label', 'Agent chat messages');
                 this.messageContainer.style.cssText = `
                         flex: 1; overflow-y: auto; padding: 10px;
                 `;
@@ -292,16 +219,14 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 const title = dom.$('.construct-title');
                 title.style.cssText = `font-size: 14px; font-weight: 600; color: #E0E7FF; margin-bottom: 4px;`;
-                title.textContent = Nls.AGENT_TITLE;
+                title.textContent = 'Kovix Agent';
 
                 const subtitle = dom.$('.construct-subtitle');
                 subtitle.style.cssText = `font-size: 12px; color: #4A5568; margin-bottom: 12px;`;
-                subtitle.textContent = Nls.AGENT_SUBTITLE;
+                subtitle.textContent = 'AI-powered coding assistant';
 
                 // Status indicator
                 this.statusIndicator = dom.$('.construct-status');
-                this.statusIndicator.setAttribute('role', 'status');
-                this.statusIndicator.setAttribute('aria-live', 'polite');
                 this.updateStatusIndicator();
 
                 // Memory status indicator
@@ -313,7 +238,7 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 const hint = dom.$('.construct-hint');
                 hint.style.cssText = `font-size: 11px; color: #4A5568; font-family: monospace; background: #0A0E1A; border-radius: 4px; padding: 6px 10px; display: inline-block;`;
-                hint.textContent = Nls.AGENT_HINT;
+                hint.textContent = 'Ctrl+Shift+I  Inline edit  |  Ctrl+Shift+C  Focus panel';
 
                 welcome.appendChild(logo);
                 welcome.appendChild(title);
@@ -332,24 +257,14 @@ export class ConstructAgentViewPane extends ViewPane {
                 this.inputBox = document.createElement('textarea');
                 this.inputBox.className = 'construct-chat-input';
                 this.inputBox.rows = 1;
-                this.inputBox.placeholder = Nls.PLACEHOLDER_ASK;
-                this.inputBox.setAttribute('role', 'textbox');
-                this.inputBox.setAttribute('aria-label', 'Type your message to the AI agent');
-                this.inputBox.setAttribute('aria-multiline', 'true');
+                this.inputBox.placeholder = 'Ask Kovix anything...';
                 this.inputBox.style.cssText = `
                         flex: 1; background: #0A0E1A; border: 1px solid #1A1F2E;
                         border-radius: 4px; padding: 8px 10px; color: #E0E7FF;
                         font-size: 13px; outline: none; resize: none;
                         min-height: 36px; max-height: 200px;
                         font-family: inherit; line-height: 1.4;
-                        outline-offset: -1px;
                 `;
-                this.inputBox.addEventListener('focus', () => {
-                        this.inputBox.style.borderColor = '#00E5FF';
-                });
-                this.inputBox.addEventListener('blur', () => {
-                        this.inputBox.style.borderColor = '#1A1F2E';
-                });
                 this.inputBox.addEventListener('input', () => {
                         this.inputBox.style.height = 'auto';
                         this.inputBox.style.height = Math.min(this.inputBox.scrollHeight, 200) + 'px';
@@ -357,22 +272,18 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 this.sendBtn = dom.$('button.construct-send-btn') as HTMLButtonElement;
                 this.sendBtn.textContent = '\u2192'; // Right arrow
-                this.sendBtn.setAttribute('aria-label', 'Send message');
                 this.sendBtn.style.cssText = `
                         background: #00E5FF; color: #0A0E1A; border: none;
                         border-radius: 4px; padding: 6px 12px; cursor: pointer;
                         font-size: 14px; font-weight: bold;
-                        outline-offset: 2px;
                 `;
 
                 this.stopBtn = dom.$('button.construct-stop-btn') as HTMLButtonElement;
                 this.stopBtn.textContent = '\u25A0'; // Stop square
-                this.stopBtn.setAttribute('aria-label', 'Stop agent execution');
                 this.stopBtn.style.cssText = `
                         background: #FF4444; color: white; border: none;
                         border-radius: 4px; padding: 6px 10px; cursor: pointer;
                         font-size: 12px; display: none;
-                        outline-offset: 2px;
                 `;
 
                 // Handle send
@@ -435,15 +346,13 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 // --- Phase 4: Clear button ---
                 this.clearBtn = dom.$('button.construct-clear-btn') as HTMLButtonElement;
-                this.clearBtn.setAttribute('aria-label', 'Clear chat messages');
                 this.clearBtn.textContent = '\uD83D\uDDB1'; // 🗑
                 this.clearBtn.style.cssText = `
                         background: transparent; color: #4A5568; border: none;
                         cursor: pointer; font-size: 14px; padding: 4px 6px;
                         display: none; border-radius: 3px;
-                        outline-offset: 2px;
                 `;
-                this.clearBtn.title = Nls.CLEAR_CHAT;
+                this.clearBtn.title = 'Clear chat';
                 this.clearBtn.onclick = () => { this.clearMessages(); };
 
                 this.sendBtn.onclick = sendMessage;
@@ -451,26 +360,6 @@ export class ConstructAgentViewPane extends ViewPane {
                         if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
                                 sendMessage();
-                        }
-                        if (e.key === 'Escape') {
-                                // Stop agent execution when Escape is pressed
-                                if (this.executionState !== 'idle') {
-                                        if (this.currentCancellationToken) {
-                                                this.currentCancellationToken.cancel();
-                                                this.currentCancellationToken = null;
-                                        }
-                                        const controller = this._abortController;
-                                        if (controller) {
-                                                controller.abort();
-                                                this._abortController = null;
-                                        }
-                                }
-                                this.inputBox.blur();
-                        }
-                        // Ctrl+Shift+Enter accepts all pending diffs
-                        if (e.key === 'Enter' && e.ctrlKey && e.shiftKey) {
-                                e.preventDefault();
-                                this.acceptAllPendingDiffs();
                         }
                 };
 
@@ -493,12 +382,6 @@ export class ConstructAgentViewPane extends ViewPane {
                 inputArea.appendChild(this.sendBtn);
                 container.appendChild(inputArea);
 
-                // Tab order: input > send > stop > clear (logical chat flow)
-                this.inputBox.tabIndex = 0;
-                this.sendBtn.tabIndex = 0;
-                this.stopBtn.tabIndex = 0;
-                this.clearBtn.tabIndex = 0;
-
                 // --- Phase 2: Context Selector Bar ---
                 const contextBar = dom.$('.construct-context-bar');
                 contextBar.style.cssText = `
@@ -508,19 +391,18 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 const contextLabel = dom.$('.construct-context-label');
                 contextLabel.style.cssText = `font-size: 10px; color: #4A5568; margin-right: 2px;`;
-                contextLabel.textContent = Nls.CONTEXT_LABEL;
+                contextLabel.textContent = 'Context:';
 
                 const scopeOptions: Array<{ scope: ContextScope; label: string; icon: string }> = [
-                        { scope: 'currentFile', label: Nls.CONTEXT_FILE, icon: '\uD83D\uDCC4' },
-                        { scope: 'workspace', label: Nls.CONTEXT_WORKSPACE, icon: '\uD83D\uDCC2' },
-                        { scope: 'selectedText', label: Nls.CONTEXT_SELECTION, icon: '\u270F\uFE0F' },
+                        { scope: 'currentFile', label: 'File', icon: '\uD83D\uDCC4' },
+                        { scope: 'workspace', label: 'Workspace', icon: '\uD83D\uDCC2' },
+                        { scope: 'selectedText', label: 'Selection', icon: '\u270F\uFE0F' },
                 ];
 
                 contextBar.appendChild(contextLabel);
 
                 for (const opt of scopeOptions) {
                         const btn = dom.$('button.construct-context-scope-btn') as HTMLButtonElement;
-                        btn.setAttribute('aria-label', `Context scope: ${opt.label}`);
                         btn.style.cssText = `
                                 background: ${this.contextScope === opt.scope ? '#1A2744' : '#0A0E1A'};
                                 border: 1px solid ${this.contextScope === opt.scope ? '#00E5FF' : '#1A1F2E'};
@@ -576,14 +458,6 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 // Initial model info load
                 this.refreshModelPickerInfo();
-
-                // --- Phase 1 (Kovix): Project detection on load ---
-                this._register(this.projectService.onDidChangeActiveProject((project) => {
-                        if (project) {
-                                const statusEl = this.messageContainer.querySelector('.construct-project-status');
-                                if (statusEl) { statusEl.textContent = `Project: ${project.name}`; }
-                        }
-                }));
 
                 // --- Phase 4: Wire construct.newChat to clear ---
                 this._register(this.commandService.onWillExecuteCommand(e => {
@@ -670,7 +544,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 this._abortController = new AbortController();
                 const abortController = this._abortController;
                 // BUG#6 FIX: Store the disposable to prevent listener leak
-			this._register(this.currentCancellationToken.token.onCancellationRequested(() => abortController.abort()));
+                        this._register(this.currentCancellationToken.token.onCancellationRequested(() => abortController.abort()));
                 this.taskStartTime = Date.now();
                 this.planningStartTime = Date.now();
                 this.planningEndTime = 0;
@@ -688,7 +562,7 @@ export class ConstructAgentViewPane extends ViewPane {
                         const plan = await this.agentLoop.runPlanningPhase(task, abortController.signal);
 
                         if (abortController.signal.aborted) {
-                                this.setExecutionState('stopped');
+                                this.setExecutionState('aborted');
                                 this.updateMessageContent(planningMsg, '[STOP] Stopped by user');
                                 // Transition back to idle after showing stopped state
                                 setTimeout(() => { this.setExecutionState('idle'); }, 1500);
@@ -701,18 +575,14 @@ export class ConstructAgentViewPane extends ViewPane {
                         this.updateMessageContent(planningMsg, '');
                         this.renderPlan(plan, task);
 
-                        // P7: Render plan timeline visualization for execution tracking
-                        this._renderPlanTimeline(plan.steps);
-
                 } catch (error) {
                         this.setExecutionState('error');
                         const msg = error instanceof Error ? error.message : String(error);
                         this.updateMessageContent(planningMsg, `[FAIL] Planning failed: ${msg}`);
                         this.logService.error('[AgentView] Planning error:', msg);
 
-                        // F-G-003: Store failed task for retry and show persistent error recovery bar
-                        this._lastFailedTaskText = task;
-                        this.showErrorRecoveryBar(msg);
+                        // Transition back to idle after showing error
+                        setTimeout(() => { this.setExecutionState('idle'); }, 2000);
                 } finally {
                         // BUG 6 FIX: Clean up cancellation state to prevent stale references
                         this.currentCancellationToken?.dispose();
@@ -722,167 +592,150 @@ export class ConstructAgentViewPane extends ViewPane {
         }
 
         /**
-         * Render the plan with checkboxes, milestones, and stop mode picker integration.
+         * Render the plan with Approve/Cancel buttons.
          */
+        private selectableSteps: ISelectablePlanStep[] = [];
+        private _currentPlanTask: string = '';
+
         private renderPlan(plan: IPlanResult, task: string): void {
+                // Remove any existing plan container
                 this.planContainer?.remove();
+                this._currentPlanTask = task;
+                // Log the plan task for debugging
+                this.logService.debug(`[ConstructAgent] Rendering plan for: ${this._currentPlanTask?.substring(0, 80)}`);
+
+                // Create selectable steps from the plan
+                this.selectableSteps = plan.steps.map((step, idx) => ({
+                        index: idx,
+                        action: step.action,
+                        target: step.target,
+                        description: step.description,
+                        selected: true,
+                }));
 
                 this.planContainer = dom.$('.construct-plan');
-                this.planContainer.setAttribute('role', 'region');
-                this.planContainer.setAttribute('aria-label', 'Execution plan');
                 this.planContainer.style.cssText = `
                         background: #141B2D; border: 1px solid #1A1F2E;
                         border-radius: 6px; padding: 12px; margin: 8px 0;
                 `;
 
-                // Convert IPlanStep[] to IKovixPlanStep[] with milestone marking
-                const kovixSteps: IKovixPlanStep[] = plan.steps.map((step, i) => {
-                        const isMilestone = (i > 0 && i < plan.steps.length - 1 && (i + 1) % 3 === 0) || i === plan.steps.length - 1;
-                        return {
-                                ...step,
-                                selected: true,
-                                isMilestone,
-                                milestoneLabel: isMilestone ? this._generateMilestoneLabel(step) : undefined,
-                        };
-                });
-
-                // Extract milestones
-                this.planMilestones = kovixSteps
-                        .filter(s => s.isMilestone)
-                        .map((s, mi) => ({
-                                id: `milestone-${mi}`,
-                                label: s.milestoneLabel ?? `Milestone ${mi + 1}`,
-                                stepIndices: [s.index],
-                                isMajor: mi % 2 === 0 || mi === kovixSteps.filter(st => st.isMilestone).length - 1,
-                                status: 'pending' as const,
-                        }));
-
                 // Plan header
                 const header = dom.$('.construct-plan-header');
-                header.style.cssText = `font-weight: 600; color: #E0E7FF; margin-bottom: 4px; font-size: 13px;`;
-                header.textContent = `\uD83D\uDCCB Plan ready \u2014 ${plan.steps.length} steps, ${this.planMilestones.length} milestones`;
+                header.style.cssText = `font-weight: 600; color: #E0E7FF; margin-bottom: 8px; font-size: 13px;`;
+                header.textContent = `\uD83D\uDCA1 Plan ready \u2014 ${plan.steps.length} steps`;
                 this.planContainer.appendChild(header);
 
-                const subHeader = dom.$('.construct-plan-subheader');
-                subHeader.style.cssText = `font-size: 11px; color: #4A5568; margin-bottom: 8px;`;
-                subHeader.textContent = Nls.UNCHECK_STEPS;
-                this.planContainer.appendChild(subHeader);
+                // Select All / Deselect All controls
+                if (this.selectableSteps.length > 0) {
+                        const controlBar = dom.$('.construct-plan-controls');
+                        controlBar.style.cssText = `display: flex; gap: 8px; margin-bottom: 8px;`;
 
-                // Plan steps with checkboxes
-                this.planCheckboxes = [];
-                const stepsContainer = dom.$('.construct-plan-steps');
-                stepsContainer.style.cssText = `max-height: 300px; overflow-y: auto;`;
-
-                for (const step of kovixSteps) {
-                        const row = dom.$('.construct-plan-step-row');
-                        row.style.cssText = `display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 12px; color: #C0C0C0; ${step.isMilestone ? 'background: #1A2744; border-radius: 3px; padding: 4px 6px; margin: 2px 0;' : ''}`;
-
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.checked = step.selected;
-                        checkbox.setAttribute('aria-label', `${step.action}: ${step.target}`);
-                        checkbox.style.cssText = `accent-color: #00E5FF; cursor: pointer;`;
-                        this.planCheckboxes.push(checkbox);
-
-                        const icon = this.getActionIcon(step.action);
-                        const milestoneMarker = step.isMilestone ? '\u2605 ' : '';
-                        const label = dom.$('span');
-                        label.textContent = `${milestoneMarker}${icon} ${step.action}: ${step.target}`;
-                        if (step.isMilestone) {
-                                label.style.color = '#00E5FF';
-                                label.style.fontWeight = '600';
-                        }
-
-                        checkbox.onchange = () => {
-                                step.selected = checkbox.checked;
-                                this._updatePlanSummary(summaryEl, kovixSteps);
+                        const selectAllBtn = dom.$('button') as HTMLButtonElement;
+                        selectAllBtn.textContent = 'Select All';
+                        selectAllBtn.style.cssText = `
+                                background: #1A2744; border: 1px solid #2D3A5C; border-radius: 3px;
+                                color: #E0E7FF; font-size: 11px; padding: 3px 8px; cursor: pointer;
+                        `;
+                        selectAllBtn.onclick = () => {
+                                this.selectableSteps.forEach(s => s.selected = true);
+                                this.planContainer?.querySelectorAll<HTMLInputElement>('.construct-step-checkbox').forEach(cb => { cb.checked = true; });
+                                this.planContainer?.querySelectorAll('.construct-step-text').forEach(el => { (el as HTMLElement).style.textDecoration = 'none'; });
                         };
 
-                        row.appendChild(checkbox);
-                        row.appendChild(label);
-                        stepsContainer.appendChild(row);
+                        const deselectAllBtn = dom.$('button') as HTMLButtonElement;
+                        deselectAllBtn.textContent = 'Deselect All';
+                        deselectAllBtn.style.cssText = `
+                                background: #1A2744; border: 1px solid #2D3A5C; border-radius: 3px;
+                                color: #E0E7FF; font-size: 11px; padding: 3px 8px; cursor: pointer;
+                        `;
+                        deselectAllBtn.onclick = () => {
+                                this.selectableSteps.forEach(s => s.selected = false);
+                                this.planContainer?.querySelectorAll<HTMLInputElement>('.construct-step-checkbox').forEach(cb => { cb.checked = false; });
+                                this.planContainer?.querySelectorAll('.construct-step-text').forEach(el => { (el as HTMLElement).style.textDecoration = 'line-through'; });
+                        };
+
+                        controlBar.appendChild(selectAllBtn);
+                        controlBar.appendChild(deselectAllBtn);
+                        this.planContainer.appendChild(controlBar);
                 }
-                this.planContainer.appendChild(stepsContainer);
 
-                // Select All / Deselect All
-                const selectBtns = dom.$('.construct-plan-select-btns');
-                selectBtns.style.cssText = `display: flex; gap: 8px; margin-top: 6px; margin-bottom: 6px;`;
+                // Plan steps with checkboxes
+                if (this.selectableSteps.length > 0) {
+                        for (const step of this.selectableSteps) {
+                                const stepRow = dom.$('.construct-plan-step');
+                                stepRow.style.cssText = `display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 12px;`;
 
-                const selectAllBtn = dom.$('button') as HTMLButtonElement;
-                selectAllBtn.textContent = Nls.SELECT_ALL;
-                selectAllBtn.setAttribute('aria-label', 'Select all plan steps');
-                selectAllBtn.style.cssText = `background: transparent; border: 1px solid #1A1F2E; color: #4A5568; border-radius: 3px; padding: 2px 8px; cursor: pointer; font-size: 10px;`;
-                selectAllBtn.onclick = () => {
-                        kovixSteps.forEach((s, i) => { s.selected = true; this.planCheckboxes[i].checked = true; });
-                        this._updatePlanSummary(summaryEl, kovixSteps);
-                };
+                                const checkbox = document.createElement('input');
+                                checkbox.type = 'checkbox';
+                                checkbox.checked = step.selected;
+                                checkbox.className = 'construct-step-checkbox';
+                                checkbox.style.cssText = `accent-color: #00E5FF; cursor: pointer;`;
+                                checkbox.onchange = () => {
+                                        step.selected = checkbox.checked;
+                                        const textEl = stepRow.querySelector('.construct-step-text') as HTMLElement;
+                                        if (textEl) {
+                                                textEl.style.textDecoration = checkbox.checked ? 'none' : 'line-through';
+                                                textEl.style.color = checkbox.checked ? '#C0C0C0' : '#666';
+                                        }
+                                };
 
-                const deselectAllBtn = dom.$('button') as HTMLButtonElement;
-                deselectAllBtn.textContent = Nls.DESELECT_ALL;
-                deselectAllBtn.setAttribute('aria-label', 'Deselect all plan steps');
-                deselectAllBtn.style.cssText = `background: transparent; border: 1px solid #1A1F2E; color: #4A5568; border-radius: 3px; padding: 2px 8px; cursor: pointer; font-size: 10px;`;
-                deselectAllBtn.onclick = () => {
-                        kovixSteps.forEach((s, i) => { s.selected = false; this.planCheckboxes[i].checked = false; });
-                        this._updatePlanSummary(summaryEl, kovixSteps);
-                };
+                                const icon = this.getActionIcon(step.action);
+                                const stepText = dom.$('.construct-step-text');
+                                stepText.style.cssText = `color: #C0C0C0;`;
+                                stepText.textContent = `${icon} ${step.action}: ${step.target}`;
 
-                selectBtns.appendChild(selectAllBtn);
-                selectBtns.appendChild(deselectAllBtn);
-                this.planContainer.appendChild(selectBtns);
-
-                // Summary
-                const summaryEl = dom.$('.construct-plan-summary-text');
-                summaryEl.style.cssText = `font-size: 11px; color: #4A5568; margin-bottom: 8px;`;
-                this._updatePlanSummary(summaryEl, kovixSteps);
-                this.planContainer.appendChild(summaryEl);
+                                stepRow.appendChild(checkbox);
+                                stepRow.appendChild(stepText);
+                                this.planContainer.appendChild(stepRow);
+                        }
+                } else {
+                        // No structured steps -- show the raw summary
+                        const summaryEl = dom.$('.construct-plan-summary');
+                        summaryEl.style.cssText = `font-size: 12px; color: #C0C0C0; white-space: pre-wrap; max-height: 150px; overflow-y: auto;`;
+                        summaryEl.textContent = plan.summary.substring(0, 500);
+                        this.planContainer.appendChild(summaryEl);
+                }
 
                 // Buttons
                 const btnContainer = dom.$('.construct-plan-buttons');
-                btnContainer.style.cssText = `display: flex; gap: 8px; margin-top: 6px; justify-content: flex-end;`;
-
-                const refineBtn = dom.$('button') as HTMLButtonElement;
-                refineBtn.textContent = Nls.REFINE_IDEA;
-                refineBtn.setAttribute('aria-label', 'Refine idea');
-                refineBtn.style.cssText = `background: transparent; border: 1px solid #1A1F2E; color: #4A5568; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px;`;
-                refineBtn.onclick = () => {
-                        this.planContainer?.remove();
-                        this.planContainer = null;
-                        // Go back to idea refinement
-                        this.setExecutionState('idle');
-                        this.addAgentMessage('[INFO] Returning to idea refinement. Type your additional thoughts below.', 'info');
-                };
+                btnContainer.style.cssText = `display: flex; gap: 8px; margin-top: 10px;`;
 
                 const approveBtn = dom.$('button') as HTMLButtonElement;
-                approveBtn.textContent = Nls.APPROVE_AND_CONTINUE;
-                approveBtn.setAttribute('aria-label', 'Approve plan and continue');
-                approveBtn.style.cssText = `background: #00C853; color: white; border: none; border-radius: 4px; padding: 6px 14px; cursor: pointer; font-size: 12px; font-weight: 600;`;
-                approveBtn.onclick = () => {
-                        // Build IApprovedPlan from selected steps
-                        const selectedSteps = kovixSteps.filter(s => s.selected);
-                        const excludedSteps = kovixSteps.filter(s => !s.selected);
-                        if (selectedSteps.length === 0) {
-                                this.notificationService.warn('Select at least one step to continue.');
-                                return;
-                        }
-                        const projectId = this.projectService.getActiveProject()?.id ?? 'default';
-                        this.approvedPlan = {
-                                projectId,
-                                allSteps: kovixSteps,
-                                selectedSteps,
-                                excludedSteps,
-                                milestones: this.planMilestones,
-                                approvedAt: Date.now(),
-                        };
-                        this.planContainer?.remove();
-                        this.planContainer = null;
-                        // Show stop mode picker
-                        this._showStopModePicker(task);
-                };
+                approveBtn.textContent = '\u2705 Approve';
+                approveBtn.style.cssText = `
+                        background: #00C853; color: white; border: none;
+                        border-radius: 4px; padding: 6px 14px; cursor: pointer;
+                        font-size: 12px; font-weight: 600;
+                `;
 
                 const cancelBtn = dom.$('button') as HTMLButtonElement;
-                cancelBtn.textContent = Nls.CANCEL;
-                cancelBtn.setAttribute('aria-label', 'Cancel plan');
-                cancelBtn.style.cssText = `background: transparent; border: 1px solid #FF4444; color: #FF4444; border-radius: 4px; padding: 6px 14px; cursor: pointer; font-size: 12px;`;
+                cancelBtn.textContent = '\u274C Cancel';
+                cancelBtn.style.cssText = `
+                        background: #FF4444; color: white; border: none;
+                        border-radius: 4px; padding: 6px 14px; cursor: pointer;
+                        font-size: 12px; font-weight: 600;
+                `;
+
+                approveBtn.onclick = async () => {
+                        // Show stop mode picker
+                        const milestones = this.agentLoop.extractMilestonesFromPlan(plan.steps);
+                        const selectedMode = await showStopModePicker(this.quickInputService, milestones);
+                        if (!selectedMode) { return; } // cancelled
+
+                        const approvedPlan: IApprovedPlan = {
+                                task,
+                                steps: this.selectableSteps,
+                                executionMode: selectedMode,
+                                milestones,
+                                approved: true,
+                                approvedAt: Date.now(),
+                        };
+
+                        this.planContainer?.remove();
+                        this.planContainer = null;
+                        this.runExecution(task, approvedPlan);
+                };
+
                 cancelBtn.onclick = () => {
                         this.planContainer?.remove();
                         this.planContainer = null;
@@ -891,53 +744,11 @@ export class ConstructAgentViewPane extends ViewPane {
                         this.progressPanel?.clear();
                 };
 
-                btnContainer.appendChild(refineBtn);
-                btnContainer.appendChild(cancelBtn);
                 btnContainer.appendChild(approveBtn);
+                btnContainer.appendChild(cancelBtn);
                 this.planContainer.appendChild(btnContainer);
 
                 this.messageContainer.appendChild(this.planContainer);
-                this.scrollToBottom();
-        }
-
-        private _updatePlanSummary(summaryEl: HTMLElement, steps: IKovixPlanStep[]): void {
-                const selected = steps.filter(s => s.selected).length;
-                const excluded = steps.filter(s => !s.selected).length;
-                summaryEl.textContent = `${selected} steps selected, ${excluded} excluded`;
-        }
-
-        private _generateMilestoneLabel(step: { action: string; target: string; description: string }): string {
-                const target = step.target || step.description;
-                if (target.length > 40) {
-                        return target.substring(0, 40) + '...';
-                }
-                return target;
-        }
-
-        private _showStopModePicker(task: string): void {
-                this.planContainer?.remove();
-                this.stopModePicker?.dispose();
-
-                this.stopModePicker = new ConstructStopModePicker(
-                        this.planMilestones,
-                        (modeConfig: IExecutionModeConfig) => {
-                                // Store the execution mode in the approved plan
-                                if (this.approvedPlan) {
-                                        this.approvedPlan.executionModeConfig = modeConfig;
-                                }
-                                this.stopModePicker?.dispose();
-                                this.stopModePicker = null;
-                                this.runExecution(task);
-                        },
-                        () => {
-                                // Back to plan — re-render plan view
-                                this.stopModePicker?.dispose();
-                                this.stopModePicker = null;
-                                this.setExecutionState('idle');
-                        },
-                );
-
-                this.stopModePicker.render(this.messageContainer);
                 this.scrollToBottom();
         }
 
@@ -952,7 +763,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 this._abortController = new AbortController();
                 const abortController = this._abortController;
                 // BUG#6 FIX: Store the disposable to prevent listener leak
-			this._register(this.currentCancellationToken.token.onCancellationRequested(() => abortController.abort()));
+                        this._register(this.currentCancellationToken.token.onCancellationRequested(() => abortController.abort()));
 
                 // Clear and re-initialize progress panel for execution phase
                 if (this.progressPanel) {
@@ -967,9 +778,6 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 // Streaming output area
                 const execMsg = this.addAgentMessage('', 'streaming');
-
-                // P7: Create streaming progress status bar
-                this._createStreamingStatusBar();
 
                 let fullText = '';
                 let stepCount = 0;
@@ -990,9 +798,6 @@ export class ConstructAgentViewPane extends ViewPane {
 
                                         case 'token':
                                                 fullText += event.text;
-                                                // P7: Track token count for streaming progress
-                                                this._streamingTokenCount++;
-                                                this._updateStreamingStatusBar();
                                                 break;
 
                                         case 'tool_start':
@@ -1012,10 +817,6 @@ export class ConstructAgentViewPane extends ViewPane {
                                                                 currentToolDetail = input.command.substring(0, 60);
                                                         }
                                                 }
-                                                // P7: Track tool call count and update plan visualization
-                                                this._streamingToolCallCount++;
-                                                this._updateStreamingStatusBar();
-                                                this._advancePlanStep(stepCount - 1, 'in-progress');
                                                 break;
 
                                         case 'tool_executing':
@@ -1044,12 +845,8 @@ export class ConstructAgentViewPane extends ViewPane {
 
                                                 if (event.success) {
                                                         fullText += `\n[OK] ${event.toolName} completed`;
-                                                        // P7: Mark plan step complete
-                                                        this._advancePlanStep(stepCount - 1, 'complete');
                                                 } else {
                                                         fullText += `\n[FAIL] ${event.toolName} failed: ${event.result.substring(0, 200)}`;
-                                                        // P7: Mark plan step error
-                                                        this._advancePlanStep(stepCount - 1, 'error');
                                                 }
                                                 break;
                                         }
@@ -1060,28 +857,26 @@ export class ConstructAgentViewPane extends ViewPane {
                                                 break;
 
                                         case 'milestone_reached':
-                                                fullText += `\n\n\uD83D\uDEA9 Milestone reached: ${event.milestone.label}`;
+                                                fullText += `\n\n\uD83D\uDEA9 Milestone reached: ${event.milestone.name}`;
                                                 break;
 
                                         case 'milestone_paused':
                                                 this.setExecutionState('paused_at_milestone');
-                                                fullText += `\n\n\u23F8 Paused at milestone: ${event.milestone.label}`;
+                                                fullText += `\n\n\u23F8 Paused at milestone: ${event.milestone.name}`;
                                                 this.renderMilestonePauseControls(event.milestone);
                                                 break;
 
                                         case 'milestone_resumed':
                                                 this.setExecutionState('executing');
-                                                fullText += `\n\n\u25B6 Resumed from milestone: ${event.milestoneId}`;
+                                                fullText += `\n\n\u25B6 Resumed from milestone: ${event.milestone.name}`;
                                                 break;
 
                                         case 'milestone_completed':
-                                                fullText += `\n\n\u2705 Milestone completed: ${event.milestone.label}`;
+                                                fullText += `\n\n\u2705 Milestone completed: ${event.milestone.name}`;
                                                 break;
 
                                         case 'complete':
                                                 fullText += `\n\n[OK] Task complete`;
-                                                // P7: Mark all remaining plan steps as complete
-                                                this._completeAllPlanSteps();
                                                 break;
 
                                         case 'error':
@@ -1096,8 +891,6 @@ export class ConstructAgentViewPane extends ViewPane {
                                                 } else {
                                                         fullText += `\n\n[FAIL] ${event.text}`;
                                                 }
-                                                // P7: Mark current plan step as error on error event
-                                                this._advancePlanStep(this._currentPlanStepIndex, 'error');
                                                 break;
                                 }
 
@@ -1105,16 +898,11 @@ export class ConstructAgentViewPane extends ViewPane {
                                 this.scrollToBottom();
                         }
 
-                        this.setExecutionState(abortController.signal.aborted ? 'stopped' : 'complete');
+                        this.setExecutionState(abortController.signal.aborted ? 'aborted' : 'complete');
 
-                        // P7: Transition to idle after brief delay only on success.
-                        // Error state stays persistent — user must take action via recovery bar.
-                        if (abortController.signal.aborted) {
-                                // Stopped by user — brief display then idle
-                                setTimeout(() => { this.setExecutionState('idle'); }, 1500);
-                        } else {
-                                setTimeout(() => { this.setExecutionState('idle'); }, 1500);
-                        }
+                        // Transition back to idle after a brief delay so the user can
+                        // see the final state indicator, then send another message.
+                        setTimeout(() => { this.setExecutionState('idle'); }, 1500);
 
                         // Auto-learn the task completion
                         if (this.constructMemory.config.enabled && this.constructMemory.config.autoLearn) {
@@ -1133,36 +921,13 @@ export class ConstructAgentViewPane extends ViewPane {
                         this.updateMessageContent(execMsg, `[FAIL] Error: ${msg}`);
                         this.logService.error('[AgentView] Execution error:', msg);
 
-                        // F-G-003: Store failed task for retry and show persistent error recovery bar
-                        this._lastFailedTaskText = task;
-                        this.showErrorRecoveryBar(msg);
-
-                        // Show structured ErrorBanner for tool execution failures
-                        this.errorBanner?.show({
-                                message: 'Agent execution failed',
-                                details: msg,
-                                canRetry: true,
-                                canUndo: this.pendingDiffs.length > 0,
-                                onRetry: async () => {
-                                        if (this._lastFailedTaskText) {
-                                                this.inputBox.value = this._lastFailedTaskText;
-                                                this._lastFailedTaskText = null;
-                                        }
-                                },
-                                onUndo: async () => {
-                                        this.commandService.executeCommand('construct.rejectAllPendingChanges');
-                                },
-                                onDismiss: () => {
-                                        this.setExecutionState('idle');
-                                },
-                        });
+                        // Transition back to idle after showing error
+                        setTimeout(() => { this.setExecutionState('idle'); }, 2000);
                 } finally {
                         // BUG 6 FIX: Clean up cancellation state to prevent stale references
                         this.currentCancellationToken?.dispose();
                         this.currentCancellationToken = null;
                         this._abortController = null;
-                        // P7: Clean up streaming progress
-                        this._destroyStreamingStatusBar();
                 }
         }
 
@@ -1170,8 +935,6 @@ export class ConstructAgentViewPane extends ViewPane {
 
         private addUserMessage(text: string): void {
                 const msg = dom.$('.construct-user-msg');
-                msg.setAttribute('role', 'article');
-                msg.setAttribute('aria-label', 'User message');
                 msg.style.cssText = `
                         background: #00E5FF20; border-left: 2px solid #00E5FF;
                         padding: 8px 10px; margin: 8px 0; border-radius: 0 4px 4px 0;
@@ -1184,8 +947,6 @@ export class ConstructAgentViewPane extends ViewPane {
 
         private addAgentMessage(text: string, type: 'info' | 'error' | 'streaming' = 'info'): HTMLElement {
                 const msg = dom.$('.construct-agent-msg');
-                msg.setAttribute('role', 'article');
-                msg.setAttribute('aria-label', 'Assistant message');
 
                 const borderColors: Record<string, string> = {
                         info: '#4A5568',
@@ -1219,131 +980,18 @@ export class ConstructAgentViewPane extends ViewPane {
                 this.inputBox.disabled = isRunning;
 
                 if (state === 'idle') {
-                        this.inputBox.placeholder = Nls.PLACEHOLDER_ASK;
+                        this.inputBox.placeholder = 'Ask Kovix anything...';
                         // Clean up progress panel
                         if (this.progressPanel) {
                                 this.progressPanel.dispose();
-                                this.progressPanel = undefined;
-                        }
-                        // F-G-003: Remove error recovery bar when transitioning to idle
-                        this.removeErrorRecoveryBar();
-                        // P7: Auto-focus input after agent response
-                        this.inputBox.focus();
-                } else if (state === 'error') {
-                        // F-G-003: Error state is persistent — user must take action
-                        this.inputBox.placeholder = Nls.PLACEHOLDER_ERROR_RECOVERY;
-                        this.sendBtn.style.display = 'none';
-                        this.stopBtn.style.display = 'none';
-                        // P7: Focus on error recovery bar for accessibility
-                        if (this._errorRecoveryBar) {
-                                this._errorRecoveryBar.focus();
+                                this.progressPanel = undefined as any;
                         }
                 } else if (state === 'planning') {
-                        this.inputBox.placeholder = Nls.PLACEHOLDER_PLANNING;
+                        this.inputBox.placeholder = 'Planning...';
                 } else if (state === 'executing') {
-                        this.inputBox.placeholder = Nls.PLACEHOLDER_EXECUTING;
+                        this.inputBox.placeholder = 'Executing...';
                 } else if (state === 'awaiting_approval') {
-                        this.inputBox.placeholder = Nls.PLACEHOLDER_AWAITING_APPROVAL;
-                }
-        }
-
-        // F-G-003: Persistent error recovery bar with Retry / Undo / Dismiss buttons
-        private showErrorRecoveryBar(errorMessage: string): void {
-                this.removeErrorRecoveryBar();
-
-                const bar = dom.$('.construct-error-recovery');
-                bar.setAttribute('role', 'alert');
-                bar.setAttribute('tabindex', '0');
-                bar.style.cssText = `
-                        background: #FF444415; border: 1px solid #FF444440;
-                        border-radius: 6px; padding: 10px 12px; margin: 8px 0;
-                        display: flex; flex-direction: column; gap: 8px;
-                        outline: none;
-                `;
-
-                const msgEl = dom.$('.construct-error-recovery-msg');
-                msgEl.style.cssText = `font-size: 12px; color: #FF6666; white-space: pre-wrap;`;
-                msgEl.textContent = `Task failed: ${errorMessage}`;
-                bar.appendChild(msgEl);
-
-                const btnRow = dom.$('.construct-error-recovery-btns');
-                btnRow.style.cssText = `display: flex; gap: 8px;`;
-
-                const retryBtn = dom.$('button') as HTMLButtonElement;
-                retryBtn.textContent = Nls.RETRY;
-                retryBtn.setAttribute('aria-label', 'Retry failed task');
-                retryBtn.tabIndex = 0;
-                retryBtn.style.cssText = `
-                        background: #00E5FF; color: #0A0E1A; border: none; border-radius: 4px;
-                        padding: 5px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
-                        outline-offset: 2px;
-                `;
-                retryBtn.onclick = () => {
-                        this.removeErrorRecoveryBar();
-                        if (this._lastFailedTaskText) {
-                                const taskText = this._lastFailedTaskText;
-                                this._lastFailedTaskText = null;
-                                this.inputBox.value = taskText;
-                                // Re-trigger the send flow
-                                this.sendBtn.click();
-                        } else {
-                                this.setExecutionState('idle');
-                        }
-                };
-
-                const undoBtn = dom.$('button') as HTMLButtonElement;
-                undoBtn.textContent = Nls.UNDO_CHANGES;
-                undoBtn.setAttribute('aria-label', 'Undo changes');
-                undoBtn.tabIndex = 0;
-                undoBtn.style.cssText = `
-                        background: transparent; color: #FFB300; border: 1px solid #FFB30040;
-                        border-radius: 4px; padding: 5px 14px; font-size: 12px; cursor: pointer;
-                        outline-offset: 2px;
-                `;
-                undoBtn.onclick = async () => {
-                        this.removeErrorRecoveryBar();
-                        try {
-                                const result = await this.agentLoop.undoLastTask();
-                                if (result && result.success) {
-                                        this.addAgentMessage(`Undone: ${result.restoredCount} files restored, ${result.deletedCount} removed.`, 'info');
-                                } else {
-                                        this.addAgentMessage(Nls.NO_CHANGES_TO_UNDO, 'info');
-                                }
-                        } catch (e) {
-                                this.logService.warn('[AgentView] Undo failed:', e);
-                                this.addAgentMessage(Nls.UNDO_FAILED, 'error');
-                        }
-                        this.setExecutionState('idle');
-                };
-
-                const dismissBtn = dom.$('button') as HTMLButtonElement;
-                dismissBtn.textContent = Nls.DISMISS;
-                dismissBtn.setAttribute('aria-label', 'Dismiss error');
-                dismissBtn.tabIndex = 0;
-                dismissBtn.style.cssText = `
-                        background: transparent; color: #4A5568; border: 1px solid #1A1F2E;
-                        border-radius: 4px; padding: 5px 14px; font-size: 12px; cursor: pointer;
-                        outline-offset: 2px;
-                `;
-                dismissBtn.onclick = () => {
-                        this.removeErrorRecoveryBar();
-                        this.setExecutionState('idle');
-                };
-
-                btnRow.appendChild(retryBtn);
-                btnRow.appendChild(undoBtn);
-                btnRow.appendChild(dismissBtn);
-                bar.appendChild(btnRow);
-
-                this.messageContainer.appendChild(bar);
-                this._errorRecoveryBar = bar;
-                this.scrollToBottom();
-        }
-
-        private removeErrorRecoveryBar(): void {
-                if (this._errorRecoveryBar) {
-                        this._errorRecoveryBar.remove();
-                        this._errorRecoveryBar = null;
+                        this.inputBox.placeholder = 'Awaiting approval...';
                 }
         }
 
@@ -1351,13 +999,13 @@ export class ConstructAgentViewPane extends ViewPane {
                 const stateConfig: Record<ExecutionState, { text: string; color: string }> = {
                         idle: { text: '\u25CF Ready', color: '#00C853' },
                         planning: { text: '\u25CF Planning...', color: '#FFB300' },
-                        refining: { text: '\u25CF Refining...', color: '#AB47BC' },
                         awaiting_approval: { text: '\u25CF Awaiting Approval', color: '#FFB300' },
                         executing: { text: '\u25CF Executing...', color: '#00E5FF' },
                         paused_at_milestone: { text: '\u25CF Paused at Milestone', color: '#FF9800' },
                         complete: { text: '\u25CF Complete', color: '#00C853' },
                         error: { text: '\u25CF Error', color: '#FF4444' },
-                        stopped: { text: '\u25CF Stopped', color: '#FF9800' },
+                        aborted: { text: '\u25CF Aborted', color: '#FF9800' },
+                        refining: { text: '\u25CF Refining...', color: '#FFB300' },
                 };
                 const config = stateConfig[this.executionState] ?? stateConfig.idle;
                 this.statusIndicator.style.cssText = `font-size: 11px; color: ${config.color}; margin-bottom: 6px;`;
@@ -1403,23 +1051,23 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 const title = dom.$('.construct-title');
                 title.style.cssText = `font-size: 14px; font-weight: 600; color: #E0E7FF; margin-bottom: 4px;`;
-                title.textContent = Nls.AGENT_TITLE;
+                title.textContent = 'Kovix Agent';
 
                 const subtitle = dom.$('.construct-subtitle');
                 subtitle.style.cssText = `font-size: 12px; color: #4A5568; margin-bottom: 12px;`;
-                subtitle.textContent = Nls.AGENT_SUBTITLE;
+                subtitle.textContent = 'AI-powered coding assistant';
 
                 const statusEl = dom.$('.construct-status');
                 const stateConfig: Record<ExecutionState, { text: string; color: string }> = {
                         idle: { text: '\u25CF Ready', color: '#00C853' },
                         planning: { text: '\u25CF Planning...', color: '#FFB300' },
-                        refining: { text: '\u25CF Refining...', color: '#AB47BC' },
                         awaiting_approval: { text: '\u25CF Awaiting Approval', color: '#FFB300' },
                         executing: { text: '\u25CF Executing...', color: '#00E5FF' },
                         paused_at_milestone: { text: '\u25CF Paused at Milestone', color: '#FF9800' },
                         complete: { text: '\u25CF Complete', color: '#00C853' },
                         error: { text: '\u25CF Error', color: '#FF4444' },
-                        stopped: { text: '\u25CF Stopped', color: '#FF9800' },
+                        aborted: { text: '\u25CF Aborted', color: '#FF9800' },
+                        refining: { text: '\u25CF Refining...', color: '#FFB300' },
                 };
                 const cfg = stateConfig.idle;
                 statusEl.style.cssText = `font-size: 11px; color: ${cfg.color}; margin-bottom: 6px;`;
@@ -1433,7 +1081,7 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 const hint = dom.$('.construct-hint');
                 hint.style.cssText = `font-size: 11px; color: #4A5568; font-family: monospace; background: #0A0E1A; border-radius: 4px; padding: 6px 10px; display: inline-block;`;
-                hint.textContent = Nls.AGENT_HINT;
+                hint.textContent = 'Ctrl+Shift+I  Inline edit  |  Ctrl+Shift+C  Focus panel';
 
                 welcome.appendChild(logo);
                 welcome.appendChild(title);
@@ -1624,7 +1272,7 @@ export class ConstructAgentViewPane extends ViewPane {
                         font-family: monospace; font-size: 11px; color: #C0C0C0;
                         white-space: pre-wrap; background: #0A0E1A;
                 `;
-                contentArea.textContent = Nls.LOADING_FILE_CONTENT;
+                contentArea.textContent = 'Loading file content...';
 
                 // Load file content via diffApplier
                 this.diffApplier.readFile(filePath).then(content => {
@@ -1636,7 +1284,7 @@ export class ConstructAgentViewPane extends ViewPane {
                         const entry = this.pendingDiffs.find(d => d.id === diffId);
                         if (entry) { entry.content = content; }
                 }).catch(() => {
-                        contentArea.textContent = Nls.UNABLE_TO_READ_FILE;
+                        contentArea.textContent = '(Unable to read file content)';
                 });
 
                 // Buttons
@@ -1647,8 +1295,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 `;
 
                 const acceptBtn = dom.$('button') as HTMLButtonElement;
-                acceptBtn.textContent = Nls.ACCEPT;
-                acceptBtn.setAttribute('aria-label', 'Accept change');
+                acceptBtn.textContent = '\u2705 Accept';
                 acceptBtn.style.cssText = `
                         background: #00C853; color: white; border: none;
                         border-radius: 3px; padding: 4px 10px; cursor: pointer;
@@ -1656,8 +1303,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 `;
 
                 const rejectBtn = dom.$('button') as HTMLButtonElement;
-                rejectBtn.textContent = Nls.REJECT;
-                rejectBtn.setAttribute('aria-label', 'Reject change');
+                rejectBtn.textContent = '\u274C Reject';
                 rejectBtn.style.cssText = `
                         background: #FF4444; color: white; border: none;
                         border-radius: 3px; padding: 4px 10px; cursor: pointer;
@@ -1755,12 +1401,10 @@ export class ConstructAgentViewPane extends ViewPane {
 
         private async runRefinementFlow(idea: string): Promise<void> {
                 this.setExecutionState('refining');
-                const projectId = this.projectService.getActiveProject()?.id ?? 'default';
-                const techStack: string[] = [];
                 try {
-                        const firstQuestion = await this.ideaRefinementService.startRefinement(projectId, idea, techStack);
-                        if (!firstQuestion) {
-                                // No question - go straight to planning
+                        const questions = await this.ideaRefinementService.startRefinement(idea);
+                        if (questions.length === 0) {
+                                // No questions - go straight to planning
                                 this.setExecutionState('idle');
                                 const contextText = this.gatherContext();
                                 const taskWithContext = contextText ? `${idea}\n\n[Context (${this.contextScope})]:\n${contextText}` : idea;
@@ -1768,7 +1412,7 @@ export class ConstructAgentViewPane extends ViewPane {
                                 await this.runPlanActFlow(taskWithContext);
                                 return;
                         }
-                        this.renderRefinementQuestion(firstQuestion, idea, projectId);
+                        this.renderRefinementQuestions(questions, idea);
                 } catch (error) {
                         const msg = error instanceof Error ? error.message : String(error);
                         this.addAgentMessage(`[Refinement Error] ${msg}. Proceeding to planning...`, 'error');
@@ -1780,7 +1424,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 }
         }
 
-        private renderRefinementQuestion(questionText: string, idea: string, projectId: string): void {
+        private renderRefinementQuestions(questions: IRefinementQuestion[], idea: string): void {
                 const container = dom.$('.construct-refinement');
                 container.style.cssText = `
                         background: #141B2D; border: 1px solid #1A1F2E;
@@ -1789,40 +1433,72 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 const header = dom.$('.construct-refinement-header');
                 header.style.cssText = `font-weight: 600; color: #E0E7FF; margin-bottom: 10px; font-size: 13px;`;
-                header.textContent = Nls.IDEA_REFINEMENT;
+                header.textContent = `\uD83D\uDCA1 Idea Refinement \u2014 ${questions.length} questions`;
                 container.appendChild(header);
 
-                const qCard = dom.$('.construct-refinement-question');
-                qCard.style.cssText = `
-                        background: #0D1117; border: 1px solid #1A1F2E;
-                        border-radius: 4px; padding: 8px 10px; margin-bottom: 8px;
-                `;
+                const answers: Map<string, string> = new Map();
 
-                const qText = dom.$('.construct-refinement-text');
-                qText.style.cssText = `font-size: 12px; color: #E0E7FF; margin-bottom: 6px;`;
-                qText.textContent = questionText;
+                for (const q of questions) {
+                        const qCard = dom.$('.construct-refinement-question');
+                        qCard.style.cssText = `
+                                background: #0D1117; border: 1px solid #1A1F2E;
+                                border-radius: 4px; padding: 8px 10px; margin-bottom: 8px;
+                        `;
 
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.placeholder = Nls.YOUR_ANSWER;
-                input.setAttribute('aria-label', 'Refinement answer');
-                input.style.cssText = `
-                        width: 100%; background: #0A0E1A; border: 1px solid #1A1F2E;
-                        border-radius: 3px; padding: 6px 8px; color: #E0E7FF;
-                        font-size: 12px; outline: none; box-sizing: border-box;
-                `;
+                        const categoryBadge = dom.$('.construct-refinement-category');
+                        categoryBadge.style.cssText = `
+                                font-size: 10px; background: #1A2744; color: #00E5FF;
+                                border-radius: 3px; padding: 1px 6px; display: inline-block; margin-bottom: 4px;
+                        `;
+                        categoryBadge.textContent = q.category;
 
-                qCard.appendChild(qText);
-                qCard.appendChild(input);
-                container.appendChild(qCard);
+                        const qText = dom.$('.construct-refinement-text');
+                        qText.style.cssText = `font-size: 12px; color: #E0E7FF; margin-bottom: 6px;`;
+                        qText.textContent = q.text;
+
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.placeholder = q.suggestions?.[0] ?? 'Your answer...';
+                        input.style.cssText = `
+                                width: 100%; background: #0A0E1A; border: 1px solid #1A1F2E;
+                                border-radius: 3px; padding: 6px 8px; color: #E0E7FF;
+                                font-size: 12px; outline: none; box-sizing: border-box;
+                        `;
+                        input.oninput = () => { answers.set(q.id, input.value); };
+
+                        qCard.appendChild(categoryBadge);
+                        qCard.appendChild(qText);
+                        qCard.appendChild(input);
+
+                        // Suggestion chips
+                        if (q.suggestions && q.suggestions.length > 0) {
+                                const chipContainer = dom.$('.construct-refinement-chips');
+                                chipContainer.style.cssText = `display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;`;
+                                for (const suggestion of q.suggestions.slice(0, 3)) {
+                                        const chip = dom.$('button') as HTMLButtonElement;
+                                        chip.textContent = suggestion;
+                                        chip.style.cssText = `
+                                                background: #1A2744; border: 1px solid #2D3A5C; border-radius: 12px;
+                                                color: #E0E7FF; font-size: 10px; padding: 2px 8px; cursor: pointer;
+                                        `;
+                                        chip.onclick = () => {
+                                                input.value = suggestion;
+                                                answers.set(q.id, suggestion);
+                                        };
+                                        chipContainer.appendChild(chip);
+                                }
+                                qCard.appendChild(chipContainer);
+                        }
+
+                        container.appendChild(qCard);
+                }
 
                 // Action buttons
                 const btnContainer = dom.$('.construct-refinement-buttons');
                 btnContainer.style.cssText = `display: flex; gap: 8px; margin-top: 8px;`;
 
                 const submitBtn = dom.$('button') as HTMLButtonElement;
-                submitBtn.textContent = Nls.SUBMIT_ANSWER;
-                submitBtn.setAttribute('aria-label', 'Submit refinement answer');
+                submitBtn.textContent = 'Submit Answers';
                 submitBtn.style.cssText = `
                         background: #00E5FF; color: #0A0E1A; border: none;
                         border-radius: 4px; padding: 6px 14px; cursor: pointer;
@@ -1830,8 +1506,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 `;
 
                 const skipBtn = dom.$('button') as HTMLButtonElement;
-                skipBtn.textContent = Nls.SKIP_TO_PLANNING;
-                skipBtn.setAttribute('aria-label', 'Skip refinement and go to planning');
+                skipBtn.textContent = 'Skip to Planning';
                 skipBtn.style.cssText = `
                         background: #1A2744; border: 1px solid #2D3A5C; color: #E0E7FF;
                         border-radius: 4px; padding: 6px 14px; cursor: pointer;
@@ -1840,14 +1515,18 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 submitBtn.onclick = async () => {
                         container.remove();
-                        const answer = input.value || '';
-                        await this.handleRefinementAnswer(answer, idea, projectId);
+                        const refinementAnswers: IRefinementAnswer[] = questions.map(q => ({
+                                questionId: q.id,
+                                text: answers.get(q.id) ?? '',
+                                skipped: !answers.has(q.id),
+                        }));
+                        await this.handleRefinementAnswers(refinementAnswers, idea);
                 };
 
                 skipBtn.onclick = async () => {
                         container.remove();
                         try {
-                                const refinedIdea = await this.ideaRefinementService.forceComplete(projectId);
+                                const refinedIdea = await this.ideaRefinementService.skipToRefinedIdea();
                                 this.proceedWithRefinedIdea(refinedIdea, idea);
                         } catch {
                                 this.setExecutionState('idle');
@@ -1866,21 +1545,14 @@ export class ConstructAgentViewPane extends ViewPane {
                 this.scrollToBottom();
         }
 
-        private async handleRefinementAnswer(answer: string, idea: string, projectId: string): Promise<void> {
-                this.addAgentMessage(Nls.PROCESSING_ANSWER, 'info');
+        private async handleRefinementAnswers(answers: IRefinementAnswer[], idea: string): Promise<void> {
+                this.addAgentMessage('\u23F3 Processing your answers...', 'info');
                 try {
-                        const result = await this.ideaRefinementService.submitAnswer(projectId, answer);
-                        if (result.readyForPlanning && result.refinedIdea) {
-                                this.proceedWithRefinedIdea(result.refinedIdea, idea);
-                        } else if (result.nextQuestion) {
-                                this.renderRefinementQuestion(result.nextQuestion, idea, projectId);
+                        const result = await this.ideaRefinementService.submitAnswers(answers);
+                        if (result.type === 'questions') {
+                                this.renderRefinementQuestions(result.questions, idea);
                         } else {
-                                // No more questions but no refined idea either — proceed with original idea
-                                this.setExecutionState('idle');
-                                const contextText = this.gatherContext();
-                                const taskWithContext = contextText ? `${idea}\n\n[Context (${this.contextScope})]:\n${contextText}` : idea;
-                                this.toolLogEntries = [];
-                                await this.runPlanActFlow(taskWithContext);
+                                this.proceedWithRefinedIdea(result.refinedIdea, idea);
                         }
                 } catch (error) {
                         const msg = error instanceof Error ? error.message : String(error);
@@ -1902,7 +1574,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 summaryEl.innerHTML = `
                         <div style="font-weight:600;color:#E0E7FF;margin-bottom:6px;font-size:13px">\u2705 Refined Idea</div>
                         <div style="font-size:12px;color:#C0C0C0;margin-bottom:8px">${this.escapeHtml(refinedIdea.refinedDescription)}</div>
-                        <div style="font-size:11px;color:#00E5FF">Scope: ${this.escapeHtml(refinedIdea.scope)}</div>
+                        <div style="font-size:11px;color:#00E5FF">Confidence: ${Math.round(refinedIdea.confidence * 100)}%</div>
                 `;
                 this.messageContainer.appendChild(summaryEl);
                 this.scrollToBottom();
@@ -1924,20 +1596,19 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 const header = dom.$('.construct-milestone-header');
                 header.style.cssText = `font-weight: 600; color: #00E5FF; margin-bottom: 6px; font-size: 13px;`;
-                header.textContent = `${Nls.PAUSED_AT} ${milestone.label}`;
+                header.textContent = `\u23F8 Paused at: ${milestone.name}`;
                 container.appendChild(header);
 
                 const desc = dom.$('.construct-milestone-desc');
                 desc.style.cssText = `font-size: 12px; color: #C0C0C0; margin-bottom: 10px;`;
-                desc.textContent = milestone.summary ?? milestone.label;
+                desc.textContent = milestone.description;
                 container.appendChild(desc);
 
                 const btnContainer = dom.$('.construct-milestone-buttons');
                 btnContainer.style.cssText = `display: flex; gap: 8px;`;
 
                 const continueBtn = dom.$('button') as HTMLButtonElement;
-                continueBtn.textContent = Nls.CONTINUE;
-                continueBtn.setAttribute('aria-label', 'Continue execution');
+                continueBtn.textContent = '\u25B6 Continue';
                 continueBtn.style.cssText = `
                         background: #00C853; color: white; border: none;
                         border-radius: 4px; padding: 6px 14px; cursor: pointer;
@@ -1945,13 +1616,12 @@ export class ConstructAgentViewPane extends ViewPane {
                 `;
                 continueBtn.onclick = () => {
                         container.remove();
-                        this.agentLoop.resumeFromMilestone(milestone.id);
+                        this.agentLoop.resumeFromMilestone();
                         this.setExecutionState('executing');
                 };
 
                 const skipBtn = dom.$('button') as HTMLButtonElement;
-                skipBtn.textContent = Nls.SKIP;
-                skipBtn.setAttribute('aria-label', 'Skip milestone');
+                skipBtn.textContent = '\u23ED Skip';
                 skipBtn.style.cssText = `
                         background: #FF9800; color: white; border: none;
                         border-radius: 4px; padding: 6px 14px; cursor: pointer;
@@ -1964,8 +1634,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 };
 
                 const stopBtn = dom.$('button') as HTMLButtonElement;
-                stopBtn.textContent = Nls.STOP;
-                stopBtn.setAttribute('aria-label', 'Stop execution');
+                stopBtn.textContent = '\u25A0 Stop';
                 stopBtn.style.cssText = `
                         background: #FF4444; color: white; border: none;
                         border-radius: 4px; padding: 6px 14px; cursor: pointer;
@@ -1994,11 +1663,11 @@ export class ConstructAgentViewPane extends ViewPane {
         private async showSessionHistory(): Promise<void> {
                 const sessions = this.sessionService.sessions;
                 if (sessions.length === 0) {
-                        this.notificationService.info(Nls.NO_PREVIOUS_SESSIONS);
+                        this.notificationService.info('No previous sessions found.');
                         return;
                 }
 
-                const picks: ISessionQuickPickItem[] = sessions.map(s => ({
+                const picks = sessions.map(s => ({
                         label: s.title,
                         description: `${s.messageCount} messages`,
                         detail: `Last active: ${new Date(s.lastActiveAt).toLocaleString()}`,
@@ -2006,12 +1675,12 @@ export class ConstructAgentViewPane extends ViewPane {
                 }));
 
                 const pick = await this.quickInputService.pick(picks, {
-                        placeHolder: Nls.SELECT_SESSION,
-                        title: Nls.SESSION_HISTORY,
+                        placeHolder: 'Select a session to restore...',
+                        title: 'Session History',
                 });
 
                 if (pick) {
-                        await this.sessionService.switchToSession(pick.sessionId);
+                        await this.sessionService.switchToSession((pick as any).sessionId);
                         this.notificationService.info(`Session restored: ${pick.label}`);
                 }
         }
@@ -2022,205 +1691,5 @@ export class ConstructAgentViewPane extends ViewPane {
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML;
-        }
-
-        // --- P7: Streaming Progress Status Bar ---
-
-        private _createStreamingStatusBar(): void {
-                this._destroyStreamingStatusBar();
-                this._streamingTokenCount = 0;
-                this._streamingToolCallCount = 0;
-                this._streamingStartTime = Date.now();
-
-                const bar = dom.$('.construct-streaming-status');
-                bar.setAttribute('role', 'status');
-                bar.setAttribute('aria-live', 'polite');
-                bar.setAttribute('aria-label', 'Execution progress');
-                bar.style.cssText = `
-                        background: #0D1117; border: 1px solid #1A1F2E;
-                        border-radius: 4px; padding: 6px 10px; margin: 4px 0;
-                        display: flex; align-items: center; gap: 16px;
-                        font-size: 11px; color: #8B949E;
-                `;
-
-                const tokenSpan = dom.$('.construct-streaming-tokens');
-                tokenSpan.style.cssText = `font-family: monospace;`;
-                tokenSpan.textContent = 'Tokens: 0';
-
-                const timerSpan = dom.$('.construct-streaming-timer');
-                timerSpan.style.cssText = `font-family: monospace;`;
-                timerSpan.textContent = '0.0s';
-
-                const toolSpan = dom.$('.construct-streaming-tools');
-                toolSpan.style.cssText = `font-family: monospace;`;
-                toolSpan.textContent = 'Tools: 0';
-
-                const spinner = dom.$('.construct-streaming-spinner');
-                spinner.style.cssText = `color: #00E5FF; animation: construct-spin 0.8s linear infinite;`;
-                spinner.textContent = '\u2B22'; // spinning hexagon indicator
-
-                bar.appendChild(spinner);
-                bar.appendChild(tokenSpan);
-                bar.appendChild(timerSpan);
-                bar.appendChild(toolSpan);
-
-                this.messageContainer.appendChild(bar);
-                this._streamingStatusBar = bar;
-
-                // Update timer every 100ms
-                this._streamingTimerInterval = window.setInterval(() => {
-                        const elapsed = (Date.now() - this._streamingStartTime) / 1000;
-                        timerSpan.textContent = `${elapsed.toFixed(1)}s`;
-                }, 100);
-
-                this.scrollToBottom();
-        }
-
-        private _updateStreamingStatusBar(): void {
-                if (!this._streamingStatusBar) { return; }
-                const tokenSpan = this._streamingStatusBar.querySelector('.construct-streaming-tokens');
-                const toolSpan = this._streamingStatusBar.querySelector('.construct-streaming-tools');
-                if (tokenSpan) {
-                        tokenSpan.textContent = `Tokens: ~${this._streamingTokenCount}`;
-                }
-                if (toolSpan) {
-                        toolSpan.textContent = `Tools: ${this._streamingToolCallCount}`;
-                }
-        }
-
-        private _destroyStreamingStatusBar(): void {
-                if (this._streamingTimerInterval !== undefined) {
-                        clearInterval(this._streamingTimerInterval);
-                        this._streamingTimerInterval = undefined;
-                }
-                if (this._streamingStatusBar) {
-                        this._streamingStatusBar.remove();
-                        this._streamingStatusBar = null;
-                }
-        }
-
-        // --- P7: Plan Visualization (Timeline/Checklist) ---
-
-        private _renderPlanTimeline(steps: Array<{ action: string; target: string; description: string }>): void {
-                this._planTimelineContainer?.remove();
-                this._planStepVisuals = [];
-                this._currentPlanStepIndex = -1;
-
-                const container = dom.$('.construct-plan-timeline');
-                container.setAttribute('role', 'list');
-                container.setAttribute('aria-label', 'Execution plan progress');
-                container.style.cssText = `
-                        margin: 8px 0; padding: 8px 10px;
-                        background: #141B2D; border: 1px solid #1A1F2E;
-                        border-radius: 6px;
-                `;
-
-                const header = dom.$('.construct-plan-timeline-header');
-                header.style.cssText = `font-size: 12px; font-weight: 600; color: #E0E7FF; margin-bottom: 8px;`;
-                header.textContent = `\uD83D\uDCCB Execution Progress`;
-                container.appendChild(header);
-
-                for (let i = 0; i < steps.length; i++) {
-                        const step = steps[i];
-                        const row = dom.$('.construct-plan-timeline-step');
-                        row.setAttribute('role', 'listitem');
-                        row.setAttribute('aria-label', `Step ${i + 1}: ${step.action} ${step.target} - pending`);
-                        row.style.cssText = `
-                                display: flex; align-items: center; gap: 8px; padding: 4px 0;
-                                font-size: 12px; color: #4A5568; position: relative;
-                        `;
-
-                        // Status indicator dot/icon
-                        const indicator = dom.$('.construct-plan-timeline-indicator');
-                        indicator.style.cssText = `
-                                width: 16px; height: 16px; border-radius: 50%;
-                                border: 2px solid #1A1F2E; flex-shrink: 0;
-                                display: flex; align-items: center; justify-content: center;
-                                font-size: 9px; color: transparent;
-                        `;
-                        indicator.textContent = '\u25CF'; // filled circle
-
-                        // Vertical connecting line
-                        if (i < steps.length - 1) {
-                                row.style.cssText += `
-                                        border-left: 2px solid #1A1F2E; margin-left: 7px; padding-left: 16px;
-                                `;
-                        } else {
-                                row.style.cssText += `
-                                        margin-left: 7px; padding-left: 16px;
-                                `;
-                        }
-
-                        // Label
-                        const icon = this.getActionIcon(step.action);
-                        const label = dom.$('.construct-plan-timeline-label');
-                        label.textContent = `${icon} ${step.action}: ${step.target}`;
-
-                        row.appendChild(indicator);
-                        row.appendChild(label);
-                        container.appendChild(row);
-
-                        this._planStepVisuals.push({
-                                index: i,
-                                label: `${step.action}: ${step.target}`,
-                                status: 'pending',
-                                element: row,
-                        });
-                }
-
-                this.messageContainer.appendChild(container);
-                this._planTimelineContainer = container;
-                this.scrollToBottom();
-        }
-
-        private _advancePlanStep(stepIndex: number, status: PlanStepStatus): void {
-                if (stepIndex < 0 || stepIndex >= this._planStepVisuals.length) { return; }
-
-                // Mark previous steps as complete if skipped
-                for (let i = 0; i < stepIndex; i++) {
-                        if (this._planStepVisuals[i].status === 'pending' || this._planStepVisuals[i].status === 'in-progress') {
-                                this._updatePlanStepVisual(i, 'complete');
-                        }
-                }
-
-                this._updatePlanStepVisual(stepIndex, status);
-                this._currentPlanStepIndex = stepIndex;
-        }
-
-        private _updatePlanStepVisual(stepIndex: number, status: PlanStepStatus): void {
-                if (stepIndex < 0 || stepIndex >= this._planStepVisuals.length) { return; }
-                const visual = this._planStepVisuals[stepIndex];
-                visual.status = status;
-
-                if (!visual.element) { return; }
-                const indicator = visual.element.querySelector('.construct-plan-timeline-indicator') as HTMLElement;
-                const label = visual.element.querySelector('.construct-plan-timeline-label') as HTMLElement;
-                if (!indicator || !label) { return; }
-
-                const statusConfig: Record<PlanStepStatus, { borderColor: string; bgColor: string; textColor: string; icon: string; labelColor: string }> = {
-                        'pending': { borderColor: '#1A1F2E', bgColor: 'transparent', textColor: 'transparent', icon: '\u25CF', labelColor: '#4A5568' },
-                        'in-progress': { borderColor: '#00E5FF', bgColor: '#00E5FF20', textColor: '#00E5FF', icon: '\u25CF', labelColor: '#E0E7FF' },
-                        'complete': { borderColor: '#00C853', bgColor: '#00C853', textColor: '#0A0E1A', icon: '\u2713', labelColor: '#8B949E' },
-                        'error': { borderColor: '#FF4444', bgColor: '#FF4444', textColor: '#FFFFFF', icon: '\u2717', labelColor: '#FF6666' },
-                };
-
-                const cfg = statusConfig[status];
-                indicator.style.borderColor = cfg.borderColor;
-                indicator.style.background = cfg.bgColor;
-                indicator.style.color = cfg.textColor;
-                indicator.textContent = cfg.icon;
-                label.style.color = cfg.labelColor;
-
-                visual.element.setAttribute('aria-label', `Step ${stepIndex + 1}: ${visual.label} - ${status}`);
-
-                this.scrollToBottom();
-        }
-
-        private _completeAllPlanSteps(): void {
-                for (let i = 0; i < this._planStepVisuals.length; i++) {
-                        if (this._planStepVisuals[i].status === 'pending' || this._planStepVisuals[i].status === 'in-progress') {
-                                this._updatePlanStepVisual(i, 'complete');
-                        }
-                }
         }
 }
