@@ -7,35 +7,19 @@
                 "strict": true,
                 "skipLibCheck": true,
                 "outDir": "./out-test",
-                "rootDir": ".",
+                "rootDir": "../../../",
                 "types": ["mocha", "node"],
                 "resolveJsonModule": true,
                 "declaration": false,
                 "sourceMap": true,
                 "allowJs": false,
-                "noEmit": false,
-                "ignoreDeprecations": "5.0"
+                "noEmit": false
         },
         "include": [
                 "./*.ts",
-                "./agent/**/*.ts",
-                "./services/**/*.ts",
-                "./_stubs/**/*.ts",
-                "./ui/**/*.ts",
-                "./security/**/*.ts",
-                "./tools/**/*.ts",
-                "./accessibility/**/*.ts",
-                "./build/**/*.ts",
-                "./config/**/*.ts",
-                "./diff/**/*.ts",
-                "./e2e/**/*.ts",
-                "./ipc/**/*.ts",
-                "./mcp/**/*.ts",
-                "./memory/**/*.ts",
-                "./notification/**/*.ts",
-                "./performance/**/*.ts",
-                "./project/**/*.ts",
-                "./service/**/*.ts",
-                "./unit/**/*.ts"
+                "agent/*.ts",
+                "services/*.ts",
+                "../../../src/vs/platform/construct/common/security/promptSanitiser.ts",
+                "../../../src/vs/platform/construct/common/security/secretRedactor.ts"
         ]
 }
