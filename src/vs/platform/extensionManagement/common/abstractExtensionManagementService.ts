@@ -76,7 +76,7 @@ export abstract class CommontExtensionManagementService extends Disposable imple
                 }
 
                 if (!(await this.isExtensionPlatformCompatible(extension))) {
-                        const productName = isWeb ? nls.localize('CONSTRUCT IDE for Web', "{0} for the Web", this.productService.nameLong) : this.productService.nameLong;
+                        const productName = isWeb ? nls.localize('Kovix for Web', "{0} for the Web", this.productService.nameLong) : this.productService.nameLong;
                         const learnLink = isWeb ? 'https://aka.ms/vscode-web-extensions-guide' : 'https://aka.ms/vscode-platform-specific-extensions';
                         return new MarkdownString(`${nls.localize('incompatible platform', "The '{0}' extension is not available in {1} for {2}.",
                                 extension.displayName ?? extension.identifier.id, productName, TargetPlatformToString(await this.getTargetPlatform()))} [${nls.localize('learn why', "Learn Why")}](${learnLink})`);

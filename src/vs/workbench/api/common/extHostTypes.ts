@@ -2822,7 +2822,7 @@ export class DataTransferItem implements vscode.DataTransferItem {
 }
 
 /**
- * A data transfer item that has been created by CONSTRUCT IDE instead of by a extension.
+ * A data transfer item that has been created by Kovix IDE instead of by a extension.
  *
  * Intentionally not exported to extensions.
  */
@@ -4077,13 +4077,13 @@ export class TimelineItem implements vscode.TimelineItem {
 export enum ExtensionMode {
         /**
          * The extension is installed normally (for example, from the marketplace
-         * or VSIX) in CONSTRUCT IDE.
+         * or VSIX) in Kovix IDE.
          */
         Production = 1,
 
         /**
          * The extension is running from an `--extensionDevelopmentPath` provided
-         * when launching CONSTRUCT IDE.
+         * when launching Kovix IDE.
          */
         Development = 2,
 

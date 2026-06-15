@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=@@NAME_LONG@@
-Comment=CONSTRUCT IDE. AI-native code editing. Redefined.
+Comment=Kovix IDE. AI-native code editing. Redefined.
 GenericName=Text Editor
 Exec=@@EXEC@@ %F
 Icon=@@ICON@@

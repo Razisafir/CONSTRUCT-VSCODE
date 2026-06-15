@@ -151,7 +151,7 @@ class ReportExtensionSlowAction extends Action {
 - Extension Name: \`${this.extension.name}\`
 - Extension Version: \`${this.extension.version}\`
 - OS Version: \`${osVersion}\`
-- CONSTRUCT IDE version: \`${this._productService.version}\`\n\n${message}`);
+- Kovix IDE version: \`${this._productService.version}\`\n\n${message}`);
 
                 const url = `${this.repoInfo.base}/${this.repoInfo.owner}/${this.repoInfo.repo}/issues/new/?body=${body}&title=${title}`;
                 this._openerService.open(URI.parse(url));

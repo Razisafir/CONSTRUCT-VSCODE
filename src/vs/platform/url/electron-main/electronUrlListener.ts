@@ -17,9 +17,9 @@ import { IProtocolUrl } from './url.js';
 import { IWindowsMainService } from '../../windows/electron-main/windows.js';
 
 /**
- * A listener for URLs that are opened from the OS and handled by CONSTRUCT IDE.
+ * A listener for URLs that are opened from the OS and handled by Kovix IDE.
  * Depending on the platform, this works differently:
- * - Windows: we use `app.setAsDefaultProtocolClient()` to register CONSTRUCT IDE with the OS
+ * - Windows: we use `app.setAsDefaultProtocolClient()` to register Kovix IDE with the OS
  *            and additionally add the `open-url` command line argument to identify.
  * - macOS:   we rely on `app.on('open-url')` to be called by the OS
  * - Linux:   we have a special shortcut installed (`resources/linux/code-url-handler.desktop`)

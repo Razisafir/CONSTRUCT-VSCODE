@@ -281,7 +281,7 @@ export class WindowTitle extends Disposable {
          * {rootPath}: e.g. /Users/Development
          * {folderName}: e.g. myFolder
          * {folderPath}: e.g. /Users/Development/myFolder
-         * {appName}: e.g. CONSTRUCT IDE
+         * {appName}: e.g. Kovix IDE
          * {remoteName}: e.g. SSH
          * {dirty}: indicator
          * {focusedView}: e.g. Terminal

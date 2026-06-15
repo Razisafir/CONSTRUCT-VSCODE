@@ -18,11 +18,11 @@ import { DeferredPromise } from '../../base/common/async.js';
 import { FileAccess } from '../../base/common/network.js';
 
 /*
- * Implements a standalone CLI app that opens CONSTRUCT IDE from a remote terminal.
+ * Implements a standalone CLI app that opens Kovix IDE from a remote terminal.
  *  - In integrated terminals for remote windows this connects to the remote server though a pipe.
  *    The pipe is passed in env VSCODE_IPC_HOOK_CLI.
- *  - In external terminals for WSL this calls CONSTRUCT IDE on the Windows side.
- *    The CONSTRUCT IDE desktop executable path is passed in env VSCODE_CLIENT_COMMAND.
+ *  - In external terminals for WSL this calls Kovix IDE on the Windows side.
+ *    The Kovix IDE desktop executable path is passed in env VSCODE_CLIENT_COMMAND.
  */
 
 
@@ -90,7 +90,7 @@ const cliStdInFilePath = process.env['VSCODE_STDIN_FILE_PATH'] as string;
 
 export async function main(desc: ProductDescription, args: string[]): Promise<void> {
         if (!cliPipe && !cliCommand) {
-                console.log('Command is only available in WSL or inside a CONSTRUCT IDE terminal.');
+                console.log('Command is only available in WSL or inside a Kovix IDE terminal.');
                 return;
         }
 
@@ -454,7 +454,7 @@ function asExtensionIdOrVSIX(inputs: string[] | undefined) {
 }
 
 function fatal(message: string, err: any): void {
-        console.error('Unable to connect to CONSTRUCT server: ' + message);
+        console.error('Unable to connect to Kovix server: ' + message);
         console.error(err);
         process.exit(1);
 }

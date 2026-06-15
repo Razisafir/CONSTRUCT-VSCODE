@@ -333,7 +333,7 @@ class ExtHostPseudoterminal implements ITerminalChildProcess {
 
         acknowledgeDataEvent(charCount: number): void {
                 // No-op, flow control is not supported in extension owned terminals. If this is ever
-                // implemented it will need new pause and resume CONSTRUCT IDE APIs.
+                // implemented it will need new pause and resume Kovix IDE APIs.
         }
 
         async setUnicodeVersion(version: '6' | '11'): Promise<void> {

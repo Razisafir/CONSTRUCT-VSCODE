@@ -71,7 +71,7 @@ export enum Filters {
 	ExtensionVersion = 'X-VSCode-ExtensionVersion',
 
 	/**
-	 * The language in use by CONSTRUCT IDE
+	 * The language in use by Kovix IDE
 	 */
 	Language = 'X-VSCode-Language',
 

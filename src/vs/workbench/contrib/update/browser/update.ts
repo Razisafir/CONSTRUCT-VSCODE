@@ -577,8 +577,8 @@ export class SwitchProductQualityContribution extends Disposable implements IWor
                                                         type: 'info',
                                                         message: nls.localize('relaunchMessage', "Changing the version requires a reload to take effect"),
                                                         detail: newQuality === 'insider' ?
-                                                                nls.localize('relaunchDetailInsiders', "Press the reload button to switch to the Insiders version of CONSTRUCT IDE.") :
-                                                                nls.localize('relaunchDetailStable', "Press the reload button to switch to the Stable version of CONSTRUCT IDE."),
+                                                                nls.localize('relaunchDetailInsiders', "Press the reload button to switch to the Insiders version of Kovix.") :
+                                                                nls.localize('relaunchDetailStable', "Press the reload button to switch to the Stable version of Kovix."),
                                                         primaryButton: nls.localize({ key: 'reload', comment: ['&& denotes a mnemonic'] }, "&&Reload")
                                                 });
 
@@ -613,7 +613,7 @@ export class SwitchProductQualityContribution extends Disposable implements IWor
                                         const { result } = await dialogService.prompt<UserDataSyncStoreType>({
                                                 type: Severity.Info,
                                                 message: nls.localize('selectSyncService.message', "Choose the settings sync service to use after changing the version"),
-                                                detail: nls.localize('selectSyncService.detail', "The Insiders version of CONSTRUCT IDE will synchronize your settings, keybindings, extensions, snippets and UI State using separate insiders settings sync service by default."),
+                                                detail: nls.localize('selectSyncService.detail', "The Insiders version of Kovix will synchronize your settings, keybindings, extensions, snippets and UI State using separate insiders settings sync service by default."),
                                                 buttons: [
                                                         {
                                                                 label: nls.localize({ key: 'use insiders', comment: ['&& denotes a mnemonic'] }, "&&Insiders"),

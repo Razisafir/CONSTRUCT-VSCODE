@@ -9,7 +9,7 @@ import { XHRRequest } from 'request-light';
 import { Location } from 'jsonc-parser';
 
 
-const USER_AGENT = 'CONSTRUCT IDE';
+const USER_AGENT = 'Kovix IDE';
 
 export class BowerJSONContribution implements IJSONContribution {
 

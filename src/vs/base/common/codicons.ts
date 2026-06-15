@@ -51,9 +51,9 @@ export const codiconsDerived = {
 } as const;
 
 /**
- * The Codicon library is a set of default icons that are built-in in CONSTRUCT IDE.
+ * The Codicon library is a set of default icons that are built-in in Kovix IDE.
  *
- * In the product (outside of base) Codicons should only be used as defaults. In order to have all icons in CONSTRUCT IDE
+ * In the product (outside of base) Codicons should only be used as defaults. In order to have all icons in Kovix IDE
  * themeable, component should define new, UI component specific icons using `iconRegistry.registerIcon`.
  * In that call a Codicon can be named as default.
  */

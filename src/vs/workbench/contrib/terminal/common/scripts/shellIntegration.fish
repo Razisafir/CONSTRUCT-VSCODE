@@ -3,7 +3,7 @@
 #   Licensed under the MIT License. See License.txt in the project root for license information.
 # ---------------------------------------------------------------------------------------------
 #
-# CONSTRUCT IDE terminal integration for fish
+# Kovix IDE terminal integration for fish
 #
 # Manual installation:
 #
@@ -70,7 +70,7 @@ if set -q VSCODE_NONCE
 end
 
 # Helper function
-function __vsc_esc -d "Emit escape sequences for CONSTRUCT IDE shell integration"
+function __vsc_esc -d "Emit escape sequences for Kovix IDE shell integration"
         builtin printf "\e]633;%s\a" (string join ";" -- $argv)
 end
 

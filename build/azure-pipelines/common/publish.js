@@ -164,16 +164,16 @@ class ESRPReleaseService {
             owners: [{ owner: { userPrincipalName: 'jomo@microsoft.com' } }],
             approvers: [{ approver: { userPrincipalName: 'jomo@microsoft.com' }, isAutoApproved: true, isMandatory: false }],
             releaseInfo: {
-                title: 'CONSTRUCT IDE',
+                title: 'Kovix IDE',
                 properties: {
                     'ReleaseContentType': 'InstallPackage'
                 },
                 minimumNumberOfApprovers: 1
             },
             productInfo: {
-                name: 'CONSTRUCT IDE',
+                name: 'Kovix IDE',
                 version,
-                description: 'CONSTRUCT IDE'
+                description: 'Kovix IDE'
             },
             accessPermissionsInfo: {
                 mainPublisher: 'VSCode',

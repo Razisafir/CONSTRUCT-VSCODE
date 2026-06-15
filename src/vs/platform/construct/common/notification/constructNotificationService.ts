@@ -36,7 +36,7 @@ export interface IConstructNotification {
 }
 
 /**
- * Service for managing CONSTRUCT-specific notifications.
+ * Service for managing Kovix-specific notifications.
  *
  * Currently, the agent completes tasks silently with no toast or popup.
  * This service provides a unified notification system that:

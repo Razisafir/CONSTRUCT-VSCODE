@@ -149,7 +149,7 @@ export class ExtensionManagementService extends AbstractExtensionManagementServi
                         const manifest = await getManifest(path.resolve(location.fsPath));
                         const extensionId = getGalleryExtensionId(manifest.publisher, manifest.name);
                         if (manifest.engines && manifest.engines.vscode && !isEngineValid(manifest.engines.vscode, this.productService.version, this.productService.date)) {
-                                throw new Error(nls.localize('incompatible', "Unable to install extension '{0}' as it is not compatible with CONSTRUCT IDE '{1}'.", extensionId, this.productService.version));
+                                throw new Error(nls.localize('incompatible', "Unable to install extension '{0}' as it is not compatible with Kovix '{1}'.", extensionId, this.productService.version));
                         }
 
                         const allowedToInstall = this.allowedExtensionsService.isAllowed({ id: extensionId, version: manifest.version, publisherDisplayName: undefined });
@@ -231,7 +231,7 @@ export class ExtensionManagementService extends AbstractExtensionManagementServi
                 try {
                         await this.extensionsScanner.removeUninstalledExtension(extension);
                 } catch (e) {
-                        throw new Error(nls.localize('removeError', "Error while removing the extension: {0}. Please Quit and Start CONSTRUCT IDE before trying again.", toErrorMessage(e)));
+                        throw new Error(nls.localize('removeError', "Error while removing the extension: {0}. Please Quit and Start Kovix before trying again.", toErrorMessage(e)));
                 }
                 return this.installFromGallery(galleryExtension);
         }
@@ -1045,7 +1045,7 @@ class InstallExtensionInProfileTask extends AbstractExtensionTask<ILocalExtensio
                                         try {
                                                 await this.extensionsScanner.removeExtension(existingExtension, 'existing');
                                         } catch (e) {
-                                                throw new Error(nls.localize('restartCode', "Please restart CONSTRUCT IDE before reinstalling {0}.", this.manifest.displayName || this.manifest.name));
+                                                throw new Error(nls.localize('restartCode', "Please restart Kovix before reinstalling {0}.", this.manifest.displayName || this.manifest.name));
                                         }
                                 }
                         }
@@ -1056,7 +1056,7 @@ class InstallExtensionInProfileTask extends AbstractExtensionTask<ILocalExtensio
                                 try {
                                         await this.extensionsScanner.removeExtension(existingWithSameVersion, 'existing');
                                 } catch (e) {
-                                        throw new Error(nls.localize('restartCode', "Please restart CONSTRUCT IDE before reinstalling {0}.", this.manifest.displayName || this.manifest.name));
+                                        throw new Error(nls.localize('restartCode', "Please restart Kovix before reinstalling {0}.", this.manifest.displayName || this.manifest.name));
                                 }
                         }
 

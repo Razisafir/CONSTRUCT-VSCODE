@@ -43,7 +43,7 @@ export const enum ShellIntegrationOscPs {
 	 */
 	FinalTerm = 133,
 	/**
-	 * Sequences pioneered by CONSTRUCT IDE. The number is derived from the least significant digit of
+	 * Sequences pioneered by Kovix IDE. The number is derived from the least significant digit of
 	 * "VSC" when encoded in hex ("VSC" = 0x56, 0x53, 0x43).
 	 */
 	VSCode = 633,
@@ -90,14 +90,14 @@ const enum FinalTermOscPt {
 }
 
 /**
- * CONSTRUCT IDE-specific shell integration sequences. Some of these are based on more common alternatives
+ * Kovix IDE-specific shell integration sequences. Some of these are based on more common alternatives
  * like those pioneered in {@link FinalTermOscPt FinalTerm}. The decision to move to entirely custom
  * sequences was to try to improve reliability and prevent the possibility of applications confusing
- * the terminal. If multiple shell integration scripts run, CONSTRUCT IDE will prioritize the VS
+ * the terminal. If multiple shell integration scripts run, Kovix IDE will prioritize the VS
  * Code-specific ones.
  *
  * It's recommended that authors of shell integration scripts use the common sequences (`133`)
- * when building general purpose scripts and the CONSTRUCT IDE-specific (`633`) when targeting only VS
+ * when building general purpose scripts and the Kovix IDE-specific (`633`) when targeting only VS
  * Code or when there are no other alternatives (eg. {@link CommandLine `633 ; E`}). These sequences
  * support mix-and-matching.
  */
@@ -196,7 +196,7 @@ const enum VSCodeOscPt {
 	RightPromptEnd = 'I',
 
 	/**
-	 * Set the value of an arbitrary property, only known properties will be handled by CONSTRUCT IDE.
+	 * Set the value of an arbitrary property, only known properties will be handled by Kovix IDE.
 	 *
 	 * Format: `OSC 633 ; P ; <Property>=<Value> ST`
 	 *
@@ -313,7 +313,7 @@ export class ShellIntegrationAddon extends Disposable implements IShellIntegrati
 		}
 
 		// Pass the sequence along to the capability
-		// It was considered to disable the common protocol in order to not confuse the CONSTRUCT IDE
+		// It was considered to disable the common protocol in order to not confuse the Kovix IDE
 		// shell integration if both happen for some reason. This doesn't work for powerlevel10k
 		// when instant prompt is enabled though. If this does end up being a problem we could pass
 		// a type flag through the capability calls

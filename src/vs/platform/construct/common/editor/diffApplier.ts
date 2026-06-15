@@ -16,7 +16,7 @@ export interface IDiffApplyResult {
 }
 
 /**
- * Service for applying file changes using CONSTRUCT IDE's IFileService.
+ * Service for applying file changes using Kovix IDE's IFileService.
  * Supports unified diff patches, direct file writes, and workspace-safe operations.
  */
 export interface IDiffApplier {

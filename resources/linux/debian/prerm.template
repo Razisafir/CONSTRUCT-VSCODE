@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (c) CONSTRUCT. Licensed under the MIT License.
+# Copyright (c) Kovix. Licensed under the MIT License.
 
 # Deregister code from the alternatives system
 update-alternatives --remove editor /usr/bin/@@NAME@@

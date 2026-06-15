@@ -158,7 +158,7 @@ const bundleVSCodeTask = task.define('bundle-vscode', task.series(
 ));
 gulp.task(bundleVSCodeTask);
 
-const sourceMappingURLBase = `https://cdn.construct-ide.com/sourcemaps/${commit}`;
+const sourceMappingURLBase = `https://cdn.kovix.com/sourcemaps/${commit}`;
 const minifyVSCodeTask = task.define('minify-vscode', task.series(
         bundleVSCodeTask,
         util.rimraf('out-vscode-min'),
@@ -363,15 +363,15 @@ function packageTask(platform, arch, sourceFolderName, destinationFolderName, op
                                 'resources/win32/vue.ico',
                                 'resources/win32/xml.ico',
                                 'resources/win32/yaml.ico',
-                                'resources/win32/kovix_70x70.png',
-                                'resources/win32/kovix_150x150.png'
+                                'resources/win32/construct_70x70.png',
+                                'resources/win32/construct_150x150.png'
                         ], { base: '.' }));
                 } else if (platform === 'linux') {
-                        all = es.merge(all, gulp.src('resources/linux/kovix.png', { base: '.' }));
+                        all = es.merge(all, gulp.src('resources/linux/construct.png', { base: '.' }));
                 } else if (platform === 'darwin') {
-                        const shortcut = gulp.src('resources/darwin/bin/kovix.sh')
+                        const shortcut = gulp.src('resources/darwin/bin/construct.sh')
                                 .pipe(replace('@@APPNAME@@', product.applicationName))
-                                .pipe(rename('bin/kovix'));
+                                .pipe(rename('bin/construct'));
 
                         all = es.merge(all, shortcut);
                 }
@@ -384,23 +384,23 @@ function packageTask(platform, arch, sourceFolderName, destinationFolderName, op
                         .pipe(filter(['**', '!LICENSE', '!version'], { dot: true }));
 
                 if (platform === 'linux') {
-                        result = es.merge(result, gulp.src('resources/completions/bash/kovix', { base: '.' })
+                        result = es.merge(result, gulp.src('resources/completions/bash/construct', { base: '.' })
                                 .pipe(replace('@@APPNAME@@', product.applicationName))
                                 .pipe(rename(function (f) { f.basename = product.applicationName; })));
 
-                        result = es.merge(result, gulp.src('resources/completions/zsh/_kovix', { base: '.' })
+                        result = es.merge(result, gulp.src('resources/completions/zsh/_construct', { base: '.' })
                                 .pipe(replace('@@APPNAME@@', product.applicationName))
                                 .pipe(rename(function (f) { f.basename = '_' + product.applicationName; })));
                 }
 
                 if (platform === 'win32') {
-                        result = es.merge(result, gulp.src('resources/win32/bin/kovix.js', { base: 'resources/win32', allowEmpty: true }));
+                        result = es.merge(result, gulp.src('resources/win32/bin/construct.js', { base: 'resources/win32', allowEmpty: true }));
 
-                        result = es.merge(result, gulp.src('resources/win32/bin/kovix.cmd', { base: 'resources/win32' })
+                        result = es.merge(result, gulp.src('resources/win32/bin/construct.cmd', { base: 'resources/win32' })
                                 .pipe(replace('@@NAME@@', product.nameShort))
                                 .pipe(rename(function (f) { f.basename = product.applicationName; })));
 
-                        result = es.merge(result, gulp.src('resources/win32/bin/kovix.sh', { base: 'resources/win32' })
+                        result = es.merge(result, gulp.src('resources/win32/bin/construct.sh', { base: 'resources/win32' })
                                 .pipe(replace('@@NAME@@', product.nameShort))
                                 .pipe(replace('@@PRODNAME@@', product.nameLong))
                                 .pipe(replace('@@VERSION@@', version))
@@ -420,7 +420,7 @@ function packageTask(platform, arch, sourceFolderName, destinationFolderName, op
                                 result = es.merge(result, gulp.src('.build/win32/appx/**', { base: '.build/win32' }));
                         }
                 } else if (platform === 'linux') {
-                        result = es.merge(result, gulp.src('resources/linux/bin/kovix.sh', { base: '.' })
+                        result = es.merge(result, gulp.src('resources/linux/bin/construct.sh', { base: '.' })
                                 .pipe(replace('@@PRODNAME@@', product.nameLong))
                                 .pipe(replace('@@APPNAME@@', product.applicationName))
                                 .pipe(rename('bin/' + product.applicationName)));
@@ -459,11 +459,11 @@ function patchWin32DependenciesTask(destinationFolderName) {
                         await rcedit(path.join(cwd, dep), {
                                 'file-version': baseVersion,
                                 'version-string': {
-                                        'CompanyName': 'KOVIX',
+                                        'CompanyName': 'Kovix',
                                         'FileDescription': product.nameLong,
                                         'FileVersion': packageJson.version,
                                         'InternalName': basename,
-                                        'LegalCopyright': 'Copyright (C) 2025 KOVIX. All rights reserved',
+                                        'LegalCopyright': 'Copyright (C) 2024 Kovix. All rights reserved',
                                         'OriginalFilename': basename,
                                         'ProductName': product.nameLong,
                                         'ProductVersion': packageJson.version,
@@ -492,7 +492,7 @@ BUILD_TARGETS.forEach(buildTarget => {
 
         const [vscode, vscodeMin] = ['', 'min'].map(minified => {
                 const sourceFolderName = `out-vscode${dashed(minified)}`;
-                const destinationFolderName = `VSCode${dashed(platform)}${dashed(arch)}`;
+                const destinationFolderName = `Kovix${dashed(platform)}${dashed(arch)}`;
 
                 const tasks = [
                         compileNativeExtensionsBuildTask,

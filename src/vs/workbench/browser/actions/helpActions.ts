@@ -160,7 +160,7 @@ class OpenNewsletterSignupUrlAction extends Action2 {
         constructor() {
                 super({
                         id: OpenNewsletterSignupUrlAction.ID,
-                        title: localize2('newsletterSignup', 'Signup for the CONSTRUCT IDE Newsletter'),
+                        title: localize2('newsletterSignup', 'Signup for the Kovix IDE Newsletter'),
                         category: Categories.Help,
                         f1: true
                 });

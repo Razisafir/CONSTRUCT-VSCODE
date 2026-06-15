@@ -202,7 +202,7 @@ export class TerminalViewPane extends ViewPane {
                                                 label: nls.localize('terminal.useMonospace', "Use 'monospace'"),
                                                 run: () => this.configurationService.updateValue(TerminalSettingId.FontFamily, 'monospace'),
                                         }];
-                                        this._notificationService.prompt(Severity.Warning, nls.localize('terminal.monospaceOnly', "The terminal only supports monospace fonts. Be sure to restart CONSTRUCT IDE if this is a newly installed font."), choices);
+                                        this._notificationService.prompt(Severity.Warning, nls.localize('terminal.monospaceOnly', "The terminal only supports monospace fonts. Be sure to restart Kovix if this is a newly installed font."), choices);
                                 }
                         }
                 }));

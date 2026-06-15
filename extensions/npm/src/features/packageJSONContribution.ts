@@ -14,7 +14,7 @@ import { fromNow } from './date';
 
 const LIMIT = 40;
 
-const USER_AGENT = 'CONSTRUCT IDE';
+const USER_AGENT = 'Kovix IDE';
 
 export class PackageJSONContribution implements IJSONContribution {
 

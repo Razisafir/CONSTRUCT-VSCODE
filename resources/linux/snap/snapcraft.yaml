@@ -1,8 +1,8 @@
 name: @@NAME@@
 version: '@@VERSION@@'
-summary: CONSTRUCT IDE. AI-native code editing. Redefined.
+summary: Kovix IDE. AI-native code editing. Redefined.
 description: |
-  CONSTRUCT IDE is a new choice of tool that combines the
+  Kovix IDE is a new choice of tool that combines the
   simplicity of a code editor with what developers need for the core
   edit-build-debug cycle, powered by AI.
 
@@ -12,7 +12,7 @@ architectures:
 
 grade: stable
 confinement: classic
-base: core20
+base: core22
 compression: lzo
 
 parts:
@@ -60,16 +60,16 @@ parts:
       - -usr/share/man
     override-build: |
       snapcraftctl build
-      patchelf --force-rpath --set-rpath '$ORIGIN/../../lib/x86_64-linux-gnu:$ORIGIN:/snap/core20/current/lib/x86_64-linux-gnu' $SNAPCRAFT_PART_INSTALL/usr/share/@@NAME@@/chrome_crashpad_handler
+      patchelf --force-rpath --set-rpath '$ORIGIN/../../lib/x86_64-linux-gnu:$ORIGIN:/snap/core22/current/lib/x86_64-linux-gnu' $SNAPCRAFT_PART_INSTALL/usr/share/@@NAME@@/chrome_crashpad_handler
   cleanup:
     after:
       - code
     plugin: nil
     build-snaps:
-      - core20
+      - core22
     override-prime: |
       set -eux
-      for snap in "core20"; do
+      for snap in "core22"; do
         cd "/snap/$snap/current" && find . -type f,l -exec rm -f "$SNAPCRAFT_PRIME/{}" \;
       done
       patchelf --print-rpath $SNAPCRAFT_PRIME/usr/share/@@NAME@@/chrome_crashpad_handler

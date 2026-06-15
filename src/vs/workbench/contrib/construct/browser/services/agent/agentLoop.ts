@@ -1203,7 +1203,7 @@ Guidelines:
          */
         private async refreshExplorer(): Promise<void> {
                 try {
-                        // Primary: CONSTRUCT IDE command
+                        // Primary: Kovix IDE command
                         await this.commandService.executeCommand('workbench.files.action.refreshFilesExplorer');
                 } catch {
                         this.logService.debug('[AgentLoop] refreshFilesExplorer command failed, trying fallback');

@@ -19,7 +19,7 @@ export const IMCPProcessNodeService = createDecorator<IMCPProcessNodeService>('c
  * JSON-RPC 2.0. This service runs in the main process and is exposed
  * to the renderer via IPC.
  *
- * In desktop CONSTRUCT IDE: the node service is available via IPC and provides
+ * In desktop Kovix IDE: the node service is available via IPC and provides
  * spec-compliant MCP protocol communication.
  * In browser mode (vscode.dev): this service is unavailable and the
  * browser-layer MCPProcessService falls back to IFileService.

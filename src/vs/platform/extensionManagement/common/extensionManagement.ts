@@ -363,7 +363,7 @@ export interface IExtensionQueryOptions {
 export const IExtensionGalleryService = createDecorator<IExtensionGalleryService>('extensionGalleryService');
 
 /**
- * Service to interact with the CONSTRUCT IDE Marketplace to get extensions.
+ * Service to interact with the Kovix IDE Marketplace to get extensions.
  * @throws Error if the Marketplace is not enabled or not reachable.
  */
 export interface IExtensionGalleryService {

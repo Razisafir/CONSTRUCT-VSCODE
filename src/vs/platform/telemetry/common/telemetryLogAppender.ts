@@ -33,7 +33,7 @@ export class TelemetryLogAppender extends Disposable implements ITelemetryAppend
                         const isVisible = () => supportsTelemetry(productService, environmentService) && logService.getLevel() === LogLevel.Trace;
                         this.logger = this._register(loggerService.createLogger(telemetryLogId, { name: localize('telemetryLog', "Telemetry{0}", logSuffix), hidden: !isVisible() }));
                         this._register(logService.onDidChangeLogLevel(() => loggerService.setVisibility(telemetryLogId, isVisible())));
-                        this.logger.info('Below are logs for every telemetry event sent from CONSTRUCT IDE once the log level is set to trace.');
+                        this.logger.info('Below are logs for every telemetry event sent from Kovix IDE once the log level is set to trace.');
                         this.logger.info('===========================================================');
                 }
         }

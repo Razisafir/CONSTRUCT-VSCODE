@@ -38,7 +38,7 @@ export interface IConstructConfigEntry<T = unknown> {
 }
 
 /**
- * Centralized configuration service for CONSTRUCT IDE.
+ * Centralized configuration service for Kovix IDE.
  *
  * P0 FIX: This is the SINGLE source of truth for all configuration.
  * Previously, configuration was fragmented across 3+ independent paths

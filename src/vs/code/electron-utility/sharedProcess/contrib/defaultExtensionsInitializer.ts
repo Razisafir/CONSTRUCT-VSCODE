@@ -70,8 +70,8 @@ export class DefaultExtensionsInitializer extends Disposable {
         }
 
         private getDefaultExtensionVSIXsLocation(): URI {
-                // appRoot = C:\Users\<name>\AppData\Local\Programs\CONSTRUCT IDE\resources\app
-                // extensionsPath = C:\Users\<name>\AppData\Local\Programs\CONSTRUCT IDE\bootstrap\extensions
+                // appRoot = C:\Users\<name>\AppData\Local\Programs\Kovix IDE\resources\app
+                // extensionsPath = C:\Users\<name>\AppData\Local\Programs\Kovix IDE\bootstrap\extensions
                 return URI.file(join(dirname(dirname(this.environmentService.appRoot)), 'bootstrap', 'extensions'));
         }
 

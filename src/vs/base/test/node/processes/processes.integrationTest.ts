@@ -25,7 +25,7 @@ function fork(id: string): cp.ChildProcess {
 suite('Processes', () => {
         test('buffered sending - simple data', function (done: () => void) {
                 if (process.env['VSCODE_PID']) {
-                        return done(); // this test fails when run from within CONSTRUCT IDE
+                        return done(); // this test fails when run from within Kovix IDE
                 }
 
                 const child = fork('vs/base/test/node/processes/fixtures/fork');

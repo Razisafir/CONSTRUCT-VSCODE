@@ -2909,9 +2909,9 @@ export interface MainThreadTestingShape {
         $updateController(controllerId: string, patch: ITestControllerPatch): void;
         /** Diposes of the test controller with the given ID */
         $unregisterTestController(controllerId: string): void;
-        /** Requests tests published to CONSTRUCT IDE. */
+        /** Requests tests published to Kovix IDE. */
         $subscribeToDiffs(): void;
-        /** Stops requesting tests published to CONSTRUCT IDE. */
+        /** Stops requesting tests published to Kovix IDE. */
         $unsubscribeFromDiffs(): void;
         /** Publishes that new tests were available on the given source. */
         $publishDiff(controllerId: string, diff: TestsDiffOp.Serialized[]): void;

@@ -171,12 +171,12 @@ export class LanguageDetectionSimpleWorker implements ILanguageDetectionWorker {
         }
 
         // This adjusts the language confidence scores to be more accurate based on:
-        // * CONSTRUCT IDE's language usage
+        // * Kovix IDE's language usage
         // * Languages with 'problematic' syntaxes that have caused incorrect language detection
         private adjustLanguageConfidence(modelResult: ModelResult): ModelResult {
                 switch (modelResult.languageId) {
                         // For the following languages, we increase the confidence because
-                        // these are commonly used languages in CONSTRUCT IDE and supported
+                        // these are commonly used languages in Kovix IDE and supported
                         // by the model.
                         case 'js':
                         case 'html':
@@ -201,12 +201,12 @@ export class LanguageDetectionSimpleWorker implements ILanguageDetectionWorker {
                         // we've had issues like #131912 that caused incorrect guesses. To enforce this, we subtract the
                         // negativeConfidenceCorrection from the confidence.
 
-                        // languages that are provided by default in CONSTRUCT IDE
+                        // languages that are provided by default in Kovix IDE
                         case 'bat':
                         case 'ini':
                         case 'makefile':
                         case 'sql':
-                        // languages that aren't provided by default in CONSTRUCT IDE
+                        // languages that aren't provided by default in Kovix IDE
                         case 'csv':
                         case 'toml':
                                 // Other considerations for negativeConfidenceCorrection that

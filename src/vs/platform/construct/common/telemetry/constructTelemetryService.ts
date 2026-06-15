@@ -8,7 +8,7 @@ import { createDecorator } from '../../../instantiation/common/instantiation.js'
 export const IConstructTelemetryService = createDecorator<IConstructTelemetryService>('construct.telemetryService');
 
 /**
- * Telemetry event types for CONSTRUCT IDE.
+ * Telemetry event types for Kovix IDE.
  */
 export type ConstructTelemetryEvent =
         | 'provider.switched'

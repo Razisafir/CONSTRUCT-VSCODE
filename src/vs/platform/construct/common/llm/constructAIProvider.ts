@@ -171,7 +171,7 @@ export enum ProviderStatus {
 }
 
 /**
- * IConstructAIProvider — the unified AI provider interface for CONSTRUCT IDE.
+ * IConstructAIProvider — the unified AI provider interface for Kovix IDE.
  *
  * This is the single abstraction that all AI consumers (agent loop, chat panel,
  * inline completions) use. Concrete implementations (OllamaProvider, XenovaProvider,

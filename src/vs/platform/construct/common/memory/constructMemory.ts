@@ -58,7 +58,7 @@ export interface IConstructMemoryAddEvent {
 }
 
 /**
- * Service that wraps Supermemory with CONSTRUCT IDE-specific logic for persistent
+ * Service that wraps Supermemory with Kovix IDE-specific logic for persistent
  * memory that survives reloads, learns from conversations, and provides
  * intelligent context retrieval for the Construct agent.
  *

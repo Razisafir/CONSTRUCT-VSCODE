@@ -297,13 +297,13 @@ const troubleshootingOptions: Fig.Option[] = [
         },
         {
                 name: '--telemetry',
-                description: 'Shows all telemetry events which CONSTRUCT IDE collects',
+                description: 'Shows all telemetry events which Kovix IDE collects',
         },
 ];
 
 const codeCompletionSpec: Fig.Spec = {
         name: 'code',
-        description: 'CONSTRUCT IDE',
+        description: 'Kovix IDE',
         args: {
                 template: ['filepaths', 'folders'],
                 isVariadic: true,

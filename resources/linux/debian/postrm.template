@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) CONSTRUCT. Licensed under the MIT License.
+# Copyright (c) Kovix. Licensed under the MIT License.
 
 rm -f /usr/bin/@@NAME@@
 

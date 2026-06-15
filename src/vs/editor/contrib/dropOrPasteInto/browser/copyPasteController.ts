@@ -214,7 +214,7 @@ export class CopyPasteController extends Disposable implements IEditorContributi
                 const dataTransfer = toVSDataTransfer(e.clipboardData);
                 const providerCopyMimeTypes = providers.flatMap(x => x.copyMimeTypes ?? []);
 
-                // Save off a handle pointing to data that CONSTRUCT IDE maintains.
+                // Save off a handle pointing to data that Kovix IDE maintains.
                 const handle = generateUuid();
                 this.setCopyMetadata(e.clipboardData, {
                         id: handle,

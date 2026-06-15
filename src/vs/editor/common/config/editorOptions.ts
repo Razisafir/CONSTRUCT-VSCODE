@@ -5807,7 +5807,7 @@ export const EditorOptions = {
                 'off' as 'off' | 'on',
                 ['off', 'on'] as const,
                 undefined
-                // TODO: Uncomment when we want to expose the setting to CONSTRUCT IDE users
+                // TODO: Uncomment when we want to expose the setting to Kovix IDE users
                 // {
                 //      enumDescriptions: [
                 //              nls.localize('experimentalGpuAcceleration.off', "Use regular DOM-based rendering."),

@@ -44,3 +44,31 @@ Extensions installed from the Open VSX Registry or other sources have their own 
 ## Contact
 
 For privacy questions or concerns, please open an issue on GitHub: https://github.com/Razisafir/KOVIX/issues
+
+## GDPR Compliance (European Union)
+
+Kovix is designed with GDPR principles in mind. Because Kovix does not collect personal data by default, most GDPR obligations (such as the right to access, rectify, or erase personal data) do not apply to the default product configuration. If you choose to enable telemetry or use cloud AI features, the following applies:
+
+- **Data Controller**: Razisafir is the data controller for any telemetry data you opt into sharing. Cloud AI providers (Anthropic, OpenAI, etc.) act as independent data controllers for data you send to their APIs.
+- **Legal Basis**: Where telemetry is enabled, processing is based on your explicit consent (Article 6(1)(a) GDPR). You may withdraw consent at any time by disabling telemetry in settings.
+- **Data Subject Rights**: You have the right to access, rectify, erase, restrict, and port any personal data we process. To exercise these rights, contact us via the GitHub issues link above.
+- **Data Retention**: Telemetry data, if enabled, is retained for no longer than 90 days. Cloud AI provider data retention is governed by each provider's privacy policy.
+- **International Transfers**: Cloud AI API calls may involve data transfers outside the EEA. By configuring a cloud AI provider, you acknowledge this possibility.
+- **DPO Contact**: For GDPR-related inquiries, open a GitHub issue with the label "gdpr."
+
+## CCPA Compliance (California, USA)
+
+Under the California Consumer Privacy Act (CCPA), California residents have the right to know what personal information is collected, to delete it, to opt out of its sale, and to not be discriminated against for exercising these rights. Because Kovix does not collect personal information by default, and we do not sell any personal information, these rights are inherently protected. If you enable telemetry:
+
+- **Right to Know**: You can request a summary of data collected by opening a GitHub issue.
+- **Right to Delete**: You can request deletion of any telemetry data by opening a GitHub issue.
+- **Right to Opt Out**: Telemetry can be disabled at any time in Kovix settings.
+- **No Sale of Data**: We do not sell, rent, or share personal information with third parties for advertising or commercial purposes.
+
+## Children's Privacy
+
+Kovix is not intended for use by children under the age of 13. We do not knowingly collect personal information from children under 13.
+
+## Changes to This Policy
+
+We may update this privacy policy from time to time. Changes will be posted on this page with an updated revision date. Continued use of Kovix after changes constitutes acceptance of the revised policy.

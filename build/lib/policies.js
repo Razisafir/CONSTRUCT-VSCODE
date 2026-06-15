@@ -470,7 +470,7 @@ async function queryVersions(serviceUrl, languageId) {
         headers: {
             'Accept': 'application/json;api-version=3.0-preview.1',
             'Content-Type': 'application/json',
-            'User-Agent': 'CONSTRUCT IDE Build',
+            'User-Agent': 'Kovix IDE Build',
         },
         body: JSON.stringify({
             filters: [{ criteria: [{ filterType: 7, value: `ms-ceintl.vscode-language-pack-${languageId}` }] }],

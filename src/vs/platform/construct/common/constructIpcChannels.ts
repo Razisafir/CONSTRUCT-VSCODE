@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 /**
- * CONSTRUCT IPC Channel Constants
+ * Kovix IPC Channel Constants
  *
  * All channel names MUST be defined here and imported by both main and renderer.
  * No inline string literals for channel names — compile-time safety only.

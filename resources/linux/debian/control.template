@@ -5,14 +5,14 @@ Depends: @@DEPENDS@@
 Recommends: @@RECOMMENDS@@
 Priority: optional
 Architecture: @@ARCHITECTURE@@
-Maintainer: KOVIX <https://github.com/Razisafir/KOVIX>
-Homepage: https://github.com/Razisafir/KOVIX
+Maintainer: KOVIX <https://github.com/Razisafir/KOVIX-VSCODE>
+Homepage: https://github.com/Razisafir/KOVIX-VSCODE
 Installed-Size: @@INSTALLEDSIZE@@
 Provides: visual-studio-@@NAME@@
 Conflicts: visual-studio-@@NAME@@
 Replaces: visual-studio-@@NAME@@
-Description: KOVIX IDE. AI-native code editing. Redefined.
- KOVIX IDE is a new choice of tool that combines the simplicity of
+Description: Kovix IDE. AI-native code editing. Redefined.
+ Kovix IDE is a new choice of tool that combines the simplicity of
  a code editor with what developers need for the core edit-build-debug cycle,
- powered by AI. See https://github.com/Razisafir/KOVIX for more
+ powered by AI. See https://github.com/Razisafir/KOVIX-VSCODE for more
  information.

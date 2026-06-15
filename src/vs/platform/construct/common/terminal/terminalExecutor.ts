@@ -169,8 +169,8 @@ export class TerminalRateLimiter {
 }
 
 /**
- * Service for executing terminal commands securely within CONSTRUCT IDE.
- * Uses CONSTRUCT IDE's terminal infrastructure for real process execution.
+ * Service for executing terminal commands securely within Kovix IDE.
+ * Uses Kovix IDE's terminal infrastructure for real process execution.
  * Enforces a security blocklist to prevent dangerous commands.
  *
  * SEC-3: Enhanced with:
@@ -221,7 +221,7 @@ export interface ITerminalExecutor {
 
         /**
          * Execute a command and return the result.
-         * The command runs in a real shell process via CONSTRUCT IDE's terminal infrastructure.
+         * The command runs in a real shell process via Kovix IDE's terminal infrastructure.
          *
          * SEC-3: Command is validated against:
          * - Shell metacharacter blocklist in arguments

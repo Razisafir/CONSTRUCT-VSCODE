@@ -159,7 +159,7 @@ export const walkthroughsExtensionPoint = ExtensionsRegistry.registerExtensionPo
                                                                         defaultSnippets: [
                                                                                 {
                                                                                         label: 'onCommand',
-                                                                                        description: localize('walkthroughs.steps.completionEvents.onCommand', 'Check off step when a given command is executed anywhere in CONSTRUCT IDE.'),
+                                                                                        description: localize('walkthroughs.steps.completionEvents.onCommand', 'Check off step when a given command is executed anywhere in Kovix IDE.'),
                                                                                         body: 'onCommand:${1:commandId}'
                                                                                 },
                                                                                 {

@@ -8,7 +8,7 @@
     "name": "Razisafir"
   },
   "homepage": "https://github.com/Razisafir/KOVIX",
-  "license": "SEE LICENSE IN CONSTRUCT_LICENSE.txt",
+  "license": "SEE LICENSE IN LICENSE.txt",
   "main": "./out/main.js",
   "type": "module",
   "private": true,
@@ -78,8 +78,6 @@
     "test-agent-e2e": "tsc -p test/unit/construct/tsconfig.json && OLLAMA_HOST=http://localhost:11434 OLLAMA_TEST_MODEL=tinyllama mocha --ui tdd --timeout 60000 test/unit/construct/out-test/services/agentLoopE2E.test.js"
   },
   "dependencies": {
-    "@microsoft/1ds-core-js": "^3.2.13",
-    "@microsoft/1ds-post-js": "^3.2.13",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@parcel/watcher": "2.1.0",
     "@qdrant/js-client-rest": "^1.18.0",

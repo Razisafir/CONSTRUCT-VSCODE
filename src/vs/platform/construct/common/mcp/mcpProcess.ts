@@ -10,8 +10,8 @@ export const IMCPProcess = createDecorator<IMCPProcess>('construct.mcpProcess');
 
 /**
  * Service providing filesystem operations through MCP-compatible interface.
- * Currently backed by CONSTRUCT IDE's IFileService for reliable file operations
- * within CONSTRUCT IDE's architecture. MCP server spawning is available when
+ * Currently backed by Kovix IDE's IFileService for reliable file operations
+ * within Kovix IDE's architecture. MCP server spawning is available when
  * the Node.js environment provides child_process access.
  */
 export interface IMCPProcess {

@@ -130,7 +130,7 @@ suite('ModelSemanticColoring', () => {
                 });
         });
 
-        test('issue #149412: CONSTRUCT IDE hangs when bad semantic token data is received', async () => {
+        test('issue #149412: Kovix IDE hangs when bad semantic token data is received', async () => {
                 await runWithFakedTimers({}, async () => {
 
                         disposables.add(languageService.registerLanguage({ id: 'testMode' }));

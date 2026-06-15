@@ -23,7 +23,7 @@ import { IHoverService } from '../../../../platform/hover/browser/hover.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
 import { INotificationService } from '../../../../platform/notification/common/notification.js';
 import { IContextViewService } from '../../../../platform/contextview/browser/contextView.js';
-// import { IDisposable } from '../../../../base/common/lifecycle.js';
+import { IDisposable } from '../../../../base/common/lifecycle.js';
 
 /**
  * Obsidian-like Memory Explorer view panel.
@@ -56,11 +56,9 @@ export class ObsidianMemoryTreePanel extends ViewPane {
                 @IHoverService hoverService: IHoverService,
                 @IQuickInputService private readonly quickInputService: IQuickInputService,
                 @INotificationService private readonly notificationService: INotificationService,
-                @IContextViewService private readonly _contextViewService: IContextViewService,
+                @IContextViewService private readonly contextViewService: IContextViewService,
         ) {
                 super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, telemetryService, hoverService);
-                // DI-injected services are referenced to satisfy noUnusedLocals
-                void this._contextViewService;
         }
 
         protected override renderBody(container: HTMLElement): void {
@@ -473,7 +471,7 @@ export class ObsidianMemoryTreePanel extends ViewPane {
                 metaDiv.innerHTML = `
                         Created: ${new Date(entry.createdAt).toLocaleString()}<br>
                         Updated: ${new Date(entry.updatedAt).toLocaleString()}<br>
-                        Source: <span style="padding:1px 4px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);border-radius:2px;">${entry.source}</span>
+                        Source: <span style="padding:1px 4px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);border-radius:2px;">${this.escapeHtml(entry.source)}</span>
                 `;
                 form.appendChild(metaDiv);
 
@@ -708,9 +706,8 @@ export class ObsidianMemoryTreePanel extends ViewPane {
         private async copyToClipboard(text: string): Promise<void> {
                 try {
                         await navigator.clipboard.writeText(text);
-                } catch (clipErr) {
+                } catch {
                         // Fallback — ignore
-                        this.logService.debug('[ObsidianMemoryExplorer] Clipboard copy failed (non-critical): ' + (clipErr instanceof Error ? clipErr.message : String(clipErr)));
                 }
         }
 

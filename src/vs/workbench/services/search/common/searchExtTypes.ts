@@ -324,7 +324,7 @@ export type TextSearchResult2 = TextSearchMatch2 | TextSearchContext2;
 /**
  * A FileSearchProvider provides search results for files in the given folder that match a query string. It can be invoked by quickaccess or other extensions.
  *
- * A FileSearchProvider is the more powerful of two ways to implement file search in CONSTRUCT IDE. Use a FileSearchProvider if you wish to search within a folder for
+ * A FileSearchProvider is the more powerful of two ways to implement file search in Kovix IDE. Use a FileSearchProvider if you wish to search within a folder for
  * all files that match the user's query.
  *
  * The FileSearchProvider will be invoked on every keypress in quickaccess. When `workspace.findFiles` is called, it will be invoked with an empty query string,
@@ -403,7 +403,7 @@ export interface TextSearchCompleteMessage2 {
 /**
  * A FileSearchProvider provides search results for files in the given folder that match a query string. It can be invoked by quickaccess or other extensions.
  *
- * A FileSearchProvider is the more powerful of two ways to implement file search in CONSTRUCT IDE. Use a FileSearchProvider if you wish to search within a folder for
+ * A FileSearchProvider is the more powerful of two ways to implement file search in Kovix IDE. Use a FileSearchProvider if you wish to search within a folder for
  * all files that match the user's query.
  *
  * The FileSearchProvider will be invoked on every keypress in quickaccess. When `workspace.findFiles` is called, it will be invoked with an empty query string,

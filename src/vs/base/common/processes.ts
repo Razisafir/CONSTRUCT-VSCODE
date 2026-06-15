@@ -99,7 +99,7 @@ export interface ProcessItem {
 }
 
 /**
- * Sanitizes a CONSTRUCT IDE process environment by removing all Electron/CONSTRUCT IDE-related values.
+ * Sanitizes a Kovix IDE process environment by removing all Electron/Kovix IDE-related values.
  */
 export function sanitizeProcessEnvironment(env: IProcessEnvironment, ...preserve: string[]): void {
         const set = preserve.reduce<Record<string, boolean>>((set, key) => {

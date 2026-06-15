@@ -17,7 +17,7 @@ export class ToggleTabFocusModeAction extends Action2 {
         constructor() {
                 super({
                         id: ToggleTabFocusModeAction.ID,
-                        title: nls.localize2({ key: 'toggle.tabMovesFocus', comment: ['Turn on/off use of tab key for moving focus around CONSTRUCT IDE'] }, 'Toggle Tab Key Moves Focus'),
+                        title: nls.localize2({ key: 'toggle.tabMovesFocus', comment: ['Turn on/off use of tab key for moving focus around Kovix'] }, 'Toggle Tab Key Moves Focus'),
                         precondition: undefined,
                         keybinding: {
                                 primary: KeyMod.CtrlCmd | KeyCode.KeyM,

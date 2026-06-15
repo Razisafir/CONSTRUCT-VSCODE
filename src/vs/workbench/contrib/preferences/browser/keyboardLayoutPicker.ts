@@ -93,8 +93,8 @@ interface IUnknownLayout {
 }
 
 const DEFAULT_CONTENT: string = [
-        `// ${nls.localize('displayLanguage', 'Defines the keyboard layout used in CONSTRUCT IDE in the browser environment.')}`,
-        `// ${nls.localize('doc', 'Open CONSTRUCT IDE and run "Developer: Inspect Key Mappings (JSON)" from Command Palette.')}`,
+        `// ${nls.localize('displayLanguage', 'Defines the keyboard layout used in Kovix in the browser environment.')}`,
+        `// ${nls.localize('doc', 'Open Kovix and run "Developer: Inspect Key Mappings (JSON)" from Command Palette.')}`,
         ``,
         `// Once you have the keyboard layout info, please paste it below.`,
         '\n'

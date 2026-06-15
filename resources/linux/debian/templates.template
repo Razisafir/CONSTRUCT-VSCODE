@@ -1,6 +1,6 @@
 Template: @@NAME@@/add-apt-repo
 Type: boolean
 Default: false
-Description: Add CONSTRUCT IDE apt repository?
- The installer would like to add the CONSTRUCT repository and signing
- key to update CONSTRUCT IDE through apt.
+Description: Add Kovix IDE apt repository?
+ The installer would like to add the Kovix repository and signing
+ key to update Kovix IDE through apt.

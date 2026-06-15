@@ -1,10 +1,10 @@
 {
         "nameShort": "Kovix",
-        "nameLong": "Kovix",
+        "nameLong": "Kovix IDE",
         "applicationName": "kovix",
         "dataFolderName": ".kovix",
         "win32MutexName": "kovixide",
-        "licenseName": "Proprietary + MIT (Code-OSS base)",
+        "licenseName": "Proprietary",
         "licenseUrl": "https://github.com/Razisafir/KOVIX/blob/main/LICENSE.txt",
         "serverLicenseUrl": "https://github.com/Razisafir/KOVIX/blob/main/LICENSE.txt",
         "serverGreeting": [],
@@ -16,10 +16,10 @@
         "win32DirName": "Kovix",
         "win32NameVersion": "Kovix",
         "win32RegValueName": "KovixIDE",
-        "win32x64AppId": "{{7A9AD883-E9CA-4B01-92B3-06779FE2B75B}",
-        "win32arm64AppId": "{{839B474D-B895-47CE-A14A-0A2BE3472D8B}",
-        "win32x64UserAppId": "{{A3297DB4-5B1B-4185-90B0-EC7DF4C1D363}",
-        "win32arm64UserAppId": "{{60626750-830D-4978-9BBA-4CAF4528D554}",
+        "win32x64AppId": "{7A9AD883-E9CA-4B01-92B3-06779FE2B75B}",
+        "win32arm64AppId": "{839B474D-B895-47CE-A14A-0A2BE3472D8B}",
+        "win32x64UserAppId": "{A3297DB4-5B1B-4185-90B0-EC7DF4C1D363}",
+        "win32arm64UserAppId": "{60626750-830D-4978-9BBA-4CAF4528D554}",
         "win32AppUserModelId": "Kovix.IDE",
         "win32ShellNameShort": "&Kovix",
         "win32TunnelServiceMutex": "kovix-tunnelservice",
@@ -41,8 +41,8 @@
                 "itemUrl": "https://open-vsx.org/vscode/item",
                 "resourceUrlTemplate": "https://open-vsx.org/vscode/unpkg/{publisher}/{name}/{version}/{path}"
         },
-        "webviewContentExternalBaseUrlTemplate": "https://{{uuid}}.vscode-cdn.net/stable/{{commit}}/out/vs/workbench/contrib/webview/browser/pre/",
-        "updateUrl": "",
+        "webviewContentExternalBaseUrlTemplate": "https://{{uuid}}.kovix.dev/stable/{{commit}}/out/vs/workbench/contrib/webview/browser/pre/",
+        "updateUrl": "https://razisafir.github.io/KOVIX/update.json",
         "builtInExtensions": [
                 {
                         "name": "ms-vscode.js-debug-companion",
@@ -93,7 +93,7 @@
                         }
                 }
         ],
-        "win32AppId": "{{6FC5ED53-6D3A-4578-B6D4-3B8A0F08043E}",
-        "win32UserAppId": "{{051CC4D2-CBBD-4AC1-9961-A524AE0B0447}",
+        "win32AppId": "{6FC5ED53-6D3A-4578-B6D4-3B8A0F08043E}",
+        "win32UserAppId": "{051CC4D2-CBBD-4AC1-9961-A524AE0B0447}",
         "quality": "stable"
 }

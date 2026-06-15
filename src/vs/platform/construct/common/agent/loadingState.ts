@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 /**
- * Granular loading phases for the CONSTRUCT IDE agent loop.
+ * Granular loading phases for the Kovix IDE agent loop.
  * Each phase represents a distinct operation with its own visual indicator.
  */
 export type LoadingPhase =

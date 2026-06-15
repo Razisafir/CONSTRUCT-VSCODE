@@ -52,9 +52,9 @@ function getNewFileHeader(tag) {
     const [major, minor] = tag.split('.');
     const shorttag = `${major}.${minor}`;
     const header = [
-        `// Type definitions for CONSTRUCT IDE ${shorttag}`,
+        `// Type definitions for Kovix IDE ${shorttag}`,
         `// Project: https://github.com/microsoft/vscode`,
-        `// Definitions by: CONSTRUCT IDE Team, Microsoft <https://github.com/microsoft>`,
+        `// Definitions by: Kovix IDE Team, Microsoft <https://github.com/microsoft>`,
         `// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped`,
         ``,
         `/*---------------------------------------------------------------------------------------------`,
@@ -64,7 +64,7 @@ function getNewFileHeader(tag) {
         ` *--------------------------------------------------------------------------------------------*/`,
         ``,
         `/**`,
-        ` * Type Definition for CONSTRUCT IDE ${shorttag} Extension API`,
+        ` * Type Definition for Kovix IDE ${shorttag} Extension API`,
         ` * See https://code.visualstudio.com/api for more information`,
         ` */`
     ].join('\n');

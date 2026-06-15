@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 //
-// CONSTRUCT IDE MODIFICATION: All 1DS telemetry has been neutralized.
+// Kovix IDE MODIFICATION: All 1DS telemetry has been neutralized.
 // Users of an offline AI IDE must not phone home. The log() and flush()
 // methods are no-ops. The original implementation is preserved in git history.
 //
@@ -25,10 +25,10 @@ const endpointUrl = 'https://mobile.events.data.microsoft.com/OneCollector/1.0';
 const endpointHealthUrl = 'https://mobile.events.data.microsoft.com/ping';
 
 /**
- * CONSTRUCT IDE: AbstractOneDataSystemAppender with telemetry disabled.
+ * Kovix IDE: AbstractOneDataSystemAppender with telemetry disabled.
  *
  * All telemetry is neutralized — log() is a no-op, flush() resolves immediately.
- * This ensures CONSTRUCT IDE never sends data to Microsoft's 1DS endpoints.
+ * This ensures Kovix IDE never sends data to Microsoft's 1DS endpoints.
  * The class structure is preserved for compatibility with subclasses and tests.
  */
 export abstract class AbstractOneDataSystemAppender implements ITelemetryAppender {
@@ -52,13 +52,13 @@ export abstract class AbstractOneDataSystemAppender implements ITelemetryAppende
 	}
 
 	log(_eventName: string, _data?: any): void {
-		// CONSTRUCT IDE: No telemetry. All 1DS telemetry is disabled.
+		// Kovix IDE: No telemetry. All 1DS telemetry is disabled.
 		// Users of an offline AI IDE must not phone home.
 		return;
 	}
 
 	flush(): Promise<void> {
-		// CONSTRUCT IDE: No telemetry. Flush is a no-op.
+		// Kovix IDE: No telemetry. Flush is a no-op.
 		return Promise.resolve(undefined);
 	}
 }

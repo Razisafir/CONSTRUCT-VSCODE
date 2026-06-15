@@ -7,7 +7,7 @@ We take security vulnerabilities seriously. If you discover a security vulnerabi
 ### How to Report
 
 - **GitHub Security Advisories**: Use [GitHub's private vulnerability reporting](https://github.com/Razisafir/KOVIX/security/advisories/new)
-- **Email**: Send details to security@kovix.dev (if configured)
+- **Email**: Send details to security@kovix.dev
 
 Please include:
 - Description of the vulnerability

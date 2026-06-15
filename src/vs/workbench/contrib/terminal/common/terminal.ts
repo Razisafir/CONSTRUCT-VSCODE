@@ -316,7 +316,7 @@ export const enum ProcessState {
         // The process was killed during launch, likely as a result of bad shell and
         // args.
         KilledDuringLaunch = 4,
-        // The process was killed by the user (the event originated from CONSTRUCT IDE).
+        // The process was killed by the user (the event originated from Kovix IDE).
         KilledByUser = 5,
         // The process was killed by itself, for example the shell crashed or `exit`
         // was run.

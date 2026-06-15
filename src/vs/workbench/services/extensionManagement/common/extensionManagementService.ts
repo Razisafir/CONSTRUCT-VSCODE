@@ -769,7 +769,7 @@ export class ExtensionManagementService extends Disposable implements IWorkbench
                         }
                 }
 
-                const productName = localize('CONSTRUCT IDE for Web', "{0} for the Web", this.productService.nameLong);
+                const productName = localize('Kovix IDE for Web', "{0} for the Web", this.productService.nameLong);
                 const virtualWorkspaceSupport = this.extensionManifestPropertiesService.getExtensionVirtualWorkspaceSupportType(manifest);
                 const virtualWorkspaceSupportReason = getWorkspaceSupportTypeMessage(manifest.capabilities?.virtualWorkspaces);
                 const hasLimitedSupport = virtualWorkspaceSupport === 'limited' || !!virtualWorkspaceSupportReason;

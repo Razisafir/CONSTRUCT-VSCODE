@@ -133,15 +133,15 @@ suite('Labels', () => {
                 // real world example (other)
                 t = '${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}';
                 assert.strictEqual(labels.template(t, { dirty: '', activeEditorShort: '', rootName: '', appName: '', separator: { label: ' - ' } }), '');
-                assert.strictEqual(labels.template(t, { dirty: '', activeEditorShort: '', rootName: '', appName: 'CONSTRUCT IDE', separator: { label: ' - ' } }), 'CONSTRUCT IDE');
-                assert.strictEqual(labels.template(t, { dirty: '', activeEditorShort: 'Untitled-1', rootName: '', appName: 'CONSTRUCT IDE', separator: { label: ' - ' } }), 'Untitled-1 - CONSTRUCT IDE');
-                assert.strictEqual(labels.template(t, { dirty: '', activeEditorShort: '', rootName: 'monaco', appName: 'CONSTRUCT IDE', separator: { label: ' - ' } }), 'monaco - CONSTRUCT IDE');
-                assert.strictEqual(labels.template(t, { dirty: '', activeEditorShort: 'somefile.txt', rootName: 'monaco', appName: 'CONSTRUCT IDE', separator: { label: ' - ' } }), 'somefile.txt - monaco - CONSTRUCT IDE');
-                assert.strictEqual(labels.template(t, { dirty: '* ', activeEditorShort: 'somefile.txt', rootName: 'monaco', appName: 'CONSTRUCT IDE', separator: { label: ' - ' } }), '* somefile.txt - monaco - CONSTRUCT IDE');
+                assert.strictEqual(labels.template(t, { dirty: '', activeEditorShort: '', rootName: '', appName: 'Kovix IDE', separator: { label: ' - ' } }), 'Kovix IDE');
+                assert.strictEqual(labels.template(t, { dirty: '', activeEditorShort: 'Untitled-1', rootName: '', appName: 'Kovix IDE', separator: { label: ' - ' } }), 'Untitled-1 - Kovix IDE');
+                assert.strictEqual(labels.template(t, { dirty: '', activeEditorShort: '', rootName: 'monaco', appName: 'Kovix IDE', separator: { label: ' - ' } }), 'monaco - Kovix IDE');
+                assert.strictEqual(labels.template(t, { dirty: '', activeEditorShort: 'somefile.txt', rootName: 'monaco', appName: 'Kovix IDE', separator: { label: ' - ' } }), 'somefile.txt - monaco - Kovix IDE');
+                assert.strictEqual(labels.template(t, { dirty: '* ', activeEditorShort: 'somefile.txt', rootName: 'monaco', appName: 'Kovix IDE', separator: { label: ' - ' } }), '* somefile.txt - monaco - Kovix IDE');
 
                 // real world example (other)
                 t = '${dirty}${activeEditorShort}${separator}${rootNameShort}${separator}${appName}';
-                assert.strictEqual(labels.template(t, { dirty: '', activeEditorShort: '', rootName: 'monaco (Workspace)', rootNameShort: 'monaco', appName: 'CONSTRUCT IDE', separator: { label: ' - ' } }), 'monaco - CONSTRUCT IDE');
+                assert.strictEqual(labels.template(t, { dirty: '', activeEditorShort: '', rootName: 'monaco (Workspace)', rootNameShort: 'monaco', appName: 'Kovix IDE', separator: { label: ' - ' } }), 'monaco - Kovix IDE');
         });
 
         test('mnemonicButtonLabel', () => {

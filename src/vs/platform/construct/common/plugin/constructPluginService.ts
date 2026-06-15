@@ -14,7 +14,7 @@ import { Event } from '../../../../base/common/event.js';
 export const IConstructPluginService = createDecorator<IConstructPluginService>('construct.pluginService');
 
 /**
- * A plugin that extends CONSTRUCT IDE functionality.
+ * A plugin that extends Kovix IDE functionality.
  */
 export interface IConstructPlugin {
         /** Unique identifier (e.g., 'com.construct.plugin-security-scanner'). */
@@ -46,7 +46,7 @@ export interface IConstructPluginCapability {
 }
 
 /**
- * Service for managing CONSTRUCT IDE plugins.
+ * Service for managing Kovix IDE plugins.
  *
  * P3: Plugin marketplace API for community tools and integrations.
  * This is a future-facing interface — the MVP focuses on the core IDE.

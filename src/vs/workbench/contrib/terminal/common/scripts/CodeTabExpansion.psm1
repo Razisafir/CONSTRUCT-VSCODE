@@ -39,7 +39,7 @@ Microsoft.PowerShell.Core\Register-ArgumentCompleter -CommandName "code","code-i
                 [System.Management.Automation.CompletionResult]::new("--show-versions", "--show-versions", 'ParameterName', 'Show versions of installed extensions, when using --list-extensions.'),
                 [System.Management.Automation.CompletionResult]::new("--status", "--status", 'ParameterName', 'Print process usage and diagnostics information.'),
                 [System.Management.Automation.CompletionResult]::new("--sync", "--sync", 'ParameterName', 'Turn sync on or off.'),
-                [System.Management.Automation.CompletionResult]::new("--telemetry", "--telemetry", 'ParameterName', 'Shows all telemetry events which CONSTRUCT IDE collects.'),
+                [System.Management.Automation.CompletionResult]::new("--telemetry", "--telemetry", 'ParameterName', 'Shows all telemetry events which Kovix IDE collects.'),
                 [System.Management.Automation.CompletionResult]::new("--uninstall-extension", "--uninstall-extension", 'ParameterName', 'Uninstalls an extension.'),
                 [System.Management.Automation.CompletionResult]::new("--update-extensions", "--update-extensions", 'ParameterName', 'Update the installed extensions.'),
                 [System.Management.Automation.CompletionResult]::new("--user-data-dir", "--user-data-dir", 'ParameterName', 'Specifies the directory that user data is kept in. Can be used to open multiple distinct instances of Code.'),

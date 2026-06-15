@@ -228,7 +228,7 @@ function createCopilotSetupStep(id: string, button: string, when: string, includ
                 description,
                 when,
                 media: {
-                        type: 'svg', altText: 'CONSTRUCT Copilot multi file edits', path: 'multi-file-edits.svg'
+                        type: 'svg', altText: 'Kovix Copilot multi file edits', path: 'multi-file-edits.svg'
                 },
         };
 }
@@ -237,12 +237,12 @@ function createCopilotSetupStep(id: string, button: string, when: string, includ
 export const walkthroughs: GettingStartedWalkthroughContent = [
         {
                 id: 'Setup',
-                title: localize('gettingStarted.setup.title', "Get Started with CONSTRUCT"),
+                title: localize('gettingStarted.setup.title', "Get Started with Kovix"),
                 description: localize('gettingStarted.setup.description', "Customize your editor, learn the basics, and start coding"),
                 isFeatured: true,
                 icon: setupIcon,
                 when: '!isWeb',
-                walkthroughPageTitle: localize('gettingStarted.setup.walkthroughPageTitle', 'Setup CONSTRUCT'),
+                walkthroughPageTitle: localize('gettingStarted.setup.walkthroughPageTitle', 'Setup Kovix'),
                 next: 'Beginner',
                 content: {
                         type: 'steps',
@@ -263,10 +263,10 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
                                 {
                                         id: 'extensionsWeb',
                                         title: localize('gettingStarted.extensions.title', "Code with extensions"),
-                                        description: localize('gettingStarted.extensionsWeb.description.interpolated', "Extensions are CONSTRUCT's power-ups. A growing number are becoming available in the web.\n{0}", Button(localize('browsePopularWeb', "Browse Popular Web Extensions"), 'command:workbench.extensions.action.showPopularExtensions')),
+                                        description: localize('gettingStarted.extensionsWeb.description.interpolated', "Extensions are Kovix's power-ups. A growing number are becoming available in the web.\n{0}", Button(localize('browsePopularWeb', "Browse Popular Web Extensions"), 'command:workbench.extensions.action.showPopularExtensions')),
                                         when: 'workspacePlatform == \'webworker\'',
                                         media: {
-                                                type: 'svg', altText: 'CONSTRUCT extension marketplace with featured language extensions', path: 'extensions-web.svg'
+                                                type: 'svg', altText: 'Kovix extension marketplace with featured language extensions', path: 'extensions-web.svg'
                                         },
                                 },
                                 {
@@ -281,10 +281,10 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
                                 {
                                         id: 'settings',
                                         title: localize('gettingStarted.settings.title', "Tune your settings"),
-                                        description: localize('gettingStarted.settings.description.interpolated', "Customize every aspect of CONSTRUCT and your extensions to your liking. Commonly used settings are listed first to get you started.\n{0}", Button(localize('tweakSettings', "Open Settings"), 'command:toSide:workbench.action.openSettings')),
+                                        description: localize('gettingStarted.settings.description.interpolated', "Customize every aspect of Kovix and your extensions to your liking. Commonly used settings are listed first to get you started.\n{0}", Button(localize('tweakSettings', "Open Settings"), 'command:toSide:workbench.action.openSettings')),
                                         when: '!config.chat.experimental.offerSetup',
                                         media: {
-                                                type: 'svg', altText: 'CONSTRUCT Settings', path: 'settings.svg'
+                                                type: 'svg', altText: 'Kovix Settings', path: 'settings.svg'
                                         },
                                 },
                                 {
@@ -300,23 +300,23 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
                                 {
                                         id: 'settingsAndSync',
                                         title: localize('gettingStarted.settings.title', "Tune your settings"),
-                                        description: localize('gettingStarted.settingsAndSync.description.interpolated', "Customize every aspect of CONSTRUCT and your extensions to your liking. [Back up and sync](command:workbench.userDataSync.actions.turnOn) your essential customizations across all your devices.\n{0}", Button(localize('tweakSettings', "Open Settings"), 'command:toSide:workbench.action.openSettings')),
+                                        description: localize('gettingStarted.settingsAndSync.description.interpolated', "Customize every aspect of Kovix and your extensions to your liking. [Back up and sync](command:workbench.userDataSync.actions.turnOn) your essential customizations across all your devices.\n{0}", Button(localize('tweakSettings', "Open Settings"), 'command:toSide:workbench.action.openSettings')),
                                         when: 'config.chat.experimental.offerSetup && syncStatus != uninitialized',
                                         completionEvents: ['onEvent:sync-enabled'],
                                         media: {
-                                                type: 'svg', altText: 'CONSTRUCT Settings', path: 'settings.svg'
+                                                type: 'svg', altText: 'Kovix Settings', path: 'settings.svg'
                                         },
                                 },
                                 {
                                         id: 'commandPaletteTask',
                                         title: localize('gettingStarted.commandPalette.title', "Unlock productivity with the Command Palette "),
-                                        description: localize('gettingStarted.commandPalette.description.interpolated', "Run commands without reaching for your mouse to accomplish any task in CONSTRUCT.\n{0}", Button(localize('commandPalette', "Open Command Palette"), 'command:workbench.action.showCommands')),
+                                        description: localize('gettingStarted.commandPalette.description.interpolated', "Run commands without reaching for your mouse to accomplish any task in Kovix.\n{0}", Button(localize('commandPalette', "Open Command Palette"), 'command:workbench.action.showCommands')),
                                         media: { type: 'svg', altText: 'Command Palette overlay for searching and executing commands.', path: 'commandPalette.svg' },
                                 },
                                 {
                                         id: 'pickAFolderTask-Mac',
                                         title: localize('gettingStarted.setup.OpenFolder.title', "Open up your code"),
-                                        description: localize('gettingStarted.setup.OpenFolder.description.interpolated', "You're all set to start coding. Open a project folder to get your files into CONSTRUCT.\n{0}", Button(localize('pickFolder', "Pick a Folder"), 'command:workbench.action.files.openFileFolder')),
+                                        description: localize('gettingStarted.setup.OpenFolder.description.interpolated', "You're all set to start coding. Open a project folder to get your files into Kovix.\n{0}", Button(localize('pickFolder', "Pick a Folder"), 'command:workbench.action.files.openFileFolder')),
                                         when: '!config.chat.experimental.offerSetup && isMac && workspaceFolderCount == 0',
                                         media: {
                                                 type: 'svg', altText: 'Explorer view showing buttons for opening folder and cloning repository.', path: 'openFolder.svg'
@@ -325,7 +325,7 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
                                 {
                                         id: 'pickAFolderTask-Other',
                                         title: localize('gettingStarted.setup.OpenFolder.title', "Open up your code"),
-                                        description: localize('gettingStarted.setup.OpenFolder.description.interpolated', "You're all set to start coding. Open a project folder to get your files into CONSTRUCT.\n{0}", Button(localize('pickFolder', "Pick a Folder"), 'command:workbench.action.files.openFolder')),
+                                        description: localize('gettingStarted.setup.OpenFolder.description.interpolated', "You're all set to start coding. Open a project folder to get your files into Kovix.\n{0}", Button(localize('pickFolder', "Pick a Folder"), 'command:workbench.action.files.openFolder')),
                                         when: '!config.chat.experimental.offerSetup && !isMac && workspaceFolderCount == 0',
                                         media: {
                                                 type: 'svg', altText: 'Explorer view showing buttons for opening folder and cloning repository.', path: 'openFolder.svg'
@@ -343,8 +343,8 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
                                 {
                                         id: 'videoTutorial',
                                         title: localize('gettingStarted.videoTutorial.title', "Watch video tutorials"),
-                                        description: localize('gettingStarted.videoTutorial.description.interpolated', "Watch the first in a series of short & practical video tutorials for CONSTRUCT's key features.\n{0}", Button(localize('watch', "Watch Tutorial"), 'https://aka.ms/vscode-getting-started-video')),
-                                        media: { type: 'svg', altText: 'CONSTRUCT Settings', path: 'learn.svg' },
+                                        description: localize('gettingStarted.videoTutorial.description.interpolated', "Watch the first in a series of short & practical video tutorials for Kovix's key features.\n{0}", Button(localize('watch', "Watch Tutorial"), 'https://aka.ms/vscode-getting-started-video')),
+                                        media: { type: 'svg', altText: 'Kovix Settings', path: 'learn.svg' },
                                 }
                         ]
                 }
@@ -352,13 +352,13 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
 
         {
                 id: 'SetupWeb',
-                title: localize('gettingStarted.setupWeb.title', "Get Started with CONSTRUCT for the Web"),
+                title: localize('gettingStarted.setupWeb.title', "Get Started with Kovix for the Web"),
                 description: localize('gettingStarted.setupWeb.description', "Customize your editor, learn the basics, and start coding"),
                 isFeatured: true,
                 icon: setupIcon,
                 when: 'isWeb',
                 next: 'Beginner',
-                walkthroughPageTitle: localize('gettingStarted.setupWeb.walkthroughPageTitle', 'Setup CONSTRUCT Web'),
+                walkthroughPageTitle: localize('gettingStarted.setupWeb.walkthroughPageTitle', 'Setup Kovix Web'),
                 content: {
                         type: 'steps',
                         steps: [
@@ -384,10 +384,10 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
                                 {
                                         id: 'extensionsWebWeb',
                                         title: localize('gettingStarted.extensions.title', "Code with extensions"),
-                                        description: localize('gettingStarted.extensionsWeb.description.interpolated', "Extensions are CONSTRUCT's power-ups. A growing number are becoming available in the web.\n{0}", Button(localize('browsePopularWeb', "Browse Popular Web Extensions"), 'command:workbench.extensions.action.showPopularExtensions')),
+                                        description: localize('gettingStarted.extensionsWeb.description.interpolated', "Extensions are Kovix's power-ups. A growing number are becoming available in the web.\n{0}", Button(localize('browsePopularWeb', "Browse Popular Web Extensions"), 'command:workbench.extensions.action.showPopularExtensions')),
                                         when: 'workspacePlatform == \'webworker\'',
                                         media: {
-                                                type: 'svg', altText: 'CONSTRUCT extension marketplace with featured language extensions', path: 'extensions-web.svg'
+                                                type: 'svg', altText: 'Kovix extension marketplace with featured language extensions', path: 'extensions-web.svg'
                                         },
                                 },
                                 {
@@ -412,13 +412,13 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
                                 {
                                         id: 'commandPaletteTaskWeb',
                                         title: localize('gettingStarted.commandPalette.title', "Unlock productivity with the Command Palette "),
-                                        description: localize('gettingStarted.commandPalette.description.interpolated', "Run commands without reaching for your mouse to accomplish any task in CONSTRUCT.\n{0}", Button(localize('commandPalette', "Open Command Palette"), 'command:workbench.action.showCommands')),
+                                        description: localize('gettingStarted.commandPalette.description.interpolated', "Run commands without reaching for your mouse to accomplish any task in Kovix.\n{0}", Button(localize('commandPalette', "Open Command Palette"), 'command:workbench.action.showCommands')),
                                         media: { type: 'svg', altText: 'Command Palette overlay for searching and executing commands.', path: 'commandPalette.svg' },
                                 },
                                 {
                                         id: 'pickAFolderTask-WebWeb',
                                         title: localize('gettingStarted.setup.OpenFolder.title', "Open up your code"),
-                                        description: localize('gettingStarted.setup.OpenFolderWeb.description.interpolated', "You're all set to start coding. You can open a local project or a remote repository to get your files into CONSTRUCT.\n{0}\n{1}", Button(localize('openFolder', "Open Folder"), 'command:workbench.action.addRootFolder'), Button(localize('openRepository', "Open Repository"), 'command:remoteHub.openRepository')),
+                                        description: localize('gettingStarted.setup.OpenFolderWeb.description.interpolated', "You're all set to start coding. You can open a local project or a remote repository to get your files into Kovix.\n{0}\n{1}", Button(localize('openFolder', "Open Folder"), 'command:workbench.action.addRootFolder'), Button(localize('openRepository', "Open Repository"), 'command:remoteHub.openRepository')),
                                         when: 'workspaceFolderCount == 0',
                                         media: {
                                                 type: 'svg', altText: 'Explorer view showing buttons for opening folder and cloning repository.', path: 'openFolder.svg'
@@ -439,12 +439,12 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
         {
                 id: 'SetupAccessibility',
                 title: localize('gettingStarted.setupAccessibility.title', "Get Started with Accessibility Features"),
-                description: localize('gettingStarted.setupAccessibility.description', "Learn the tools and shortcuts that make CONSTRUCT accessible. Note that some actions are not actionable from within the context of the walkthrough."),
+                description: localize('gettingStarted.setupAccessibility.description', "Learn the tools and shortcuts that make Kovix accessible. Note that some actions are not actionable from within the context of the walkthrough."),
                 isFeatured: true,
                 icon: setupIcon,
                 when: CONTEXT_ACCESSIBILITY_MODE_ENABLED.key,
                 next: 'Setup',
-                walkthroughPageTitle: localize('gettingStarted.setupAccessibility.walkthroughPageTitle', 'Setup CONSTRUCT Accessibility'),
+                walkthroughPageTitle: localize('gettingStarted.setupAccessibility.walkthroughPageTitle', 'Setup Kovix Accessibility'),
                 content: {
                         type: 'steps',
                         steps: [
@@ -475,7 +475,7 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
                                 {
                                         id: 'commandPaletteTaskAccessibility',
                                         title: localize('gettingStarted.commandPaletteAccessibility.title', "Unlock productivity with the Command Palette "),
-                                        description: localize('gettingStarted.commandPaletteAccessibility.description.interpolated', "Run commands without reaching for your mouse to accomplish any task in CONSTRUCT.\n{0}", Button(localize('commandPalette', "Open Command Palette"), 'command:workbench.action.showCommands')),
+                                        description: localize('gettingStarted.commandPaletteAccessibility.description.interpolated', "Run commands without reaching for your mouse to accomplish any task in Kovix.\n{0}", Button(localize('commandPalette', "Open Command Palette"), 'command:workbench.action.showCommands')),
                                         media: { type: 'markdown', path: 'empty' },
                                 },
                                 {
@@ -548,10 +548,10 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
                                 {
                                         id: 'extensions',
                                         title: localize('gettingStarted.extensions.title', "Code with extensions"),
-                                        description: localize('gettingStarted.extensions.description.interpolated', "Extensions are CONSTRUCT's power-ups. They range from handy productivity hacks, expanding out-of-the-box features, to adding completely new capabilities.\n{0}", Button(localize('browsePopular', "Browse Popular Extensions"), 'command:workbench.extensions.action.showPopularExtensions')),
+                                        description: localize('gettingStarted.extensions.description.interpolated', "Extensions are Kovix's power-ups. They range from handy productivity hacks, expanding out-of-the-box features, to adding completely new capabilities.\n{0}", Button(localize('browsePopular', "Browse Popular Extensions"), 'command:workbench.extensions.action.showPopularExtensions')),
                                         when: 'workspacePlatform != \'webworker\'',
                                         media: {
-                                                type: 'svg', altText: 'CONSTRUCT extension marketplace with featured language extensions', path: 'extensions.svg'
+                                                type: 'svg', altText: 'Kovix extension marketplace with featured language extensions', path: 'extensions.svg'
                                         },
                                 },
                                 {

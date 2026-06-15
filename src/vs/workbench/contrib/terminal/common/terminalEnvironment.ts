@@ -289,7 +289,7 @@ export async function createTerminalEnvironment(
                         }
                 }
 
-                // Sanitize the environment, removing any undesirable CONSTRUCT IDE and Electron environment
+                // Sanitize the environment, removing any undesirable Kovix IDE and Electron environment
                 // variables
                 sanitizeProcessEnvironment(env, 'VSCODE_IPC_HOOK_CLI');
 

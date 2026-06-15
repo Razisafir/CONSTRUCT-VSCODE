@@ -21,8 +21,8 @@ import { assertWithinWorkspace } from '../../../../../../platform/construct/comm
  *
  * Strategy:
  * 1. Attempts to use the node-layer MCPProcessNodeService for real MCP protocol
- *    over stdio (if available via CONSTRUCT IDE's remote/node IPC).
- * 2. Falls back to CONSTRUCT IDE's IFileService for file operations when the node
+ *    over stdio (if available via Kovix IDE's remote/node IPC).
+ * 2. Falls back to Kovix IDE's IFileService for file operations when the node
  *    layer is unavailable (browser-only mode).
  *
  * This ensures the agent loop always has functional file operations regardless

@@ -1,4 +1,4 @@
-CONSTRUCT IDE v0.1.0-beta — Build Checksums
+Kovix IDE v0.1.0-beta — Build Checksums
 ==============================================
 Build Date: 2026-06-07
 Build Environment: Linux (headless — no packaging available)

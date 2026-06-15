@@ -5,7 +5,7 @@
 **AI-native development environment with autonomous coding agents**
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/Razisafir/KOVIX)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+[![License](https://img.shields.io/badge/license-MIT%20%2B%20Proprietary-green.svg)](./LICENSE.txt)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/Razisafir/KOVIX)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/Razisafir/KOVIX/actions)
 
@@ -15,13 +15,13 @@
 
 ## What is Kovix?
 
-Kovix is an AI-native development environment built on the [VS Code open-source (Code-OSS)](https://github.com/microsoft/vscode) foundation. It integrates autonomous coding agents directly into the editor, enabling a workflow where AI reads your codebase, writes code, runs terminal commands, and searches your project — all with human approval before applying changes. Unlike cloud-dependent tools like Cursor or GitHub Copilot, Kovix is designed to work with **local LLMs** via Ollama or LM Studio, ensuring your code and API keys never leave your machine. No telemetry, no Microsoft account, and no subscription required.
+Kovix is an AI-native development environment built on the [VS Code open-source (Code-OSS)](https://github.com/microsoft/vscode) foundation. It integrates autonomous coding agents directly into the editor, enabling a workflow where AI reads your codebase, writes code, runs terminal commands, and searches your project — all with human approval before applying changes. Unlike cloud-dependent tools like Cursor or GitHub Copilot, Kovix is designed to work with **local LLMs** via Ollama or LM Studio, ensuring your code and API keys never leave your machine. No telemetry, no Microsoft account required. Kovix is free to use with a generous AI message allowance; a Pro tier with unlimited AI and advanced features is available for power users.
 
 The agent system uses a plan/act loop: you describe what you want, the agent reasons through the steps, calls tools (file read/write, terminal execution, code search), and presents changes for your review. Multiple AI backends are supported — switch between Ollama for fully offline inference, Xenova Transformers.js for in-process ONNX models, or cloud APIs like Anthropic for maximum capability.
 
 ## Built on Code-OSS
 
-Kovix is built on [Microsoft's Code-OSS]((https://github.com/microsoft/vscode)), the open-source foundation of VS Code, used under the [MIT License](https://opensource.org/licenses/MIT). We are grateful to Microsoft and the VS Code team for their incredible work on the editor platform that makes Kovix possible. All VS Code editor features, the extension system, terminal, debugging, and the entire workbench are inherited from Code-OSS.
+Kovix is built on [Microsoft's Code-OSS](https://github.com/microsoft/vscode), the open-source foundation of VS Code, used under the [MIT License](https://opensource.org/licenses/MIT). We are grateful to Microsoft and the VS Code team for their incredible work on the editor platform that makes Kovix possible. All VS Code editor features, the extension system, terminal, debugging, and the entire workbench are inherited from Code-OSS.
 
 ## Features
 
@@ -34,7 +34,7 @@ Kovix is built on [Microsoft's Code-OSS]((https://github.com/microsoft/vscode)),
 - **Built-in Kali Linux terminal on Windows via WSL2** — Detects Kali WSL2 automatically and adds a dedicated terminal profile for security testing workflows
 - **Security tooling: nmap, Ghidra, Nuclei** — Integrated network scanning, binary decompilation, and vulnerability scanning with safety gates requiring explicit user confirmation
 - **Multi-model: switch between local and cloud models in one click** — Status bar model picker lets you swap providers instantly
-- **No telemetry, no Microsoft account, no subscription** — All Microsoft telemetry removed; Open VSX gallery replaces the proprietary marketplace
+- **No telemetry, no Microsoft account required** — All Microsoft telemetry removed; Open VSX gallery replaces the proprietary marketplace. Free tier with optional Pro upgrade.
 
 ## Screenshots / Demo
 
