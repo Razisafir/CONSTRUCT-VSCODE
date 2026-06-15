@@ -157,8 +157,9 @@ export class MCPMarketplaceService extends Disposable implements IMCPMarketplace
                                         documentationUrl: entry.documentationUrl,
                                         repositoryUrl: entry.repositoryUrl ?? entry.repository ?? ''
                                 });
-                        } catch {
+                        } catch (parseErr) {
                                 // Skip malformed entries
+                                this.logService.debug('[MCP Marketplace] Skipping malformed registry entry: ' + (parseErr instanceof Error ? parseErr.message : String(parseErr)));
                         }
                 }
 

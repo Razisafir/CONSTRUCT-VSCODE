@@ -708,8 +708,9 @@ export class ObsidianMemoryTreePanel extends ViewPane {
         private async copyToClipboard(text: string): Promise<void> {
                 try {
                         await navigator.clipboard.writeText(text);
-                } catch {
+                } catch (clipErr) {
                         // Fallback — ignore
+                        this.logService.debug('[ObsidianMemoryExplorer] Clipboard copy failed (non-critical): ' + (clipErr instanceof Error ? clipErr.message : String(clipErr)));
                 }
         }
 

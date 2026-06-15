@@ -69,6 +69,7 @@ export class MCPProcessService extends Disposable implements IMCPProcess {
                                 try {
                                         return accessor.get(IMCPProcessNodeService);
                                 } catch {
+                                        // Non-critical: IMCPProcessNodeService may not be registered in all contexts
                                         return null;
                                 }
                         }) as IMCPProcessNodeService | null;
@@ -329,7 +330,8 @@ export class MCPProcessService extends Disposable implements IMCPProcess {
                 const uri = this.resolveUri(path);
                 try {
                         return await this.fileService.exists(uri);
-                } catch {
+                } catch (existsErr) {
+                        this.logService.debug('[MCPProcess] File existence check failed: ' + (existsErr instanceof Error ? existsErr.message : String(existsErr)));
                         return false;
                 }
         }
@@ -351,8 +353,9 @@ export class MCPProcessService extends Disposable implements IMCPProcess {
                         if (!exists) {
                                 await this.fileService.createFolder(parent);
                         }
-                } catch {
+                } catch (mkdirErr) {
                         // Parent directory creation might fail if it's a root path
+                        this.logService.debug('[MCPProcess] Parent directory creation skipped: ' + (mkdirErr instanceof Error ? mkdirErr.message : String(mkdirErr)));
                 }
         }
 
@@ -363,7 +366,7 @@ export class MCPProcessService extends Disposable implements IMCPProcess {
                 }
                 // Stop the node-layer MCP server if it was started
                 if (this._nodeService) {
-                        this._nodeService.stop().catch(() => { /* non-critical */ });
+                        this._nodeService.stop().catch(err => { this.logService?.debug?.('[MCPProcess] Node service stop failed (non-critical): ' + (err instanceof Error ? err.message : String(err))); });
                         this._nodeService = null;
                 }
                 super.dispose();

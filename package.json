@@ -12,6 +12,7 @@
   "main": "./out/main.js",
   "type": "module",
   "private": true,
+  "engines": { "node": ">=22.0.0", "npm": ">=10.0.0" },
   "scripts": {
     "test": "echo Please run any of the test scripts from the scripts folder.",
     "test-browser": "npx playwright install && node test/unit/browser/index.js",

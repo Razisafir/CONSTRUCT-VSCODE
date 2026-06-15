@@ -280,7 +280,7 @@ export class MCPProcessNodeService extends Disposable implements IMCPProcessNode
                                         }
                                 }
                         } catch {
-                                // Not a valid JSON-RPC response -- skip
+                                // Non-critical: Not a valid JSON-RPC response -- skip (stderr noise, partial lines, etc.)
                         }
                 }
         }

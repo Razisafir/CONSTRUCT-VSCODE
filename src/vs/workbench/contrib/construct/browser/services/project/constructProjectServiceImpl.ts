@@ -137,6 +137,7 @@ export class ConstructProjectServiceImpl extends Disposable implements IConstruc
                         await this.fileService.createFolder(constructDir);
                 } catch {
                         // Directory might already exist
+                        this.logService.debug('[ConstructProject] .construct directory creation skipped (may already exist)');
                 }
 
                 const manifestUri = URI.joinPath(constructDir, PROJECT_MANIFEST);
@@ -830,7 +831,8 @@ export class ConstructProjectServiceImpl extends Disposable implements IConstruc
                         const uri = URI.file(registryPath);
                         const content = await this.fileService.readFile(uri);
                         return JSON.parse(new TextDecoder().decode(content.value.buffer)) as IGlobalRegistryEntry[];
-                } catch {
+                } catch (parseErr) {
+                        this.logService.debug('[ConstructProject] Failed to parse global registry, returning empty: ' + (parseErr instanceof Error ? parseErr.message : String(parseErr)));
                         return [];
                 }
         }
@@ -893,6 +895,7 @@ export class ConstructProjectServiceImpl extends Disposable implements IConstruc
                                 await this.fileService.createFolder(URI.file(parentPath));
                         } catch {
                                 // Directory might already exist
+                                this.logService.debug('[ConstructProject] Parent directory creation skipped (may already exist)');
                         }
                 }
         }

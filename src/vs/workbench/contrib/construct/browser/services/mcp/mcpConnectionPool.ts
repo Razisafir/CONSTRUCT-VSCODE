@@ -133,7 +133,7 @@ export class MCPConnectionPool extends Disposable {
                         transport = null;
                 }
 
-                const { Client } = await import('@modelcontextprotocol/sdk/client/index.js').catch(() => ({ Client: null }));
+                const { Client } = await import('@modelcontextprotocol/sdk/client/index.js').catch(err => { this.logService?.debug?.('[MCPConnectionPool] MCP SDK import failed: ' + (err instanceof Error ? err.message : String(err))); return { Client: null as any }; });
                 const client = Client ? new Client({ name: 'kovix', version: '1.0.0' }) : null;
 
                 const entry: IConnectionEntry = {
@@ -233,7 +233,7 @@ export class MCPConnectionPool extends Disposable {
                                                         if (msg.error) { p.reject(new Error(msg.error.message ?? 'Unknown error')); }
                                                         else { p.resolve(msg.result); }
                                                 }
-                                        } catch { /* ignore non-JSON */ }
+                                        } catch { /* Non-critical: ignore non-JSON chunks on stderr/stdout */ }
                                 }
                         });
                 }
@@ -351,8 +351,8 @@ export class MCPConnectionPool extends Disposable {
 
                 this.emitConnectionEvent(serverName, MCPConnectionState.Reconnecting);
 
-                try { await entry.client?.close?.(); } catch { /* ignore */ }
-                try { await entry.transport?.close?.(); } catch { /* ignore */ }
+                try { await entry.client?.close?.(); } catch { /* Non-critical: cleanup, client may already be closed */ }
+                try { await entry.transport?.close?.(); } catch { /* Non-critical: cleanup, transport may already be closed */ }
 
                 // Recreate transport
                 const def = entry.definition;

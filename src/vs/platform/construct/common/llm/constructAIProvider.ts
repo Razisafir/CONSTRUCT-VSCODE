@@ -6,6 +6,7 @@
 
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 import { Event } from '../../../../base/common/event.js';
+import { IToolDefinition } from '../tools/constructToolRegistry.js';
 
 export class ConstructAuthError extends Error {
         constructor(message: string) {
@@ -94,20 +95,6 @@ export interface IToolCall {
         name: string;
         /** JSON-encoded arguments for the tool */
         arguments: string;
-}
-
-/**
- * A tool definition that can be provided to any provider.
- * Follows the OpenAI function-calling schema convention.
- */
-export interface IToolDefinition {
-        name: string;
-        description: string;
-        inputSchema: {
-                type: 'object';
-                properties: Record<string, unknown>;
-                required?: string[];
-        };
 }
 
 /**

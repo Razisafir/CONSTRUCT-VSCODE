@@ -14,8 +14,9 @@ import { IStorageService } from '../../../../../../platform/storage/common/stora
 import {
         IConstructAIProvider, AIProviderType, AIStreamEvent, IChatMessage,
         IChatOptions, ICompleteOptions, ICompleteResult, IModelInfo,
-        IToolDefinition, ProviderStatus
+        ProviderStatus
 } from '../../../../../../platform/construct/common/llm/constructAIProvider.js';
+import { IToolDefinition } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
 import { IConstructAIService } from '../../../../../../platform/construct/common/llm/constructAIService.js';
 import { ISecureKeyManager } from '../../../../../../platform/construct/common/security/secureKeyManager.js';
 import { OllamaProvider } from './ollamaProvider.js';

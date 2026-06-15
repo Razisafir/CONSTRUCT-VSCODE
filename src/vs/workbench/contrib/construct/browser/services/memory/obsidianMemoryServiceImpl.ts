@@ -248,8 +248,9 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
                         totalSizeBytes = this._cachedStore
                                 ? JSON.stringify(this._cachedStore).length * 2 // Approximate UTF-16 byte count
                                 : 0;
-                } catch {
+                } catch (sizeErr) {
                         // Ignore
+                        this.logService.debug('[ObsidianMemory] Store size calculation failed (non-critical): ' + (sizeErr instanceof Error ? sizeErr.message : String(sizeErr)));
                 }
 
                 const lastUpdated = entries.length > 0
@@ -509,8 +510,9 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
 
                                 store.entries.push(entry);
                                 importedCount++;
-                        } catch {
+                        } catch (parseErr) {
                                 // Skip unparseable blocks
+                                this.logService.debug('[ObsidianMemory] Skipping unparseable memory block: ' + (parseErr instanceof Error ? parseErr.message : String(parseErr)));
                                 continue;
                         }
                 }
@@ -615,8 +617,9 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
                                         return this._cachedStore;
                                 }
                         }
-                } catch {
+                } catch (loadErr) {
                         // File doesn't exist or is corrupt — start fresh
+                        this.logService.debug('[ObsidianMemory] Store file load failed, starting fresh: ' + (loadErr instanceof Error ? loadErr.message : String(loadErr)));
                 }
 
                 this._cachedStore = { version: MEMORY_STORE_VERSION, entries: [] };
@@ -657,7 +660,8 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
                         const os = await import('os');
                         const home = os.homedir();
                         return `${home}/${KOVIX_DIR}/${MEMORY_STORE_FILE}`;
-                } catch {
+                } catch (osErr) {
+                        this.logService.debug('[ObsidianMemory] Cannot determine home directory: ' + (osErr instanceof Error ? osErr.message : String(osErr)));
                         return null;
                 }
         }
@@ -665,7 +669,8 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
         private async getFs(): Promise<typeof import('fs') | null> {
                 try {
                         return await import('fs');
-                } catch {
+                } catch (fsErr) {
+                        this.logService.debug('[ObsidianMemory] Cannot import fs module: ' + (fsErr instanceof Error ? fsErr.message : String(fsErr)));
                         return null;
                 }
         }

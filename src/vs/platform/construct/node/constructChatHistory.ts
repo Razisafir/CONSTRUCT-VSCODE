@@ -192,8 +192,9 @@ export class ConstructChatHistoryService extends Disposable implements IConstruc
                         try {
                                 const db = this._db as { close: () => void };
                                 db.close();
-                        } catch {
-                                // Ignore close errors
+                        } catch (closeErr) {
+                                // Non-critical: Ignore close errors during cleanup
+                                this.logService.debug('[ChatHistory] Database close error (non-critical): ' + (closeErr instanceof Error ? closeErr.message : String(closeErr)));
                         }
                         this._db = null;
                 }

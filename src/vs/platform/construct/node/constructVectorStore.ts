@@ -296,7 +296,8 @@ export class ConstructVectorStoreService extends Disposable implements IConstruc
                         const info = await client.getCollection(this._collectionName);
                         const pointsCount = (info as Record<string, unknown>)?.points_count;
                         return typeof pointsCount === 'number' ? pointsCount : 0;
-                } catch {
+                } catch (countErr) {
+                        this.logService.debug('[VectorStore] Points count query failed: ' + (countErr instanceof Error ? countErr.message : String(countErr)));
                         return 0;
                 }
         }
@@ -453,8 +454,9 @@ export class ConstructVectorStoreService extends Disposable implements IConstruc
                                                 }
                                         }
                                 }
-                        } catch {
+                        } catch (readErr) {
                                 // Skip directories we can't read
+                                this.logService.debug('[VectorStore] Skipped unreadable directory: ' + (readErr instanceof Error ? readErr.message : String(readErr)));
                         }
                 };
 
@@ -466,7 +468,8 @@ export class ConstructVectorStoreService extends Disposable implements IConstruc
                 try {
                         const fs = await import('fs');
                         return fs.readFileSync(filePath, 'utf-8');
-                } catch {
+                } catch (readErr) {
+                        this.logService.debug('[VectorStore] Failed to read file content, returning empty: ' + (readErr instanceof Error ? readErr.message : String(readErr)));
                         return '';
                 }
         }

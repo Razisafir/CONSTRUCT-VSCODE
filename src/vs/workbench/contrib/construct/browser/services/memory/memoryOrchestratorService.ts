@@ -266,8 +266,9 @@ export class MemoryOrchestratorService extends Disposable implements IMemoryOrch
                         data.semantic = semanticEntries;
                         data.procedural = proceduralEntries;
                         storageUsedBytes = new TextEncoder().encode(JSON.stringify(data)).length;
-                } catch {
+                } catch (serErr) {
                         // Fallback: if serialization fails, report 0
+                        this.logService.debug('[MemoryOrchestrator] Storage size serialization failed (non-critical): ' + (serErr instanceof Error ? serErr.message : String(serErr)));
                 }
 
                 // Rolling average of the last 10 query durations

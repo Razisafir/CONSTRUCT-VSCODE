@@ -415,7 +415,8 @@ export class SecureKeyManagerService extends Disposable implements ISecureKeyMan
                 }
                 try {
                         return JSON.parse(raw) as Record<string, string>;
-                } catch {
+                } catch (parseErr) {
+                        this.logService.debug('[SecureKeyManager] Failed to parse endpoint overrides, resetting: ' + (parseErr instanceof Error ? parseErr.message : String(parseErr)));
                         return {};
                 }
         }
@@ -574,8 +575,9 @@ export class SecureKeyManagerService extends Disposable implements ISecureKeyMan
                         if (modelsResponse.status === 401) {
                                 return { healthy: false, latencyMs: 0, error: 'Authentication failed. Check your API key and endpoint.' };
                         }
-                } catch {
+                } catch (modelsErr) {
                         // /v1/models failed, try /health as fallback
+                        this.logService.debug('[SecureKeyManager] /v1/models endpoint failed, trying /health fallback: ' + (modelsErr instanceof Error ? modelsErr.message : String(modelsErr)));
                 }
 
                 // Fallback: try /health endpoint

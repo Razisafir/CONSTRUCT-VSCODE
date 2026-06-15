@@ -7,6 +7,8 @@
 
 import { ITerminalExecutor, ITerminalExecResult, sanitiseForAuditLog, TerminalRateLimiter,
         detectShellMetacharInArgs, isCommandInAllowlist, isDangerousCommand } from '../common/terminal/terminalExecutor.js';
+import { CONSTRUCT_CHANNELS } from '../common/constructIpcChannels.js';
+import { isConstructTrustedSender, IpcSenderContext } from '../common/security/ipcSenderValidation.js';
 import { ILogService } from '../../log/common/log.js';
 import { IConfigurationService } from '../../configuration/common/configuration.js';
 import { Disposable } from '../../../base/common/lifecycle.js';
@@ -40,6 +42,26 @@ export class TerminalNodeService extends Disposable implements ITerminalExecutor
                 this.logService.info('[TerminalNode] Service created (SEC-3 hardened)');
         }
 
+        // ─── SEC-2: Sender Validation ──────────────────────────────────────────────
+
+        /**
+         * Validate that the current call context is trusted for this restricted channel.
+         * Defense-in-depth: the IPC channel wrapper (ValidatingConstructChannel) already
+         * validates at the transport layer, but this provides service-level protection
+         * if the service is ever called through a different code path.
+         */
+        private validateSender(senderContext?: IpcSenderContext): void {
+                if (!isConstructTrustedSender(CONSTRUCT_CHANNELS.TERMINAL, senderContext)) {
+                        const reason = senderContext?.extensionId
+                                ? `extension "${senderContext.extensionId}"`
+                                : senderContext?.origin
+                                        ? `origin "${senderContext.origin}"`
+                                        : 'untrusted sender';
+                        this.logService.error(`[SEC-2] TerminalNode: rejected call from ${reason} on restricted channel ${CONSTRUCT_CHANNELS.TERMINAL}`);
+                        throw new Error(`SEC-2: Access denied — ${reason} is not trusted for terminal operations`);
+                }
+        }
+
         isBlocked(command: string): boolean {
                 // SEC-6: Use the unified dangerous command patterns from common module
                 return isDangerousCommand(command);
@@ -52,6 +74,8 @@ export class TerminalNodeService extends Disposable implements ITerminalExecutor
                 signal?: AbortSignal,
                 onOutput?: (data: string) => void
         ): Promise<ITerminalExecResult> {
+                this.validateSender(); // SEC-2
+
                 // SEC-3: Shell metacharacter detection in arguments
                 const parts = command.trim().split(/\s+/);
                 if (parts.length > 1) {

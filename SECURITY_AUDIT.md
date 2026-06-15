@@ -71,7 +71,7 @@ All 25 high-severity vulnerabilities are in development/build dependencies (elec
 | MCP tool execution has timeout (30s) | PARTIAL | Timeout not explicitly set at 30s in current code; should be added |
 | Audit log does not contain raw API keys (SEC-5) | PASS | sanitiseForAuditLog() redacts sk-ant-*, Bearer, password=, token=, key= patterns |
 | IPC channel names use shared enum (SEC-2) | PASS | ConstructIpcChannel enum created |
-| Sender validation on IPC messages (SEC-2) | PASS | isConstructTrustedSender() validates sender origin |
+| Sender validation on IPC messages (SEC-2) | PASS | isConstructTrustedSender() validates sender origin — implemented in src/vs/platform/construct/common/security/ipcSenderValidation.ts, rejects extension/webview access to restricted channels (SECURE_KEYS, TERMINAL, CONFIG) |
 | CSP headers on webviews (SEC-1) | PASS | Strict CSP with nonce-based script-src applied to onboarding wizard |
 | API key vault via OS keychain (SEC-5) | PASS | ConstructKeyVault class wraps ISecureKeyManager |
 | Secret redaction in logs (SEC-5) | PASS | redactSecrets() applied to cloudProvider log calls |

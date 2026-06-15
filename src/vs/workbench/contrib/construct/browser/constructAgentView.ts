@@ -78,6 +78,9 @@ export class ConstructAgentViewPane extends ViewPane {
         private executionState: ExecutionState = 'idle';
         private currentCancellationToken: CancellationTokenSource | null = null;
         private _abortController: AbortController | null = null;
+        private _pendingTextUpdate: string | undefined;
+        private _rafId: number | undefined;
+        private _scrollPending = false;
 
         // Performance metrics tracking
         private taskStartTime = 0;
@@ -140,6 +143,40 @@ export class ConstructAgentViewPane extends ViewPane {
                 @IQuickInputService private readonly quickInputService: IQuickInputService,
         ) {
                 super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, telemetryService, hoverService);
+        }
+
+        public override dispose(): void {
+                // Cancel any running agent operation
+                if (this._abortController && !this._abortController.signal.aborted) {
+                        this._abortController.abort();
+                }
+                if (this.currentCancellationToken) {
+                        this.currentCancellationToken.dispose();
+                        this.currentCancellationToken = null;
+                }
+                // Reset execution state so panel works when reopened
+                this.executionState = 'idle';
+                // Dispose progress panel if active
+                if (this.progressPanel) {
+                        this.progressPanel.dispose();
+                }
+                // Clean up any pending animation frames
+                if (this._rafId !== undefined) {
+                        cancelAnimationFrame(this._rafId);
+                }
+                super.dispose();
+        }
+
+        override setVisible(visible: boolean): void {
+                if (!visible && this.executionState !== 'idle') {
+                        // Abort the running operation when panel is hidden
+                        if (this._abortController && !this._abortController.signal.aborted) {
+                                this._abortController.abort();
+                        }
+                        // Reset state so panel can be used when reshown
+                        this.setExecutionState('idle');
+                }
+                super.setVisible(visible);
         }
 
         protected override renderBody(container: HTMLElement): void {
@@ -306,7 +343,7 @@ export class ConstructAgentViewPane extends ViewPane {
                                         type: 'user_message',
                                         taskId: this.currentTaskId,
                                         messageNumber: this.messageCount
-                                }).catch(() => { /* non-critical */ });
+                                }).catch(err => { this.logService?.debug?.('[AgentView] User message memory storage failed (non-critical): ' + (err instanceof Error ? err.message : String(err))); });
                         }
 
                         // Phase 2: Check IConstructAIService availability first, then fallback to Anthropic
@@ -909,7 +946,7 @@ export class ConstructAgentViewPane extends ViewPane {
                                 this.constructMemory.addMemory(`Agent completed task: ${task}`, {
                                         type: 'task_completion',
                                         taskId: this.currentTaskId ?? 'unknown',
-                                }).catch(() => { /* non-critical */ });
+                                }).catch(err => { this.logService?.debug?.('[AgentView] Task completion memory storage failed (non-critical): ' + (err instanceof Error ? err.message : String(err))); });
                         }
 
                         // Phase 2: Show tool activity log after execution
@@ -967,7 +1004,15 @@ export class ConstructAgentViewPane extends ViewPane {
         }
 
         private updateMessageContent(element: HTMLElement, text: string): void {
-                element.textContent = text;
+                if (this._pendingTextUpdate !== text) {
+                        this._pendingTextUpdate = text;
+                        if (!this._rafId) {
+                                this._rafId = requestAnimationFrame(() => {
+                                        element.textContent = this._pendingTextUpdate!;
+                                        this._rafId = undefined;
+                                });
+                        }
+                }
         }
 
         private setExecutionState(state: ExecutionState): void {
@@ -1023,7 +1068,13 @@ export class ConstructAgentViewPane extends ViewPane {
         }
 
         private scrollToBottom(): void {
-                this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
+                if (!this._scrollPending) {
+                        this._scrollPending = true;
+                        requestAnimationFrame(() => {
+                                this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
+                                this._scrollPending = false;
+                        });
+                }
         }
 
         /**
@@ -1112,14 +1163,15 @@ export class ConstructAgentViewPane extends ViewPane {
                 try {
                         await this.commandService.executeCommand('workbench.files.action.refreshFilesExplorer');
                 } catch {
-                        // Fallback: stat the workspace root to trigger file watcher
+                        this.logService?.debug?.('[AgentView] refreshFilesExplorer command failed, trying fallback');
                         try {
                                 const rootUri = this.workspaceContextService.getWorkspace().folders[0]?.uri;
                                 if (rootUri) {
                                         await this.fileService.stat(rootUri);
                                 }
-                        } catch {
+                        } catch (statErr) {
                                 // Non-critical -- file explorer will refresh eventually via watchers
+                                this.logService?.debug?.('[AgentView] File explorer refresh fallback also failed (non-critical): ' + (statErr instanceof Error ? statErr.message : String(statErr)));
                         }
                 }
         }
@@ -1528,7 +1580,8 @@ export class ConstructAgentViewPane extends ViewPane {
                         try {
                                 const refinedIdea = await this.ideaRefinementService.skipToRefinedIdea();
                                 this.proceedWithRefinedIdea(refinedIdea, idea);
-                        } catch {
+                        } catch (skipErr) {
+                                this.logService?.warn?.('[AgentView] Skip-to-refined-idea failed, falling back to original: ' + (skipErr instanceof Error ? skipErr.message : String(skipErr)));
                                 this.setExecutionState('idle');
                                 const contextText = this.gatherContext();
                                 const taskWithContext = contextText ? `${idea}\n\n[Context (${this.contextScope})]:\n${contextText}` : idea;

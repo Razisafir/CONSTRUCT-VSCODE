@@ -126,8 +126,9 @@ export class MCPServerManagerService extends Disposable implements IMCPServerMan
                                         description: `Auto-discovered ${check.name} MCP server`,
                                         isBuiltin: true
                                 });
-                        } catch {
+                        } catch (whichErr) {
                                 // Not available in PATH
+                                this.logService.debug('[MCP Manager] Auto-discovery: ' + check.name + ' not available in PATH: ' + (whichErr instanceof Error ? whichErr.message : String(whichErr)));
                         }
                 }
 

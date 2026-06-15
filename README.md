@@ -44,7 +44,7 @@ Kovix is built on [Microsoft's Code-OSS]((https://github.com/microsoft/vscode)),
 
 ## Prerequisites
 
-- **Node.js 20+** and **npm 10+**
+- **Node.js 22+** and **npm 10+**
 - **Git**
 - For local AI: [Ollama](https://ollama.ai) (recommended) or [LM Studio](https://lmstudio.ai)
 - For Kali terminal (Windows only): WSL2 + Kali Linux from Microsoft Store

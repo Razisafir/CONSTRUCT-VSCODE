@@ -400,8 +400,9 @@ export class BrowserAutomationService extends Disposable implements IBrowserAuto
                                 }
                                 parts.push('');
                         }
-                } catch {
+                } catch (consoleErr) {
                         // Console logs unavailable -- non-critical
+                        this.logService.debug('[Browser] Console log retrieval unavailable (non-critical): ' + (consoleErr instanceof Error ? consoleErr.message : String(consoleErr)));
                 }
 
                 // Last screenshot metadata (not the image itself, to save tokens)

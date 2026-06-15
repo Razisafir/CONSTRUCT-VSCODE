@@ -5,14 +5,14 @@ Depends: @@DEPENDS@@
 Recommends: @@RECOMMENDS@@
 Priority: optional
 Architecture: @@ARCHITECTURE@@
-Maintainer: CONSTRUCT <https://github.com/Razisafir/CONSTRUCT-VSCODE>
-Homepage: https://github.com/Razisafir/CONSTRUCT-VSCODE
+Maintainer: KOVIX <https://github.com/Razisafir/KOVIX>
+Homepage: https://github.com/Razisafir/KOVIX
 Installed-Size: @@INSTALLEDSIZE@@
 Provides: visual-studio-@@NAME@@
 Conflicts: visual-studio-@@NAME@@
 Replaces: visual-studio-@@NAME@@
-Description: CONSTRUCT IDE. AI-native code editing. Redefined.
- CONSTRUCT IDE is a new choice of tool that combines the simplicity of
+Description: KOVIX IDE. AI-native code editing. Redefined.
+ KOVIX IDE is a new choice of tool that combines the simplicity of
  a code editor with what developers need for the core edit-build-debug cycle,
- powered by AI. See https://github.com/Razisafir/CONSTRUCT-VSCODE for more
+ powered by AI. See https://github.com/Razisafir/KOVIX for more
  information.

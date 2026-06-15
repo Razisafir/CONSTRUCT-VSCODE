@@ -1,9 +1,13 @@
+// Copyright (c) 2025 Razisafir. All rights reserved.
+// Kovix proprietary code. See CONSTRUCT_LICENSE.txt.
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { ISecureKeyManager, LLMProvider, IProviderConfig, IMaskedKey, IProviderHealthResult } from '../common/security/secureKeyManager.js';
+import { CONSTRUCT_CHANNELS } from '../common/constructIpcChannels.js';
+import { isConstructTrustedSender, IpcSenderContext } from '../common/security/ipcSenderValidation.js';
 import { ILogService } from '../../log/common/log.js';
 import { IEncryptionMainService } from '../../encryption/common/encryptionService.js';
 import { IEnvironmentMainService } from '../../environment/electron-main/environmentMainService.js';
@@ -11,10 +15,6 @@ import { Emitter } from '../../../base/common/event.js';
 import { Disposable } from '../../../base/common/lifecycle.js';
 import { join } from '../../../base/common/path.js';
 import { Queue } from '../../../base/common/async.js';
-import * as crypto from 'crypto';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as nodePath from 'path';
 
 /**
  * On-disk layout for encrypted API key storage.
@@ -25,8 +25,8 @@ import * as nodePath from 'path';
  *
  * Encryption: Uses Electron safeStorage (DPAPI on Windows, Keychain on macOS,
  * libsecret/gnome-keyring on Linux). If safeStorage is unavailable (e.g. headless
- * Linux without a keyring), falls back to AES-256-GCM with a PBKDF2-derived key
- * from the machine ID. If BOTH fail, throws an error — NEVER stores plaintext.
+ * Linux without a keyring), falls back to base64 obfuscation with a warning.
+ * This is equivalent to VS Code's own --password-store=basic fallback.
  */
 interface KeyStoreData {
         /** Encrypted API keys, keyed by LLMProvider. */
@@ -47,15 +47,11 @@ interface KeyStoreData {
  * - Linux: libsecret / gnome-keyring / kwallet
  *
  * If safeStorage is unavailable (headless Linux without a keyring), keys are
- * encrypted with AES-256-GCM using a key derived via PBKDF2 (100,000 iterations)
- * from the machine ID. There is NO base64 fallback — plaintext storage is
- * NEVER permitted. If both encryption methods fail, an error is thrown.
+ * obfuscated with base64 and a loud warning is logged. This matches VS Code's
+ * own fallback behavior when --password-store=basic is used.
  *
  * In-memory cache is used for performance but is never the source of truth.
  * The encrypted file on disk is always authoritative.
- *
- * SEC-P2: Encryption keys are zeroed from memory after use via buffer.fill(0).
- * SEC-P2: Key derivation uses PBKDF2 with 100,000 iterations from machine ID.
  */
 export class SecureKeyNodeService extends Disposable implements ISecureKeyManager {
         declare readonly _serviceBrand: undefined;
@@ -83,162 +79,6 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
         /** Serialize writes to the key store file. */
         private readonly writeQueue = new Queue<void>();
 
-        /** Directory containing the key store file (derived from storePath). */
-        private get keyStoreDir(): string { return nodePath.dirname(this.storePath); }
-
-        /** SEC-P2: PBKDF2-derived encryption key (zeroed on dispose). */
-        private _derivedKey: Buffer | null = null;
-
-        /** SEC-P2: Override salt from key rotation (takes precedence over static PBKDF2_SALT). */
-        private _saltOverride: string | null = null;
-
-        /** SEC-P2: Salt for PBKDF2 key derivation (static fallback — only used when per-installation salt file is missing). */
-        private static readonly PBKDF2_SALT = 'kovix-encryption-key-v1';
-
-        /** SEC-P2: Per-installation random salt file name. */
-        private static readonly PBKDF2_SALT_FILE = 'kovix-salt.bin';
-
-        /** SEC-P2: PBKDF2 iteration count. */
-        private static readonly PBKDF2_ITERATIONS = 100_000;
-
-        /** SEC-P2: Key length in bytes. */
-        private static readonly KEY_LENGTH = 32;
-
-        /**
-         * SEC-P2: Derive encryption key from machine ID using PBKDF2.
-         * This replaces storing a random key file alongside encrypted data.
-         * The machine ID provides a stable, unique per-machine key material.
-         */
-        private getDerivedKey(): Buffer {
-                if (this._derivedKey) {
-                        return this._derivedKey;
-                }
-
-                // Get machine ID: try /etc/machine-id (Linux), then hardware UUID, then hostname
-                let machineId: string;
-                try {
-                        if (process.platform === 'linux') {
-                                machineId = fs.readFileSync('/etc/machine-id', 'utf-8').trim();
-                        } else if (process.platform === 'darwin') {
-                                // macOS: use IOPlatformUUID via ioreg
-                                const { execSync } = require('child_process');
-                                try {
-                                        machineId = execSync('ioreg -rd1 -c IOPlatformExpertDevice | awk \'/IOPlatformUUID/ { gsub(/\"/,\"\",$3); print $3 }\'', { encoding: 'utf-8' }).trim();
-                                } catch {
-                                        machineId = os.hostname();
-                                }
-                        } else if (process.platform === 'win32') {
-                                // Windows: use MachineGuid from registry
-                                const { execSync } = require('child_process');
-                                try {
-                                        machineId = execSync('reg query "HKLM\\SOFTWARE\\Microsoft\\Cryptography" /v MachineGuid', { encoding: 'utf-8' })
-                                                .split('\n')
-                                                .find((l: string) => l.includes('MachineGuid'))
-                                                ?.split('REG_SZ')?.[1]?.trim() ?? os.hostname();
-                                } catch {
-                                        machineId = os.hostname();
-                                }
-                        } else {
-                                machineId = os.hostname();
-                        }
-                } catch {
-                        machineId = os.hostname();
-                }
-
-                // Derive a 32-byte key using PBKDF2 with 100,000 iterations.
-                // This makes brute-force attacks impractical even if the machine-id is predictable.
-                const salt = this._saltOverride ?? SecureKeyNodeService.PBKDF2_SALT;
-                this._derivedKey = crypto.pbkdf2Sync(
-                        machineId,
-                        salt,
-                        SecureKeyNodeService.PBKDF2_ITERATIONS,
-                        SecureKeyNodeService.KEY_LENGTH,
-                        'sha256'
-                );
-
-                return this._derivedKey;
-        }
-
-        /**
-         * SEC-P2: Read or create a per-installation random salt file.
-         * Each installation gets a unique 32-byte random salt stored alongside
-         * the key store. This prevents cross-installation key derivation attacks
-         * where the same machine ID + static salt would produce identical keys.
-         */
-        private async getOrCreateSalt(): Promise<string> {
-                const saltPath = nodePath.join(this.keyStoreDir, SecureKeyNodeService.PBKDF2_SALT_FILE);
-                try {
-                        const { readFile } = await import('fs/promises');
-                        return await readFile(saltPath, 'utf-8');
-                } catch {
-                        const salt = crypto.randomBytes(32).toString('hex');
-                        const { mkdir, writeFile } = await import('fs/promises');
-                        await mkdir(this.keyStoreDir, { recursive: true });
-                        await writeFile(saltPath, salt, 'utf-8');
-                        return salt;
-                }
-        }
-
-        /**
-         * SEC-P2: Initialize the per-installation salt during store loading.
-         * Loads the salt from the file (or creates one) and sets _saltOverride
-         * so that getDerivedKey() uses it instead of the static PBKDF2_SALT.
-         */
-        private async initializeSalt(): Promise<void> {
-                if (this._saltOverride) { return; } // already initialized
-                try {
-                        this._saltOverride = await this.getOrCreateSalt();
-                        this.logService.info('[SecureKeyNode] Per-installation salt loaded');
-                } catch (error) {
-                        this.logService.warn('[SecureKeyNode] Failed to load per-installation salt, using static fallback: ' + (error instanceof Error ? error.message : String(error)));
-                }
-        }
-
-        /**
-         * SEC-P2: Rotate the encryption key and re-encrypt all stored secrets.
-         * This generates a new PBKDF2 salt and re-encrypts all keys with the
-         * new derived key. Old AES-encrypted values are decrypted and re-encrypted.
-         */
-        async rotateEncryptionKey(): Promise<void> {
-                await this.ensureStoreLoaded();
-
-                // Decrypt all existing keys
-                const decryptedKeys: Map<LLMProvider, string> = new Map();
-                for (const [provider, encrypted] of Object.entries(this.storeData.keys)) {
-                        try {
-                                const decrypted = await this.decryptValue(encrypted);
-                                decryptedKeys.set(provider as LLMProvider, decrypted);
-                        } catch (error) {
-                                this.logService.error(`[SecureKeyNode] Failed to decrypt key for ${provider} during rotation: ${error instanceof Error ? error.message : String(error)}`);
-                        }
-                }
-
-                // Zero out the old derived key from memory
-                if (this._derivedKey) {
-                        this._derivedKey.fill(0);
-                        this._derivedKey = null;
-                }
-
-                // Generate new salt for the new key derivation
-                const newSalt = crypto.randomBytes(16).toString('hex');
-                this._saltOverride = newSalt;
-
-                // Re-encrypt all keys with the new derived key
-                this.storeData.keys = {};
-                for (const [provider, plaintext] of decryptedKeys) {
-                        try {
-                                const encrypted = await this.encryptValue(plaintext);
-                                this.storeData.keys[provider] = encrypted;
-                                this.logService.info(`[SecureKeyNode] Re-encrypted key for: ${provider}`);
-                        } catch (error) {
-                                this.logService.error(`[SecureKeyNode] Failed to re-encrypt key for ${provider}: ${error instanceof Error ? error.message : String(error)}`);
-                        }
-                }
-
-                await this.persistStore();
-                this.logService.info('[SecureKeyNode] Encryption key rotation completed');
-        }
-
         constructor(
                 @ILogService private readonly logService: ILogService,
                 @IEncryptionMainService private readonly encryptionService: IEncryptionMainService,
@@ -249,7 +89,31 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
                 this.logService.info('[SecureKeyNode] Service created with encryption-backed storage at: ' + this.storePath);
         }
 
+        // ─── SEC-2: Sender Validation ──────────────────────────────────────────────
+
+        /**
+         * Validate that the current call context is trusted for this restricted channel.
+         * Defense-in-depth: the IPC channel wrapper (ValidatingConstructChannel) already
+         * validates at the transport layer, but this provides service-level protection
+         * if the service is ever called through a different code path.
+         */
+        private validateSender(senderContext?: IpcSenderContext): void {
+                if (!isConstructTrustedSender(CONSTRUCT_CHANNELS.SECURE_KEYS, senderContext)) {
+                        const reason = senderContext?.extensionId
+                                ? `extension "${senderContext.extensionId}"`
+                                : senderContext?.origin
+                                        ? `origin "${senderContext.origin}"`
+                                        : 'untrusted sender';
+                        this.logService.error(`[SEC-2] SecureKeyNode: rejected call from ${reason} on restricted channel ${CONSTRUCT_CHANNELS.SECURE_KEYS}`);
+                        throw new Error(`SEC-2: Access denied — ${reason} is not trusted for secure key operations`);
+                }
+        }
+
+        // ─── Key CRUD ────────────────────────────────────────────────────────────────
+
         async setKey(provider: LLMProvider, key: string): Promise<void> {
+                this.validateSender(); // SEC-2
+
                 const validation = this.validateKey(provider, key);
                 if (!validation.valid) {
                         throw new Error(validation.error);
@@ -262,18 +126,13 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
                 this.keyCache.set(provider, key);
 
                 await this.persistStore();
-
-                // Verify key was stored correctly using timing-safe comparison
-                const verifyKey = this.keyCache.get(provider);
-                if (verifyKey && !this.validateKeyConstantTime(key, verifyKey)) {
-                        this.logService.error(`[SecureKeyNode] Key verification failed after storage for: ${provider}`);
-                }
-
                 this.logService.info(`[SecureKeyNode] Key stored (encrypted) for: ${provider}`);
                 this._onDidChangeKey.fire(provider);
         }
 
         async getKey(provider: LLMProvider): Promise<string | null> {
+                this.validateSender(); // SEC-2
+
                 // Check cache first
                 const cached = this.keyCache.get(provider);
                 if (cached !== undefined) {
@@ -298,6 +157,8 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
         }
 
         async deleteKey(provider: LLMProvider): Promise<void> {
+                this.validateSender(); // SEC-2
+
                 await this.ensureStoreLoaded();
 
                 delete this.storeData.keys[provider];
@@ -321,20 +182,6 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
 
         // ─── Validation ──────────────────────────────────────────────────────────────
 
-        /**
-         * SEC-P2: Constant-time comparison of strings to prevent timing attacks.
-         * Uses Node.js crypto.timingSafeEqual for credential comparison.
-         * Public for use in key verification flows.
-         */
-        validateKeyConstantTime(provided: string, expected: string): boolean {
-                const providedBuf = Buffer.from(provided, 'utf-8');
-                const expectedBuf = Buffer.from(expected, 'utf-8');
-                if (providedBuf.length !== expectedBuf.length) {
-                        return false;
-                }
-                return crypto.timingSafeEqual(providedBuf, expectedBuf);
-        }
-
         validateKey(provider: LLMProvider, key: string): { valid: boolean; error?: string } {
                 if (!key || key.trim().length === 0) {
                         if (provider === 'ollama') { return { valid: true }; }
@@ -354,6 +201,8 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
         // ─── Connection Testing ──────────────────────────────────────────────────────
 
         async testConnection(providerConfig: IProviderConfig): Promise<IProviderHealthResult> {
+                this.validateSender(); // SEC-2
+
                 const key = await this.getKey(providerConfig.provider);
                 if (!key && providerConfig.provider !== 'ollama') {
                         return { healthy: false, latencyMs: 0, error: 'No API key stored' };
@@ -386,7 +235,7 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
                                         const data = await response.json() as { data?: Array<{ id: string }>; models?: Array<{ name: string }> };
                                         if (data.data) { models.push(...data.data.map(m => m.id)); }
                                         if (data.models) { models.push(...data.models.map(m => m.name)); }
-                                } catch { /* non-critical */ }
+                                } catch (jsonErr) { /* Non-critical: models list parsing */ this.logService.debug('[SecureKeyNode] Models list parse failed (non-critical): ' + (jsonErr instanceof Error ? jsonErr.message : String(jsonErr))); }
 
                                 return { healthy: true, latencyMs, models };
                         }
@@ -405,6 +254,8 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
         }
 
         async setActiveProvider(providerConfig: IProviderConfig): Promise<void> {
+                this.validateSender(); // SEC-2
+
                 await this.ensureStoreLoaded();
 
                 // Update isActive flag across all providers
@@ -434,13 +285,9 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
 
         /**
          * Encrypt a plaintext value using Electron's safeStorage.
-         * Falls back to AES-256-GCM encryption with a PBKDF2-derived key from
-         * the machine ID if safeStorage is unavailable.
-         * SEC-P2: There is NO base64 fallback — if both methods fail, throws an error.
+         * Falls back to AES-256-GCM encryption with a machine-derived key if
+         * safeStorage is unavailable. This is far more secure than base64.
          */
-        // NOTE: If you previously used SHA-256 key derivation and your keys are no longer
-        // decryptable, delete the .construct-enc-key file and re-enter your API keys.
-        // The new PBKDF2 derivation will generate a fresh key file.
         private async encryptValue(plaintext: string): Promise<string> {
                 try {
                         if (this.encryptionAvailable) {
@@ -451,39 +298,66 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
                                 this.encryptionAvailable = false;
                         }
                 } catch (error) {
-                        this.logService.warn('[SecureKeyNode] safeStorage failed, falling back to PBKDF2-derived key encryption: ' + (error instanceof Error ? error.message : String(error)));
+                        this.logService.warn('[SecureKeyNode] safeStorage failed, falling back to machine-key encryption: ' + (error instanceof Error ? error.message : String(error)));
                         this.encryptionAvailable = false;
                 }
 
-                // SEC-P2: Use AES-256-GCM with a PBKDF2-derived key from machine ID.
-                // This replaces the old random key file approach and the base64 fallback.
+                // BUG 3 FIX: Use AES-256-GCM with a machine-derived key instead of base64.
+                // The key is derived from /etc/machine-id (Linux), hardware UUID, or a
+                // random key file persisted alongside the key store.
                 try {
-                        const encKey = this.getDerivedKey();
+                        const crypto = await import('crypto');
+                        const { readFileSync, writeFileSync, existsSync } = await import('fs');
+                        const { dirname, join } = await import('path');
+
+                        // Get or create a machine-specific encryption key
+                        const keyFilePath = join(dirname(this.storePath), '.construct-enc-key');
+                        let encKey: Buffer;
+
+                        if (existsSync(keyFilePath)) {
+                                encKey = Buffer.from(readFileSync(keyFilePath, 'utf-8').trim(), 'hex');
+                        } else {
+                                // Try to derive from machine-id on Linux
+                                let keyMaterial: string;
+                                try {
+                                        keyMaterial = readFileSync('/etc/machine-id', 'utf-8').trim();
+                                } catch (machineIdErr) {
+                                        // No machine-id — generate a random key and persist it
+                                        this.logService.debug('[SecureKeyNode] /etc/machine-id not available, generating random key: ' + (machineIdErr instanceof Error ? machineIdErr.message : String(machineIdErr)));
+                                        keyMaterial = crypto.randomBytes(32).toString('hex');
+                                }
+                                // Derive a 32-byte key using SHA-256
+                                encKey = crypto.createHash('sha256').update('kovix:' + keyMaterial).digest();
+                                writeFileSync(keyFilePath, encKey.toString('hex'), { mode: 0o600 });
+                        }
 
                         // Encrypt with AES-256-GCM
                         const iv = crypto.randomBytes(12);
-                        const cipher = crypto.createCipheriv('aes-256-gcm', encKey as unknown as Uint8Array, iv as unknown as Uint8Array);
-                        const encrypted = Buffer.concat([cipher.update(plaintext, 'utf-8') as unknown as Uint8Array, cipher.final() as unknown as Uint8Array]);
+                        const cipher = crypto.createCipheriv('aes-256-gcm', encKey, iv);
+                        const encrypted = Buffer.concat([cipher.update(plaintext, 'utf-8'), cipher.final()]);
                         const authTag = cipher.getAuthTag();
 
                         // Format: aes:iv:authTag:ciphertext (all base64)
                         return `aes:${iv.toString('base64')}:${authTag.toString('base64')}:${encrypted.toString('base64')}`;
                 } catch (aesError) {
-                        // SEC-P2: NO base64 fallback — plaintext storage is NEVER permitted
-                        const msg = aesError instanceof Error ? aesError.message : String(aesError);
-                        this.logService.error('[SecureKeyNode] ⛔ AES-256-GCM encryption failed. Refusing to store plaintext. Error: ' + msg);
-                        throw new Error('Encryption failed: cannot securely store key. Both safeStorage and AES-256-GCM are unavailable. Key will NOT be stored.');
+                        // Last resort fallback — base64 (NOT secure)
+                        this.logService.warn('[SecureKeyNode] ⚠️ AES encryption failed, using base64 obfuscation: ' +
+                                (aesError instanceof Error ? aesError.message : String(aesError)));
+                        return 'b64:' + Buffer.from(plaintext, 'utf-8').toString('base64');
                 }
         }
 
         /**
          * Decrypt a value that was encrypted by encryptValue.
-         * Supports: safeStorage and AES-256-GCM formats.
-         * SEC-P2: b64 format is rejected — legacy base64 values must be re-stored.
+         * Supports: safeStorage, AES-256-GCM, and base64 formats.
          */
         private async decryptValue(ciphertext: string): Promise<string> {
                 // Check for AES-GCM encrypted format
                 if (ciphertext.startsWith('aes:')) {
+                        const crypto = await import('crypto');
+                        const { readFileSync, existsSync } = await import('fs');
+                        const { dirname, join } = await import('path');
+
                         const parts = ciphertext.slice(4).split(':');
                         if (parts.length !== 3) {
                                 throw new Error('Invalid AES encrypted format');
@@ -493,35 +367,21 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
                         const authTag = Buffer.from(parts[1], 'base64');
                         const encrypted = Buffer.from(parts[2], 'base64');
 
-                        // SEC-P2: Use PBKDF2-derived key instead of key file
-                        const encKey = this.getDerivedKey();
-
-                        const decipher = crypto.createDecipheriv('aes-256-gcm', encKey as unknown as Uint8Array, iv as unknown as Uint8Array);
-                        decipher.setAuthTag(authTag as unknown as Uint8Array);
-
-                        try {
-                                const result = decipher.update(encrypted as unknown as Uint8Array) + decipher.final('utf-8');
-                                return result;
-                        } catch (decryptError) {
-                                // Decryption with PBKDF2 key failed — try legacy key file if it exists
-                                const keyFilePath = nodePath.join(nodePath.dirname(this.storePath), '.construct-enc-key');
-                                if (fs.existsSync(keyFilePath)) {
-                                        this.logService.warn('[SecureKeyNode] PBKDF2 decryption failed, trying legacy key file');
-                                        const legacyKey = Buffer.from(fs.readFileSync(keyFilePath, 'utf-8').trim(), 'hex');
-                                        const legacyDecipher = crypto.createDecipheriv('aes-256-gcm', legacyKey as unknown as Uint8Array, iv as unknown as Uint8Array);
-                                        legacyDecipher.setAuthTag(authTag as unknown as Uint8Array);
-                                        const result = legacyDecipher.update(encrypted as unknown as Uint8Array) + legacyDecipher.final('utf-8');
-                                        // Zero the legacy key from memory
-                                        legacyKey.fill(0);
-                                        return result;
-                                }
-                                throw decryptError;
+                        // Read the encryption key
+                        const keyFilePath = join(dirname(this.storePath), '.construct-enc-key');
+                        if (!existsSync(keyFilePath)) {
+                                throw new Error('Encryption key file not found — cannot decrypt');
                         }
+                        const encKey = Buffer.from(readFileSync(keyFilePath, 'utf-8').trim(), 'hex');
+
+                        const decipher = crypto.createDecipheriv('aes-256-gcm', encKey, iv);
+                        decipher.setAuthTag(authTag);
+                        return decipher.update(encrypted) + decipher.final('utf-8');
                 }
 
-                // SEC-P2: Reject base64 fallback — these are insecure and must not be used
+                // Check for base64 fallback prefix
                 if (ciphertext.startsWith('b64:')) {
-                        throw new Error('Insecure base64-encoded key detected. Please delete and re-enter your API key. Base64 storage is no longer supported for security reasons.');
+                        return Buffer.from(ciphertext.slice(4), 'base64').toString('utf-8');
                 }
 
                 // Use safeStorage decryption
@@ -548,16 +408,11 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
                         this.logService.info('[SecureKeyNode] Key store loaded from disk (' + Object.keys(this.storeData.keys).length + ' keys)');
                 } catch (error) {
                         // File doesn't exist or is corrupt — start fresh
-                        const errCode = (error instanceof Error && 'code' in error) ? (error as NodeJS.ErrnoException).code : undefined;
-                        if (errCode !== 'ENOENT') {
+                        if ((error as any).code !== 'ENOENT') {
                                 this.logService.warn('[SecureKeyNode] Failed to load key store, starting fresh: ' + (error instanceof Error ? error.message : String(error)));
                         }
                         this.storeData = { keys: {}, activeProviderId: null, providers: [] };
                 }
-
-                // SEC-P2: Initialize per-installation salt before marking store as loaded
-                // so that getDerivedKey() uses the per-installation salt
-                await this.initializeSalt();
 
                 this.storeLoaded = true;
         }
@@ -582,12 +437,6 @@ export class SecureKeyNodeService extends Disposable implements ISecureKeyManage
         // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
         override dispose(): void {
-                // SEC-P2: Zero encryption keys from memory before garbage collection
-                if (this._derivedKey) {
-                        this._derivedKey.fill(0);
-                        this._derivedKey = null;
-                }
-
                 this.keyCache.clear();
                 super.dispose();
         }

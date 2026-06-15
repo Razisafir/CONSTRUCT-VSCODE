@@ -125,7 +125,7 @@ export class PendingChangesService extends Disposable implements IPendingChanges
                                 if (!parentExists) {
                                         await this.fileService.createFolder(parent);
                                 }
-                        } catch { /* concurrent creation is fine */ }
+                        } catch { /* Non-critical: concurrent creation is fine */ this.logService.debug('[PendingChanges] Parent directory creation skipped (concurrent creation)'); }
 
                         await this.fileService.writeFile(uri, VSBuffer.fromString(entry.proposedContent));
                         entry.accepted = true;
@@ -157,7 +157,7 @@ export class PendingChangesService extends Disposable implements IPendingChanges
                                         await this.fileService.del(uri, { recursive: false, useTrash: true });
                                         this.logService.info(`[PendingChanges] Rejected new file, deleted from disk: ${uri.fsPath}`);
                                 }
-                        } catch { /* non-critical */ }
+                        } catch (delErr) { /* Non-critical */ this.logService.debug('[PendingChanges] File deletion during rejection failed (non-critical): ' + (delErr instanceof Error ? delErr.message : String(delErr))); }
                 }
 
                 entry.accepted = false;

@@ -509,9 +509,11 @@ export class ObsidianMemoryEditorPane extends Disposable {
         }
 
         private updateMetadata(entry: IObsidianMemoryEntry): void {
+                const safeId = this.escapeHtml(String(entry.id));
+                const safeSource = this.escapeHtml(String(entry.source));
                 this.metaEl.innerHTML = `
-                        ID: <code style="font-size:10px;color:var(--vscode-textPreformat-foreground);background:var(--vscode-textPreformat-background);padding:1px 3px;border-radius:2px;">${entry.id.substring(0, 8)}...</code>
-                        &nbsp;·&nbsp; Source: <span style="padding:1px 4px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);border-radius:2px;">${entry.source}</span>
+                        ID: <code style="font-size:10px;color:var(--vscode-textPreformat-foreground);background:var(--vscode-textPreformat-background);padding:1px 3px;border-radius:2px;">${safeId.substring(0, 8)}...</code>
+                        &nbsp;·&nbsp; Source: <span style="padding:1px 4px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);border-radius:2px;">${safeSource}</span>
                         &nbsp;·&nbsp; Created: ${new Date(entry.createdAt).toLocaleString()}
                         &nbsp;·&nbsp; Updated: ${new Date(entry.updatedAt).toLocaleString()}
                 `;
@@ -564,6 +566,15 @@ export class ObsidianMemoryEditorPane extends Disposable {
 
                 // Links
                 html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" style="color:var(--vscode-textLink-foreground);">$1</a>');
+
+                // After link conversion, strip dangerous URI schemes
+                html = html.replace(/href="([^"]*)"/g, (match: string, url: string) => {
+                        const scheme = url.trim().toLowerCase();
+                        if (scheme.startsWith('javascript:') || scheme.startsWith('data:') || scheme.startsWith('vbscript:')) {
+                                return 'href="#"';
+                        }
+                        return match;
+                });
 
                 // Bullet lists
                 html = html.replace(/^[-*] (.+)$/gm, '<li style="margin-left:16px;">$1</li>');

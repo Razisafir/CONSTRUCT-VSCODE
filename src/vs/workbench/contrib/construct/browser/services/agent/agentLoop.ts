@@ -14,7 +14,8 @@ import { IApprovedPlan, IMilestone, ExecutionState } from '../../../../../../pla
 import { ExecutionMode } from '../../../../../../platform/construct/common/agent/executionMode.js';
 import { LoadingState, FileChangeEntry } from '../../../../../../platform/construct/common/agent/loadingState.js';
 import { IConstructAIService } from '../../../../../../platform/construct/common/llm/constructAIService.js';
-import { IChatMessage, IToolDefinition, IToolCall } from '../../../../../../platform/construct/common/llm/constructAIProvider.js';
+import { IChatMessage, IToolCall } from '../../../../../../platform/construct/common/llm/constructAIProvider.js';
+import { IToolDefinition } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
 import { IMCPProcess } from '../../../../../../platform/construct/common/mcp/mcpProcess.js';
 import { IMCPServerManager } from '../../../../../../platform/construct/common/mcp/mcpServerManager.js';
 import { ITerminalExecutor } from '../../../../../../platform/construct/common/terminal/terminalExecutor.js';
@@ -38,8 +39,8 @@ import { IPendingChangesService } from '../../../../../../platform/construct/com
 import { IUniversalMemoryService } from '../../../../../../platform/construct/common/memory/universalMemoryService.js';
 import { IObsidianMemoryService } from '../../../../../../platform/construct/common/memory/obsidianMemoryService.js';
 import { IConstructToolRegistry } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
-// H3: Prompt sanitizer for memory injection prevention
-import { sanitizeMemoryContext } from '../../../../../../platform/construct/common/agent/promptSanitizer.js';
+// H3: Memory context sanitizer for injection prevention
+import { sanitizeMemoryContext } from '../../../../../../platform/construct/common/agent/memoryContextSanitizer.js';
 
 const MAX_ROUNDS = 15;
 
@@ -553,8 +554,9 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                                                                         } else {
                                                                                                 this.snapshotManager.trackFileCreated(this._activeSnapshotId, filePath);
                                                                                         }
-                                                                                } catch {
+                                                                                } catch (trackErr) {
                                                                                         // Snapshot tracking is non-critical
+                                                                                        this.logService.debug('[AgentLoop] Snapshot file tracking failed (non-critical): ' + (trackErr instanceof Error ? trackErr.message : String(trackErr)));
                                                                                         this.snapshotManager.trackFileCreated(this._activeSnapshotId, filePath);
                                                                                 }
                                                                         }
@@ -579,7 +581,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                                                 this.constructMemory.addMemory(
                                                                         `Tool ${event.toolName}: ${JSON.stringify(event.toolInput)} -> ${success ? 'Success' : 'Failed'}`,
                                                                         { type: 'tool_result', toolName: event.toolName, taskId: task }
-                                                                ).catch(() => { /* non-critical */ });
+                                                                ).catch(err => { this.logService.debug('[AgentLoop] Tool result memory storage failed (non-critical): ' + (err instanceof Error ? err.message : String(err))); });
                                                         }
                                                         break;
                                                 }
@@ -649,18 +651,18 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                 this.constructMemory.addMemory(
                                         `Task completed: ${task}. Summary: ${finalSummary.substring(0, 500)}`,
                                         { type: 'task_summary', task }
-                                ).catch(() => { /* non-critical */ });
+                                ).catch(err => { this.logService.debug('[AgentLoop] Task summary memory storage failed (non-critical): ' + (err instanceof Error ? err.message : String(err))); });
                         }
 
                         // Auto-extract universal memory from completed task
                         if (this.universalMemory && finalSummary) {
-                                this.universalMemory.autoExtractFromTask(task, finalSummary.substring(0, 500)).catch(() => { /* non-critical */ });
+                                this.universalMemory.autoExtractFromTask(task, finalSummary.substring(0, 500)).catch(err => { this.logService.debug('[AgentLoop] Universal memory auto-extract failed (non-critical): ' + (err instanceof Error ? err.message : String(err))); });
                         }
 
                         // Record assistant turn and auto-extract from Obsidian memory
                         if (finalSummary) {
                                 this.obsidianMemory.recordConversationTurn(sessionId, 'assistant', finalSummary.substring(0, 500));
-                                this.obsidianMemory.autoExtractFromConversation(sessionId).catch(() => { /* non-critical */ });
+                                this.obsidianMemory.autoExtractFromConversation(sessionId).catch(err => { this.logService.debug('[AgentLoop] Obsidian memory auto-extract failed (non-critical): ' + (err instanceof Error ? err.message : String(err))); });
                         }
 
                         yield { type: 'complete', summary: finalSummary || 'Task completed.' };
@@ -952,8 +954,8 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                         return `Error: ${result.output}`;
                                 }
                         }
-                } catch {
-                        // Fall through to hardcoded implementation
+                } catch (err) {
+                        this.logService.debug('[AgentLoop] Tool registry dispatch failed, falling back to hardcoded: ' + (err instanceof Error ? err.message : String(err)));
                 }
 
                 try {
@@ -1204,14 +1206,15 @@ Guidelines:
                         // Primary: CONSTRUCT IDE command
                         await this.commandService.executeCommand('workbench.files.action.refreshFilesExplorer');
                 } catch {
-                        // Fallback: stat the workspace root to trigger file watcher
+                        this.logService.debug('[AgentLoop] refreshFilesExplorer command failed, trying fallback');
                         try {
                                 const rootUri = this.workspaceContextService.getWorkspace().folders[0]?.uri;
                                 if (rootUri) {
                                         await this.fileService.stat(rootUri);
                                 }
-                        } catch {
+                        } catch (statErr) {
                                 // Non-critical -- file explorer will refresh eventually via watchers
+                                this.logService.debug('[AgentLoop] File explorer refresh fallback also failed (non-critical): ' + (statErr instanceof Error ? statErr.message : String(statErr)));
                         }
                 }
         }

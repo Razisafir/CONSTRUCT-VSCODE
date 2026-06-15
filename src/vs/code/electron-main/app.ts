@@ -136,6 +136,7 @@ import { FileWatcherNodeService } from '../../platform/construct/node/constructF
 import { ITerminalExecutor } from '../../platform/construct/common/terminal/terminalExecutor.js';
 import { TerminalNodeService } from '../../platform/construct/node/constructTerminalService.js';
 import { CONSTRUCT_CHANNELS } from '../../platform/construct/common/constructIpcChannels.js';
+import { createValidatingChannel } from '../../platform/construct/common/security/ipcChannelWrapper.js';
 
 /**
  * The main CONSTRUCT IDE application. There will only ever be one instance,
@@ -1292,13 +1293,13 @@ export class CodeApplication extends Disposable {
                 const constructChatHistoryChannel = ProxyChannel.fromService(accessor.get(IConstructChatHistory), disposables);
                 mainProcessElectronServer.registerChannel(CONSTRUCT_CHANNELS.CHAT_HISTORY, constructChatHistoryChannel);
 
-                // Config service — centralized configuration
-                const constructConfigChannel = ProxyChannel.fromService(accessor.get(IConstructConfigService), disposables);
-                mainProcessElectronServer.registerChannel(CONSTRUCT_CHANNELS.CONFIG, constructConfigChannel);
+                // Config service — centralized configuration (SEC-2: restricted channel with sender validation)
+                const constructConfigChannelRaw = ProxyChannel.fromService(accessor.get(IConstructConfigService), disposables);
+                mainProcessElectronServer.registerChannel(CONSTRUCT_CHANNELS.CONFIG, createValidatingChannel(CONSTRUCT_CHANNELS.CONFIG, constructConfigChannelRaw, (msg) => this.logService.warn(msg)));
 
-                // Secure key service — OS keychain access
-                const constructSecureKeysChannel = ProxyChannel.fromService(accessor.get(ISecureKeyManager), disposables);
-                mainProcessElectronServer.registerChannel(CONSTRUCT_CHANNELS.SECURE_KEYS, constructSecureKeysChannel);
+                // Secure key service — OS keychain access (SEC-2: restricted channel with sender validation)
+                const constructSecureKeysChannelRaw = ProxyChannel.fromService(accessor.get(ISecureKeyManager), disposables);
+                mainProcessElectronServer.registerChannel(CONSTRUCT_CHANNELS.SECURE_KEYS, createValidatingChannel(CONSTRUCT_CHANNELS.SECURE_KEYS, constructSecureKeysChannelRaw, (msg) => this.logService.warn(msg)));
 
                 // Notification service — system notifications
                 const constructNotificationChannel = ProxyChannel.fromService(accessor.get(IConstructNotificationService), disposables);
@@ -1312,9 +1313,9 @@ export class CodeApplication extends Disposable {
                 const constructFileWatcherChannel = ProxyChannel.fromService(accessor.get(IFileWatcherService), disposables);
                 mainProcessElectronServer.registerChannel(CONSTRUCT_CHANNELS.FILE_WATCHER, constructFileWatcherChannel);
 
-                // Terminal execution service — replaces browser child_process
-                const constructTerminalChannel = ProxyChannel.fromService(accessor.get(ITerminalExecutor), disposables);
-                mainProcessElectronServer.registerChannel(CONSTRUCT_CHANNELS.TERMINAL, constructTerminalChannel);
+                // Terminal execution service — replaces browser child_process (SEC-2: restricted channel with sender validation)
+                const constructTerminalChannelRaw = ProxyChannel.fromService(accessor.get(ITerminalExecutor), disposables);
+                mainProcessElectronServer.registerChannel(CONSTRUCT_CHANNELS.TERMINAL, createValidatingChannel(CONSTRUCT_CHANNELS.TERMINAL, constructTerminalChannelRaw, (msg) => this.logService.warn(msg)));
         }
 
         private async openFirstWindow(accessor: ServicesAccessor, initialProtocolUrls: IInitialProtocolUrls | undefined): Promise<ICodeWindow[]> {

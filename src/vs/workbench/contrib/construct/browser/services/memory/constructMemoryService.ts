@@ -358,7 +358,8 @@ export class ConstructMemoryService extends Disposable implements IConstructMemo
                                                                 containerTag: this.containerTag,
                                                 });
                                                 return true;
-                                } catch {
+                                } catch (err) {
+                                                this.logService.warn('[ConstructMemory] Profile check failed: ' + (err instanceof Error ? err.message : String(err)));
                                                 return false;
                                 }
                 }

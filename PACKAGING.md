@@ -74,7 +74,7 @@ Based on the failed build attempt and VS Code's official build requirements:
 | Swap | 8 GB | 16 GB |
 | Disk Space | 30 GB free | 50 GB free |
 | CPU Cores | 4 | 8+ |
-| Node.js | 20.x | 20.x LTS |
+| Node.js | 22.x | 22.x LTS |
 | Build Time | ~30 min (16GB) | ~15 min (32GB) |
 
 ---
@@ -84,8 +84,8 @@ Based on the failed build attempt and VS Code's official build requirements:
 ### 1. Prerequisites
 
 ```bash
-# Node.js 20.x (via nvm)
-source ~/.nvm/nvm.sh && nvm use 20
+# Node.js 22.x (via nvm)
+source ~/.nvm/nvm.sh && nvm use 22
 
 # Ensure dependencies are installed
 cd /home/z/my-project/KOVIX

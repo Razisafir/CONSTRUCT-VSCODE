@@ -391,7 +391,8 @@ export class SnapshotManagerService extends Disposable implements ISnapshotManag
                         }
 
                         return -1;
-                } catch {
+                } catch (err) {
+                        this.logService.debug('[SnapshotManager] Git stash count failed: ' + (err instanceof Error ? err.message : String(err)));
                         return -1;
                 }
         }
@@ -417,6 +418,7 @@ export class SnapshotManagerService extends Disposable implements ISnapshotManag
                         await this.fileService.createFolder(URI.file(backupDir));
                 } catch {
                         // Directory might already exist
+                        this.logService.debug('[SnapshotManager] Backup directory creation skipped (may already exist)');
                 }
 
                 this.logService.info(`[SnapshotManager] File snapshot created with ${existingFiles.length} existing files`);
@@ -442,8 +444,9 @@ export class SnapshotManagerService extends Disposable implements ISnapshotManag
                                         results.push(relativePath);
                                 }
                         }
-                } catch {
+                } catch (err) {
                         // Permission errors, etc. -- skip
+                        this.logService.debug('[SnapshotManager] File collection skipped (permission/path error): ' + (err instanceof Error ? err.message : String(err)));
                 }
         }
 
@@ -534,8 +537,9 @@ export class SnapshotManagerService extends Disposable implements ISnapshotManag
                         const targetUri = URI.file(`${snapshot.workspacePath}/${filePath}`);
                         try {
                                 await this.fileService.del(targetUri);
-                        } catch {
+                        } catch (delErr) {
                                 // File might already be gone
+                                this.logService.debug('[SnapshotManager] File deletion skipped (may already be gone): ' + (delErr instanceof Error ? delErr.message : String(delErr)));
                         }
                 });
                 await Promise.all(deletes);
@@ -545,8 +549,9 @@ export class SnapshotManagerService extends Disposable implements ISnapshotManag
                 const backupDir = this.getBackupDir(snapshot);
                 try {
                         await this.fileService.del(URI.file(backupDir), { recursive: true });
-                } catch {
+                } catch (cleanErr) {
                         // Non-critical
+                        this.logService.debug('[SnapshotManager] Backup directory cleanup failed (non-critical): ' + (cleanErr instanceof Error ? cleanErr.message : String(cleanErr)));
                 }
         }
 
@@ -560,7 +565,8 @@ export class SnapshotManagerService extends Disposable implements ISnapshotManag
                                 5000
                         );
                         return result.exitCode === 0 && result.stdout.trim() === 'true';
-                } catch {
+                } catch (err) {
+                        this.logService.debug('[SnapshotManager] Git detection failed: ' + (err instanceof Error ? err.message : String(err)));
                         return false;
                 }
         }
@@ -689,6 +695,7 @@ export class SnapshotManagerService extends Disposable implements ISnapshotManag
                                 await this.fileService.createFolder(URI.file(parentPath));
                         } catch {
                                 // Might already exist
+                                this.logService.debug('[SnapshotManager] Parent directory creation skipped (may already exist)');
                         }
                 }
         }
@@ -700,14 +707,15 @@ export class SnapshotManagerService extends Disposable implements ISnapshotManag
                 try {
                         await this.commandService.executeCommand('workbench.files.action.refreshFilesExplorer');
                 } catch {
-                        // Non-critical
+                        this.logService.debug('[SnapshotManager] refreshFilesExplorer command failed, trying fallback');
                         try {
                                 const rootUri = this.workspaceContextService.getWorkspace().folders[0]?.uri;
                                 if (rootUri) {
                                         await this.fileService.stat(rootUri);
                                 }
-                        } catch {
+                        } catch (statErr) {
                                 // Non-critical
+                                this.logService.debug('[SnapshotManager] File explorer refresh fallback also failed (non-critical): ' + (statErr instanceof Error ? statErr.message : String(statErr)));
                         }
                 }
         }

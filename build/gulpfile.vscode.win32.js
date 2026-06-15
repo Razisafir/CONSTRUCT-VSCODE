@@ -150,7 +150,7 @@ function copyInnoUpdater(arch) {
  */
 function updateIcon(executablePath) {
         return cb => {
-                const icon = path.join(repoPath, 'resources', 'win32', 'construct.ico');
+                const icon = path.join(repoPath, 'resources', 'win32', 'kovix.ico');
                 rcedit(executablePath, { icon }, cb);
         };
 }

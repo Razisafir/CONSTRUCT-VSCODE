@@ -4,6 +4,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { IConstructConfigService, IConstructConfigEntry, ConstructConfigScope } from '../common/config/constructConfigService.js';
+import { CONSTRUCT_CHANNELS } from '../common/constructIpcChannels.js';
+import { isConstructTrustedSender, IpcSenderContext } from '../common/security/ipcSenderValidation.js';
 import { ILogService } from '../../log/common/log.js';
 import { IFileService } from '../../files/common/files.js';
 import { URI } from '../../../base/common/uri.js';
@@ -19,16 +21,16 @@ const CONFIG_FILE_NAME = 'settings.json';
  * Default CONSTRUCT configuration values.
  */
 const DEFAULTS: Record<string, unknown> = {
-	'construct.cloud.baseUrl': 'https://api.openai.com/v1',
-	'construct.cloud.model': 'gpt-4o-mini',
-	'construct.anthropic.model': 'claude-sonnet-4-20250514',
-	'construct.ollama.baseUrl': 'http://localhost:11434',
-	'construct.ollama.model': 'codellama',
-	'construct.agent.maxRounds': 15,
-	'construct.agent.autoAccept': false,
-	'construct.memory.autoLearn': true,
-	'construct.telemetry.enabled': false,
-	'construct.debug': false,
+        'construct.cloud.baseUrl': 'https://api.openai.com/v1',
+        'construct.cloud.model': 'gpt-4o-mini',
+        'construct.anthropic.model': 'claude-sonnet-4-20250514',
+        'construct.ollama.baseUrl': 'http://localhost:11434',
+        'construct.ollama.model': 'codellama',
+        'construct.agent.maxRounds': 15,
+        'construct.agent.autoAccept': false,
+        'construct.memory.autoLearn': true,
+        'construct.telemetry.enabled': false,
+        'construct.debug': false,
 };
 
 /**
@@ -37,143 +39,169 @@ const DEFAULTS: Record<string, unknown> = {
  * In the main process, workspace info is set via setWorkspace() when available.
  */
 export class ConstructConfigService extends Disposable implements IConstructConfigService {
-	declare readonly _serviceBrand: undefined;
+        declare readonly _serviceBrand: undefined;
 
-	private readonly _onDidChangeConfiguration = this._register(new Emitter<string>());
-	readonly onDidChangeConfiguration = this._onDidChangeConfiguration.event;
+        private readonly _onDidChangeConfiguration = this._register(new Emitter<string>());
+        readonly onDidChangeConfiguration = this._onDidChangeConfiguration.event;
 
-	private _config: Map<string, unknown> = new Map();
-	private _configUri: URI | null = null;
+        private _config: Map<string, unknown> = new Map();
+        private _configUri: URI | null = null;
 
-	constructor(
-		@ILogService private readonly logService: ILogService,
-		@IFileService private readonly fileService: IFileService,
-	) {
-		super();
-		this.logService.info('[ConstructConfig] Service created');
-	}
+        constructor(
+                @ILogService private readonly logService: ILogService,
+                @IFileService private readonly fileService: IFileService,
+        ) {
+                super();
+                this.logService.info('[ConstructConfig] Service created');
+        }
 
-	/**
-	 * Set the workspace root URI. Called when workspace info becomes available.
-	 */
-	setWorkspace(workspaceRoot: URI): void {
-		this._configUri = joinPath(workspaceRoot, CONFIG_DIR_NAME, CONFIG_FILE_NAME);
-		this.loadConfig().catch(err => {
-			this.logService.warn('[ConstructConfig] Failed to load config:', err instanceof Error ? err.message : String(err));
-		});
-	}
+        // ─── SEC-2: Sender Validation ──────────────────────────────────────────────
 
-	private async loadConfig(): Promise<void> {
-		if (!this._configUri) { return; }
+        /**
+         * Validate that the current call context is trusted for this restricted channel.
+         * Defense-in-depth: the IPC channel wrapper (ValidatingConstructChannel) already
+         * validates at the transport layer, but this provides service-level protection
+         * if the service is ever called through a different code path.
+         */
+        private validateSender(senderContext?: IpcSenderContext): void {
+                if (!isConstructTrustedSender(CONSTRUCT_CHANNELS.CONFIG, senderContext)) {
+                        const reason = senderContext?.extensionId
+                                ? `extension "${senderContext.extensionId}"`
+                                : senderContext?.origin
+                                        ? `origin "${senderContext.origin}"`
+                                        : 'untrusted sender';
+                        this.logService.error(`[SEC-2] ConstructConfig: rejected call from ${reason} on restricted channel ${CONSTRUCT_CHANNELS.CONFIG}`);
+                        throw new Error(`SEC-2: Access denied — ${reason} is not trusted for config operations`);
+                }
+        }
 
-		try {
-			const content = await this.fileService.readFile(this._configUri);
-			const parsed = JSON.parse(content.value.toString());
-			for (const [key, value] of Object.entries(parsed)) {
-				this._config.set(key, value);
-			}
-			this.logService.info(`[ConstructConfig] Loaded ${this._config.size} settings from ${this._configUri.fsPath}`);
-		} catch {
-			this.logService.info('[ConstructConfig] No existing config file, using defaults');
-		}
-	}
+        /**
+         * Set the workspace root URI. Called when workspace info becomes available.
+         */
+        setWorkspace(workspaceRoot: URI): void {
+                this._configUri = joinPath(workspaceRoot, CONFIG_DIR_NAME, CONFIG_FILE_NAME);
+                this.loadConfig().catch(err => {
+                        this.logService.warn('[ConstructConfig] Failed to load config:', err instanceof Error ? err.message : String(err));
+                });
+        }
 
-	private async saveConfig(): Promise<void> {
-		if (!this._configUri) { return; }
+        private async loadConfig(): Promise<void> {
+                if (!this._configUri) { return; }
 
-		const obj: Record<string, unknown> = {};
-		for (const [key, value] of this._config) {
-			obj[key] = value;
-		}
+                try {
+                        const content = await this.fileService.readFile(this._configUri);
+                        const parsed = JSON.parse(content.value.toString());
+                        for (const [key, value] of Object.entries(parsed)) {
+                                this._config.set(key, value);
+                        }
+                        this.logService.info(`[ConstructConfig] Loaded ${this._config.size} settings from ${this._configUri.fsPath}`);
+                } catch {
+                        this.logService.info('[ConstructConfig] No existing config file, using defaults');
+                }
+        }
 
-		// Ensure .construct directory exists
-		const configDir = joinPath(this._configUri, '..');
-		try {
-			const dirExists = await this.fileService.exists(configDir);
-			if (!dirExists) {
-				await this.fileService.createFolder(configDir);
-			}
-		} catch { /* concurrent creation is fine */ }
+        private async saveConfig(): Promise<void> {
+                if (!this._configUri) { return; }
 
-		await this.fileService.writeFile(this._configUri, VSBuffer.fromString(JSON.stringify(obj, null, 2)));
-	}
+                const obj: Record<string, unknown> = {};
+                for (const [key, value] of this._config) {
+                        obj[key] = value;
+                }
 
-	getValue<T>(key: string, scope?: ConstructConfigScope): T {
-		if (this._config.has(key)) {
-			return this._config.get(key) as T;
-		}
-		return DEFAULTS[key] as T;
-	}
+                // Ensure .construct directory exists
+                const configDir = joinPath(this._configUri, '..');
+                try {
+                        const dirExists = await this.fileService.exists(configDir);
+                        if (!dirExists) {
+                                await this.fileService.createFolder(configDir);
+                        }
+                } catch { /* Non-critical: concurrent directory creation is fine */ this.logService.debug('[ConstructConfig] Config directory creation skipped (concurrent creation)'); }
 
-	async setValue<T>(key: string, value: T, scope: ConstructConfigScope): Promise<void> {
-		this._config.set(key, value);
-		await this.saveConfig();
-		this._onDidChangeConfiguration.fire(key);
-		this.logService.info(`[ConstructConfig] Set ${key} = ${typeof value === 'string' ? '***' : String(value)}`);
-	}
+                await this.fileService.writeFile(this._configUri, VSBuffer.fromString(JSON.stringify(obj, null, 2)));
+        }
 
-	async removeValue(key: string): Promise<void> {
-		this._config.delete(key);
-		await this.saveConfig();
-		this._onDidChangeConfiguration.fire(key);
-	}
+        getValue<T>(key: string, scope?: ConstructConfigScope): T {
+                if (this._config.has(key)) {
+                        return this._config.get(key) as T;
+                }
+                return DEFAULTS[key] as T;
+        }
 
-	getAllEntries(prefix?: string): IConstructConfigEntry[] {
-		const entries: IConstructConfigEntry[] = [];
-		const allKeys = new Set([...Object.keys(DEFAULTS), ...this._config.keys()]);
+        async setValue<T>(key: string, value: T, scope: ConstructConfigScope): Promise<void> {
+                this.validateSender(); // SEC-2
 
-		for (const key of allKeys) {
-			if (prefix && !key.startsWith(prefix)) { continue; }
-			const defaultValue = DEFAULTS[key];
-			const currentValue = this._config.has(key) ? this._config.get(key) : defaultValue;
-			entries.push({
-				key,
-				value: currentValue,
-				scope: 'workspace',
-				isModified: this._config.has(key) && this._config.get(key) !== defaultValue,
-				defaultValue,
-				description: '',
-			});
-		}
+                this._config.set(key, value);
+                await this.saveConfig();
+                this._onDidChangeConfiguration.fire(key);
+                this.logService.info(`[ConstructConfig] Set ${key} = ${typeof value === 'string' ? '***' : String(value)}`);
+        }
 
-		return entries;
-	}
+        async removeValue(key: string): Promise<void> {
+                this.validateSender(); // SEC-2
 
-	hasValue(key: string): boolean {
-		return this._config.has(key) || key in DEFAULTS;
-	}
+                this._config.delete(key);
+                await this.saveConfig();
+                this._onDidChangeConfiguration.fire(key);
+        }
 
-	async resetAll(): Promise<void> {
-		this._config.clear();
-		await this.saveConfig();
-		this._onDidChangeConfiguration.fire('*');
-	}
+        getAllEntries(prefix?: string): IConstructConfigEntry[] {
+                const entries: IConstructConfigEntry[] = [];
+                const allKeys = new Set([...Object.keys(DEFAULTS), ...this._config.keys()]);
 
-	getConstructDir(): URI {
-		if (this._configUri) {
-			return joinPath(this._configUri, '..');
-		}
-		return URI.file('.construct');
-	}
+                for (const key of allKeys) {
+                        if (prefix && !key.startsWith(prefix)) { continue; }
+                        const defaultValue = DEFAULTS[key];
+                        const currentValue = this._config.has(key) ? this._config.get(key) : defaultValue;
+                        entries.push({
+                                key,
+                                value: currentValue,
+                                scope: 'workspace',
+                                isModified: this._config.has(key) && this._config.get(key) !== defaultValue,
+                                defaultValue,
+                                description: '',
+                        });
+                }
 
-	exportSettings(): Record<string, unknown> {
-		const obj: Record<string, unknown> = {};
-		for (const [key, value] of this._config) {
-			obj[key] = value;
-		}
-		return obj;
-	}
+                return entries;
+        }
 
-	async importSettings(settings: Record<string, unknown>): Promise<void> {
-		for (const [key, value] of Object.entries(settings)) {
-			this._config.set(key, value);
-		}
-		await this.saveConfig();
-		this._onDidChangeConfiguration.fire('*');
-	}
+        hasValue(key: string): boolean {
+                return this._config.has(key) || key in DEFAULTS;
+        }
 
-	override dispose(): void {
-		this._config.clear();
-		super.dispose();
-	}
+        async resetAll(): Promise<void> {
+                this._config.clear();
+                await this.saveConfig();
+                this._onDidChangeConfiguration.fire('*');
+        }
+
+        getConstructDir(): URI {
+                if (this._configUri) {
+                        return joinPath(this._configUri, '..');
+                }
+                return URI.file('.construct');
+        }
+
+        exportSettings(): Record<string, unknown> {
+                const obj: Record<string, unknown> = {};
+                for (const [key, value] of this._config) {
+                        obj[key] = value;
+                }
+                return obj;
+        }
+
+        async importSettings(settings: Record<string, unknown>): Promise<void> {
+                this.validateSender(); // SEC-2
+
+                for (const [key, value] of Object.entries(settings)) {
+                        this._config.set(key, value);
+                }
+                await this.saveConfig();
+                this._onDidChangeConfiguration.fire('*');
+        }
+
+        override dispose(): void {
+                this._config.clear();
+                super.dispose();
+        }
 }

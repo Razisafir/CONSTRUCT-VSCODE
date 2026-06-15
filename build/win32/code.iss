@@ -8,21 +8,21 @@
 AppId={#AppId}
 AppName={#NameLong}
 AppVerName={#NameVersion}
-AppPublisher=CONSTRUCT
-AppPublisherURL=https://construct-ide.com/
-AppSupportURL=https://construct-ide.com/
-AppUpdatesURL=https://construct-ide.com/
+AppPublisher=KOVIX
+AppPublisherURL=https://github.com/Razisafir/KOVIX
+AppSupportURL=https://github.com/Razisafir/KOVIX
+AppUpdatesURL=https://github.com/Razisafir/KOVIX
 DefaultGroupName={#NameLong}
 AllowNoIcons=yes
 OutputDir={#OutputDir}
-OutputBaseFilename=ConstructIDESetup
+OutputBaseFilename=KovixIDESetup
 Compression=lzma
 SolidCompression=yes
 AppMutex={code:GetAppMutex}
 SetupMutex={#AppMutex}setup
 WizardImageFile="{#RepoDir}\resources\win32\inno-big-100.bmp,{#RepoDir}\resources\win32\inno-big-125.bmp,{#RepoDir}\resources\win32\inno-big-150.bmp,{#RepoDir}\resources\win32\inno-big-175.bmp,{#RepoDir}\resources\win32\inno-big-200.bmp,{#RepoDir}\resources\win32\inno-big-225.bmp,{#RepoDir}\resources\win32\inno-big-250.bmp"
 WizardSmallImageFile="{#RepoDir}\resources\win32\inno-small-100.bmp,{#RepoDir}\resources\win32\inno-small-125.bmp,{#RepoDir}\resources\win32\inno-small-150.bmp,{#RepoDir}\resources\win32\inno-small-175.bmp,{#RepoDir}\resources\win32\inno-small-200.bmp,{#RepoDir}\resources\win32\inno-small-225.bmp,{#RepoDir}\resources\win32\inno-small-250.bmp"
-SetupIconFile={#RepoDir}\resources\win32\construct.ico
+SetupIconFile={#RepoDir}\resources\win32\kovix.ico
 UninstallDisplayIcon={app}\{#ExeBasename}.exe
 ChangesEnvironment=true
 ChangesAssociations=true
@@ -36,8 +36,8 @@ ArchitecturesInstallIn64BitMode={#ArchitecturesInstallIn64BitMode}
 WizardStyle=modern
 
 // We've seen an uptick on broken installations from updates which were unable
-// to shutdown CONSTRUCT IDE. We rely on the fact that the update signals
-// that CONSTRUCT IDE is ready to be shutdown, so we're good to use `force` here.
+// to shutdown KOVIX IDE. We rely on the fact that the update signals
+// that KOVIX IDE is ready to be shutdown, so we're good to use `force` here.
 CloseApplications=force
 
 #ifdef Sign
@@ -1325,7 +1325,7 @@ begin
 
   #if "user" == InstallTarget
     if not WizardSilent() and IsAdmin() then begin
-      if MsgBox('This User Installer is not meant to be run as an Administrator. If you would like to install CONSTRUCT IDE for all users in this system, download the System Installer instead from https://construct-ide.com. Are you sure you want to continue?', mbError, MB_OKCANCEL) = IDCANCEL then begin
+      if MsgBox('This User Installer is not meant to be run as an Administrator. If you would like to install KOVIX IDE for all users in this system, download the System Installer instead from https://github.com/Razisafir/KOVIX. Are you sure you want to continue?', mbError, MB_OKCANCEL) = IDCANCEL then begin
         Result := False;
       end;
     end;
@@ -1426,9 +1426,9 @@ begin
         Result := '';
 end;
 
-// CONSTRUCT IDE will create a flag file before the update starts (/update=C:\foo\bar)
-// - if the file exists at this point, the user quit CONSTRUCT IDE before the update finished, so don't start CONSTRUCT IDE after update
-// - otherwise, the user has accepted to apply the update and CONSTRUCT IDE should start
+// KOVIX IDE will create a flag file before the update starts (/update=C:\foo\bar)
+// - if the file exists at this point, the user quit KOVIX IDE before the update finished, so don't start KOVIX IDE after update
+// - otherwise, the user has accepted to apply the update and KOVIX IDE should start
 function LockFileExists(): Boolean;
 begin
   Result := FileExists(ExpandConstant('{param:update}'))
