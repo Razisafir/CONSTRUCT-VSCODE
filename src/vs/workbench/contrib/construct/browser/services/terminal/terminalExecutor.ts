@@ -136,7 +136,10 @@ export class TerminalExecutorService extends Disposable implements ITerminalExec
 
                 return new Promise<ITerminalExecResult>((resolve, reject) => {
                         let stdout = '';
-                        const stderr = '';
+                        // Note: VS Code terminal API doesn't separate stdout from stderr in onData.
+                        // Both streams are merged. stderr is tracked for API compatibility but
+                        // cannot be populated from the terminal instance's merged output stream.
+                        let stderr = '';
                         let exitCode = 0;
                         let settled = false;
 

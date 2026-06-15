@@ -1,1064 +1,954 @@
+// Copyright (c) 2025 Razisafir. All rights reserved.
+// Kovix proprietary code. See CONSTRUCT_LICENSE.txt.
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as dom from '../../../../base/browser/dom.js';
-import { Disposable, DisposableStore } from '../../../../base/common/lifecycle.js';
-import { Emitter } from '../../../../base/common/event.js';
+import { Disposable } from '../../../../base/common/lifecycle.js';
+import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { IConstructProjectService } from '../../../../platform/construct/common/project/constructProjectService.js';
-import { IProjectCreationInput } from '../../../../platform/construct/common/project/constructProjectTypes.js';
+import {
+        ProjectTemplate,
+        IKovixProject,
+        IProjectCreationInput,
+        ITechStackEntry,
+        PROJECT_TEMPLATE_LABELS,
+        PROJECT_TEMPLATE_DESCRIPTIONS,
+        PROJECT_TEMPLATE_ICONS,
+} from '../../../../platform/construct/common/project/constructProjectTypes.js';
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
-import { IFileService } from '../../../../platform/files/common/files.js';
-import { URI } from '../../../../base/common/uri.js';
+import { INotificationService } from '../../../../platform/notification/common/notification.js';
 import { ILogService } from '../../../../platform/log/common/log.js';
-import * as Nls from './constructNls.js';
 
-// ─── Theme constants (consistent with agent view) ────────────────────────────
+// --- Types --------------------------------------------------------------------
 
-const COLORS = {
-        bg: '#0D1117',
-        text: '#E0E7FF',
-        accent: '#00E5FF',
-        border: '#1A1F2E',
-        dimText: '#8B949E',
-        inputBg: '#0A0E1A',
-        inputBorder: '#1A1F2E',
-        inputFocusBorder: '#00E5FF',
-        chipSelectedBg: 'rgba(0, 229, 255, 0.12)',
-        chipSelectedBorder: '#00E5FF',
-        chipUnselectedBg: 'transparent',
-        chipUnselectedBorder: '#1A1F2E',
-        dangerText: '#F85149',
-        successAccent: '#00C853',
-};
+type WizardStep = 1 | 2 | 3 | 4;
 
-const STEP_COUNT = 4;
+interface IWizardState {
+        step: WizardStep;
+        name: string;
+        description: string;
+        template: ProjectTemplate | null;
+        techStack: ITechStackEntry[];
+        goals: string[];
+}
 
-const STEP_TITLES: string[] = [
-        Nls.STEP_NAME_PROJECT,
-        Nls.STEP_DESCRIBE_IDEA,
-        Nls.STEP_TECH_STACK,
-        Nls.STEP_SUCCESS_CRITERIA,
+// --- Predefined tech stack options --------------------------------------------
+
+const TECH_OPTIONS: Array<{ category: ITechStackEntry['category']; name: string; icon: string }> = [
+        { category: 'language', name: 'TypeScript', icon: '\uD83D\uDCBB' },
+        { category: 'language', name: 'JavaScript', icon: '\u26A1' },
+        { category: 'language', name: 'Python', icon: '\uD83D\uDC0D' },
+        { category: 'language', name: 'Rust', icon: '\uD83E\uDD80' },
+        { category: 'language', name: 'Go', icon: '\uD83D\uDC22' },
+        { category: 'language', name: 'Java', icon: '\u2615' },
+        { category: 'framework', name: 'React', icon: '\u269B\uFE0F' },
+        { category: 'framework', name: 'Vue', icon: '\uD83D\uDE8C' },
+        { category: 'framework', name: 'Svelte', icon: '\uD83E\uDD8A' },
+        { category: 'framework', name: 'Next.js', icon: '\u25B2' },
+        { category: 'framework', name: 'Express', icon: '\uD83D\uDE87' },
+        { category: 'framework', name: 'Fastify', icon: '\u26A1' },
+        { category: 'framework', name: 'NestJS', icon: '\uD83D\uDE3A' },
+        { category: 'database', name: 'PostgreSQL', icon: '\uD83D\uDC18' },
+        { category: 'database', name: 'MongoDB', icon: '\uD83C\uDF43' },
+        { category: 'database', name: 'SQLite', icon: '\uD83D\uDDC3' },
+        { category: 'database', name: 'Redis', icon: '\uD83D\uDFE5' },
+        { category: 'runtime', name: 'Node.js', icon: '\uD83D\uDE38' },
+        { category: 'runtime', name: 'Bun', icon: '\uD83E\uDD5B' },
+        { category: 'runtime', name: 'Deno', icon: '\uD83E\uDD8A' },
+        { category: 'tool', name: 'Docker', icon: '\uD83D\uDC33' },
+        { category: 'tool', name: 'ESLint', icon: '\uD83D\uDD0D' },
+        { category: 'tool', name: 'Prettier', icon: '\u2728' },
+        { category: 'tool', name: 'Vitest', icon: '\uD83E\uDDEA' },
 ];
 
-const STEP_SUBTITLES: string[] = [
-        Nls.STEP_SUBTITLE_NAME,
-        Nls.STEP_SUBTITLE_DESCRIBE,
-        Nls.STEP_SUBTITLE_TECH,
-        Nls.STEP_SUBTITLE_GOALS,
-];
+// --- CSS Styles ---------------------------------------------------------------
 
-// ─── Wizard ──────────────────────────────────────────────────────────────────
+const WIZARD_STYLES = `
+        .kovix-wizard-overlay {
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                backdrop-filter: blur(8px);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                animation: kovix-wizard-fadeIn 0.2s ease;
+        }
+        @keyframes kovix-wizard-fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+        }
+        .kovix-wizard-modal {
+                background: #0D1117;
+                border: 1px solid #1A1F2E;
+                border-radius: 12px;
+                width: 720px;
+                max-height: 85vh;
+                display: flex;
+                flex-direction: column;
+                box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 1px rgba(0, 229, 255, 0.2);
+                animation: kovix-wizard-slideIn 0.3s ease;
+        }
+        @keyframes kovix-wizard-slideIn {
+                from { opacity: 0; transform: translateY(20px) scale(0.97); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .kovix-wizard-header {
+                padding: 20px 24px 16px;
+                border-bottom: 1px solid #1A1F2E;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+        }
+        .kovix-wizard-title {
+                font-size: 18px;
+                font-weight: 700;
+                color: #E0E7FF;
+                letter-spacing: -0.3px;
+        }
+        .kovix-wizard-close {
+                background: transparent;
+                border: none;
+                color: #4A5568;
+                font-size: 20px;
+                cursor: pointer;
+                padding: 4px 8px;
+                border-radius: 4px;
+                transition: color 0.15s ease;
+        }
+        .kovix-wizard-close:hover { color: #FF4444; }
+        .kovix-wizard-progress {
+                display: flex;
+                align-items: center;
+                padding: 16px 24px;
+                gap: 4px;
+        }
+        .kovix-wizard-progress-step {
+                flex: 1;
+                height: 3px;
+                border-radius: 2px;
+                background: #1A1F2E;
+                transition: background 0.3s ease;
+        }
+        .kovix-wizard-progress-step.active {
+                background: #00E5FF;
+                box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+        }
+        .kovix-wizard-progress-step.completed {
+                background: #00C853;
+        }
+        .kovix-wizard-step-label {
+                font-size: 11px;
+                color: #4A5568;
+                margin-right: 12px;
+                white-space: nowrap;
+        }
+        .kovix-wizard-body {
+                flex: 1;
+                overflow-y: auto;
+                padding: 20px 24px;
+        }
+        .kovix-wizard-body::-webkit-scrollbar {
+                width: 6px;
+        }
+        .kovix-wizard-body::-webkit-scrollbar-track {
+                background: transparent;
+        }
+        .kovix-wizard-body::-webkit-scrollbar-thumb {
+                background: #1A1F2E;
+                border-radius: 3px;
+        }
+        .kovix-wizard-footer {
+                padding: 16px 24px;
+                border-top: 1px solid #1A1F2E;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+        }
+        .kovix-wizard-btn {
+                padding: 8px 20px;
+                border-radius: 6px;
+                border: none;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.15s ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+        }
+        .kovix-wizard-btn:active { transform: scale(0.97); }
+        .kovix-wizard-btn-primary {
+                background: #00E5FF;
+                color: #0D1117;
+        }
+        .kovix-wizard-btn-primary:hover { background: #33ECFF; }
+        .kovix-wizard-btn-primary:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+        }
+        .kovix-wizard-btn-secondary {
+                background: #141B2D;
+                color: #E0E7FF;
+                border: 1px solid #1A1F2E;
+        }
+        .kovix-wizard-btn-secondary:hover { border-color: #00E5FF; color: #00E5FF; }
+        .kovix-wizard-btn-create {
+                background: #00C853;
+                color: white;
+        }
+        .kovix-wizard-btn-create:hover { background: #00D85A; }
+        .kovix-wizard-btn-create:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+        }
+        /* Step 1: Project Info */
+        .kovix-wizard-label {
+                display: block;
+                font-size: 12px;
+                font-weight: 600;
+                color: #8B949E;
+                margin-bottom: 6px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+        }
+        .kovix-wizard-input {
+                width: 100%;
+                background: #0A0E1A;
+                border: 1px solid #1A1F2E;
+                border-radius: 6px;
+                padding: 10px 14px;
+                color: #E0E7FF;
+                font-size: 14px;
+                outline: none;
+                transition: border-color 0.15s ease;
+                font-family: inherit;
+                resize: vertical;
+        }
+        .kovix-wizard-input:focus { border-color: #00E5FF; }
+        .kovix-wizard-input::placeholder { color: #4A5568; }
+        .kovix-wizard-field { margin-bottom: 20px; }
+        /* Step 2: Template Grid */
+        .kovix-wizard-template-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+        }
+        .kovix-wizard-template-card {
+                background: #141B2D;
+                border: 1px solid #1A1F2E;
+                border-radius: 8px;
+                padding: 16px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+        }
+        .kovix-wizard-template-card:hover {
+                border-color: #00E5FF40;
+                background: #1A2744;
+        }
+        .kovix-wizard-template-card.selected {
+                border-color: #00E5FF;
+                background: #1A2744;
+                box-shadow: 0 0 12px rgba(0, 229, 255, 0.15);
+        }
+        .kovix-wizard-template-icon {
+                font-size: 24px;
+                flex-shrink: 0;
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 8px;
+                background: #0A0E1A;
+        }
+        .kovix-wizard-template-info {
+                flex: 1;
+                min-width: 0;
+        }
+        .kovix-wizard-template-name {
+                font-size: 13px;
+                font-weight: 600;
+                color: #E0E7FF;
+                margin-bottom: 3px;
+        }
+        .kovix-wizard-template-desc {
+                font-size: 11px;
+                color: #8B949E;
+                line-height: 1.4;
+        }
+        /* Step 3: Tech Stack & Goals */
+        .kovix-wizard-tech-grid {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                margin-bottom: 20px;
+        }
+        .kovix-wizard-tech-chip {
+                background: #141B2D;
+                border: 1px solid #1A1F2E;
+                border-radius: 16px;
+                padding: 5px 12px;
+                font-size: 12px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+                color: #8B949E;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+        }
+        .kovix-wizard-tech-chip:hover {
+                border-color: #00E5FF40;
+                color: #E0E7FF;
+        }
+        .kovix-wizard-tech-chip.selected {
+                border-color: #00E5FF;
+                background: #1A2744;
+                color: #00E5FF;
+        }
+        .kovix-wizard-section-title {
+                font-size: 13px;
+                font-weight: 600;
+                color: #E0E7FF;
+                margin-bottom: 10px;
+        }
+        .kovix-wizard-goals-input {
+                width: 100%;
+                min-height: 80px;
+        }
+        .kovix-wizard-goals-hint {
+                font-size: 11px;
+                color: #4A5568;
+                margin-top: 4px;
+        }
+        /* Step 4: Review */
+        .kovix-wizard-review-section {
+                margin-bottom: 16px;
+        }
+        .kovix-wizard-review-label {
+                font-size: 11px;
+                font-weight: 600;
+                color: #4A5568;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 4px;
+        }
+        .kovix-wizard-review-value {
+                font-size: 14px;
+                color: #E0E7FF;
+                line-height: 1.5;
+        }
+        .kovix-wizard-review-tags {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+        }
+        .kovix-wizard-review-tag {
+                background: #141B2D;
+                border: 1px solid #1A1F2E;
+                border-radius: 4px;
+                padding: 2px 8px;
+                font-size: 11px;
+                color: #00E5FF;
+        }
+        .kovix-wizard-divider {
+                border: none;
+                border-top: 1px solid #1A1F2E;
+                margin: 16px 0;
+        }
+        .kovix-wizard-success {
+                text-align: center;
+                padding: 20px 0;
+        }
+        .kovix-wizard-success-icon {
+                font-size: 48px;
+                color: #00C853;
+                margin-bottom: 12px;
+                animation: kovix-wizard-scaleIn 0.5s ease;
+        }
+        @keyframes kovix-wizard-scaleIn {
+                from { transform: scale(0); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+        }
+        .kovix-wizard-success-title {
+                font-size: 18px;
+                font-weight: 700;
+                color: #E0E7FF;
+                margin-bottom: 4px;
+        }
+        .kovix-wizard-success-subtitle {
+                font-size: 13px;
+                color: #8B949E;
+        }
+`;
 
-export class ConstructProjectWizard extends Disposable {
+// --- Wizard Implementation ----------------------------------------------------
 
-        // ── State ─────────────────────────────────────────────────────────────
+class ProjectWizard extends Disposable {
+        private overlay!: HTMLElement;
+        private modal!: HTMLElement;
+        private body!: HTMLElement;
+        private stepLabel!: HTMLElement;
+        private progressSteps: HTMLElement[] = [];
+        private backBtn!: HTMLButtonElement;
+        private nextBtn!: HTMLButtonElement;
 
-        private currentStep = 1;
-        private projectName = '';
-        private projectDescription = '';
-        private techStack: string[] = [];
-        private goals: string[] = [];
-        private suggestedTech: string[] = [];
+        private state: IWizardState = {
+                step: 1,
+                name: '',
+                description: '',
+                template: null,
+                techStack: [],
+                goals: [],
+        };
 
-        // ── DOM references ────────────────────────────────────────────────────
-
-        private container: HTMLElement | null = null;
-        private _overlayElement: HTMLElement | null = null;
-        private indicatorContainer: HTMLElement | null = null;
-        private contentContainer: HTMLElement | null = null;
-        private _navContainer: HTMLElement | null = null;
-        private previousButton: HTMLButtonElement | null = null;
-        private nextButton: HTMLButtonElement | null = null;
-        private createButton: HTMLButtonElement | null = null;
-        private techSuggestionsContainer: HTMLElement | null = null;
-
-        /**
-         * Step-specific event listeners that are recreated on every step change.
-         * Cleared via `stepDisposables.clear()` before rendering a new step.
-         */
-        private readonly stepDisposables = this._register(new DisposableStore());
-
-        // ── Events ────────────────────────────────────────────────────────────
-
-        private readonly _onDidCreateProject = this._register(new Emitter<void>());
-        readonly onDidCreateProject = this._onDidCreateProject.event;
-
-        // ── Constructor (DI) ──────────────────────────────────────────────────
+        private resolve: ((result: IKovixProject | null) => void) | null = null;
 
         constructor(
-                @IConstructProjectService private readonly projectService: IConstructProjectService,
-                @IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
-                @IFileService private readonly fileService: IFileService,
-                @ILogService private readonly logService: ILogService,
+                private readonly instantiationService: IInstantiationService,
+                private readonly workspaceContextService: IWorkspaceContextService,
+                private readonly notificationService: INotificationService,
+                private readonly logService: ILogService,
         ) {
                 super();
-                // Suppress TS6133 — these DOM references are placeholders for future cleanup/updates
-                void this._overlayElement;
-                void this._navContainer;
         }
-
-        // ── Public API ────────────────────────────────────────────────────────
 
         /**
-         * Show the project wizard. Opens the construct panel and renders
-         * the wizard overlay inside it.
+         * Show the wizard and return a promise that resolves with the created project
+         * or null if the user cancelled.
          */
-        async show(): Promise<void> {
-                // The wizard is rendered inside the construct agent panel.
-                // The agent view will call render(container) when it's ready.
-                // For command-palette invocation, we signal readiness.
+        show(): Promise<IKovixProject | null> {
+                return new Promise<IKovixProject | null>((resolve) => {
+                        this.resolve = resolve;
+                        this.render();
+                });
         }
 
-        render(container: HTMLElement): void {
-                this.container = container;
-                dom.clearNode(container);
+        // --- Rendering ------------------------------------------------------------
 
-                // Create the full-size overlay inside the agent panel
-                const overlay = dom.$('div.construct-project-wizard-overlay');
-                overlay.setAttribute('role', 'dialog');
-                overlay.setAttribute('aria-modal', 'true');
-                overlay.setAttribute('aria-label', 'Project creation wizard');
-                overlay.style.cssText = [
-                        'position: absolute',
-                        'top: 0; left: 0; right: 0; bottom: 0',
-                        `background: ${COLORS.bg}`,
-                        'display: flex',
-                        'flex-direction: column',
-                        'z-index: 1000',
-                        'overflow: hidden',
-                        "font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
-                ].join('; ');
-                container.style.position = 'relative';
-                container.appendChild(overlay);
-                this._overlayElement = overlay;
+        private render(): void {
+                // Inject styles once
+                if (!document.getElementById('kovix-wizard-styles')) {
+                        const styleEl = document.createElement('style');
+                        styleEl.id = 'kovix-wizard-styles';
+                        styleEl.textContent = WIZARD_STYLES;
+                        document.head.appendChild(styleEl);
+                }
 
-                // Render the three main sections
-                this.renderStepIndicator(overlay);
-                this.renderContentArea(overlay);
-                this.renderNavBar(overlay);
+                // Overlay
+                this.overlay = dom.$('.kovix-wizard-overlay');
+                this.overlay.addEventListener('click', (e) => {
+                        if (e.target === this.overlay) {
+                                this.cancel();
+                        }
+                });
 
-                // Populate current step content
-                this.refreshContent();
+                // Modal
+                this.modal = dom.$('.kovix-wizard-modal');
 
-                // Kick off async workspace tech detection
-                this.detectTechStack();
+                // Header
+                const header = dom.$('.kovix-wizard-header');
+                const title = dom.$('.kovix-wizard-title');
+                title.textContent = 'New Project';
+                const closeBtn = dom.$('button.kovix-wizard-close') as HTMLButtonElement;
+                closeBtn.textContent = '\u2715'; // ✕
+                closeBtn.onclick = () => this.cancel();
+                header.appendChild(title);
+                header.appendChild(closeBtn);
+                this.modal.appendChild(header);
+
+                // Progress bar
+                const progressContainer = dom.$('.kovix-wizard-progress');
+                this.stepLabel = dom.$('.kovix-wizard-step-label');
+                this.stepLabel.textContent = 'Step 1 of 4';
+                progressContainer.appendChild(this.stepLabel);
+
+                this.progressSteps = [];
+                for (let i = 0; i < 4; i++) {
+                        const step = dom.$('.kovix-wizard-progress-step');
+                        this.progressSteps.push(step);
+                        progressContainer.appendChild(step);
+                }
+                this.updateProgress();
+                this.modal.appendChild(progressContainer);
+
+                // Body
+                this.body = dom.$('.kovix-wizard-body');
+                this.renderCurrentStep();
+                this.modal.appendChild(this.body);
+
+                // Footer
+                const footer = dom.$('.kovix-wizard-footer');
+                this.backBtn = dom.$('button.kovix-wizard-btn.kovix-wizard-btn-secondary') as HTMLButtonElement;
+                this.backBtn.textContent = '\u2190 Back';
+                this.backBtn.onclick = () => this.goBack();
+                this.backBtn.style.display = 'none';
+
+                this.nextBtn = dom.$('button.kovix-wizard-btn.kovix-wizard-btn-primary') as HTMLButtonElement;
+                this.nextBtn.textContent = 'Next \u2192';
+                this.nextBtn.onclick = () => this.goForward();
+
+                footer.appendChild(this.backBtn);
+                footer.appendChild(this.nextBtn);
+                this.modal.appendChild(footer);
+
+                this.overlay.appendChild(this.modal);
+                document.body.appendChild(this.overlay);
+
+                // Focus the first input
+                setTimeout(() => {
+                        const firstInput = this.body.querySelector('input, textarea') as HTMLElement;
+                        firstInput?.focus();
+                }, 100);
+        }
+
+        private renderCurrentStep(): void {
+                // Clear body
+                while (this.body.firstChild) {
+                        this.body.removeChild(this.body.firstChild);
+                }
+
+                switch (this.state.step) {
+                        case 1:
+                                this.renderStep1();
+                                break;
+                        case 2:
+                                this.renderStep2();
+                                break;
+                        case 3:
+                                this.renderStep3();
+                                break;
+                        case 4:
+                                this.renderStep4();
+                                break;
+                }
+
+                this.updateProgress();
+                this.updateButtons();
+        }
+
+        // --- Step 1: Project Info --------------------------------------------------
+
+        private renderStep1(): void {
+                const heading = dom.$('div');
+                heading.style.cssText = 'font-size: 16px; font-weight: 700; color: #E0E7FF; margin-bottom: 4px;';
+                heading.textContent = 'Project Information';
+                const subtitle = dom.$('div');
+                subtitle.style.cssText = 'font-size: 12px; color: #8B949E; margin-bottom: 24px;';
+                subtitle.textContent = 'Give your project a name and description.';
+                this.body.appendChild(heading);
+                this.body.appendChild(subtitle);
+
+                // Name
+                const nameField = dom.$('.kovix-wizard-field');
+                const nameLabel = dom.$('.kovix-wizard-label');
+                nameLabel.textContent = 'Project Name';
+                nameLabel.setAttribute('for', 'kovix-project-name');
+                const nameInput = dom.$('input.kovix-wizard-input') as HTMLInputElement;
+                nameInput.id = 'kovix-project-name';
+                nameInput.type = 'text';
+                nameInput.placeholder = 'my-awesome-project';
+                nameInput.value = this.state.name;
+                nameInput.addEventListener('input', () => {
+                        this.state.name = nameInput.value.trim();
+                        this.updateButtons();
+                });
+                nameInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') { this.goForward(); }
+                });
+                nameField.appendChild(nameLabel);
+                nameField.appendChild(nameInput);
+                this.body.appendChild(nameField);
+
+                // Description
+                const descField = dom.$('.kovix-wizard-field');
+                const descLabel = dom.$('.kovix-wizard-label');
+                descLabel.textContent = 'Description';
+                descLabel.setAttribute('for', 'kovix-project-desc');
+                const descInput = dom.$('textarea.kovix-wizard-input') as HTMLTextAreaElement;
+                descInput.id = 'kovix-project-desc';
+                descInput.placeholder = 'A brief description of your project...';
+                descInput.rows = 3;
+                descInput.value = this.state.description;
+                descInput.addEventListener('input', () => {
+                        this.state.description = descInput.value;
+                });
+                descField.appendChild(descLabel);
+                descField.appendChild(descInput);
+                this.body.appendChild(descField);
+        }
+
+        // --- Step 2: Template Grid -------------------------------------------------
+
+        private renderStep2(): void {
+                const heading = dom.$('div');
+                heading.style.cssText = 'font-size: 16px; font-weight: 700; color: #E0E7FF; margin-bottom: 4px;';
+                heading.textContent = 'Choose a Template';
+                const subtitle = dom.$('div');
+                subtitle.style.cssText = 'font-size: 12px; color: #8B949E; margin-bottom: 24px;';
+                subtitle.textContent = 'Select a project template to get started.';
+                this.body.appendChild(heading);
+                this.body.appendChild(subtitle);
+
+                const grid = dom.$('.kovix-wizard-template-grid');
+
+                const templates = Object.values(ProjectTemplate);
+                for (const template of templates) {
+                        const card = dom.$('.kovix-wizard-template-card');
+                        if (this.state.template === template) {
+                                card.classList.add('selected');
+                        }
+
+                        const iconEl = dom.$('.kovix-wizard-template-icon');
+                        iconEl.textContent = PROJECT_TEMPLATE_ICONS[template];
+
+                        const infoEl = dom.$('.kovix-wizard-template-info');
+                        const nameEl = dom.$('.kovix-wizard-template-name');
+                        nameEl.textContent = PROJECT_TEMPLATE_LABELS[template];
+                        const descEl = dom.$('.kovix-wizard-template-desc');
+                        descEl.textContent = PROJECT_TEMPLATE_DESCRIPTIONS[template];
+
+                        infoEl.appendChild(nameEl);
+                        infoEl.appendChild(descEl);
+                        card.appendChild(iconEl);
+                        card.appendChild(infoEl);
+
+                        card.addEventListener('click', () => {
+                                this.state.template = template;
+                                // Update visual selection
+                                grid.querySelectorAll('.kovix-wizard-template-card').forEach(c => c.classList.remove('selected'));
+                                card.classList.add('selected');
+                                this.updateButtons();
+                        });
+
+                        grid.appendChild(card);
+                }
+
+                this.body.appendChild(grid);
+        }
+
+        // --- Step 3: Tech Stack & Goals -------------------------------------------
+
+        private renderStep3(): void {
+                const heading = dom.$('div');
+                heading.style.cssText = 'font-size: 16px; font-weight: 700; color: #E0E7FF; margin-bottom: 4px;';
+                heading.textContent = 'Tech Stack & Goals';
+                const subtitle = dom.$('div');
+                subtitle.style.cssText = 'font-size: 12px; color: #8B949E; margin-bottom: 24px;';
+                subtitle.textContent = 'Select your technologies and define project goals.';
+                this.body.appendChild(heading);
+                this.body.appendChild(subtitle);
+
+                // Tech Stack section
+                const techTitle = dom.$('.kovix-wizard-section-title');
+                techTitle.textContent = 'Technology Stack';
+                this.body.appendChild(techTitle);
+
+                const techGrid = dom.$('.kovix-wizard-tech-grid');
+                const selectedNames = new Set(this.state.techStack.map(t => t.name));
+
+                for (const opt of TECH_OPTIONS) {
+                        const chip = dom.$('.kovix-wizard-tech-chip');
+                        chip.textContent = `${opt.icon} ${opt.name}`;
+                        if (selectedNames.has(opt.name)) {
+                                chip.classList.add('selected');
+                        }
+
+                        chip.addEventListener('click', () => {
+                                if (selectedNames.has(opt.name)) {
+                                        selectedNames.delete(opt.name);
+                                        chip.classList.remove('selected');
+                                        this.state.techStack = this.state.techStack.filter(t => t.name !== opt.name);
+                                } else {
+                                        selectedNames.add(opt.name);
+                                        chip.classList.add('selected');
+                                        this.state.techStack.push({ category: opt.category, name: opt.name });
+                                }
+                        });
+
+                        techGrid.appendChild(chip);
+                }
+                this.body.appendChild(techGrid);
+
+                // Divider
+                const divider = dom.$('hr.kovix-wizard-divider');
+                this.body.appendChild(divider);
+
+                // Goals section
+                const goalsTitle = dom.$('.kovix-wizard-section-title');
+                goalsTitle.textContent = 'Project Goals';
+                this.body.appendChild(goalsTitle);
+
+                const goalsInput = dom.$('textarea.kovix-wizard-input.kovix-wizard-goals-input') as HTMLTextAreaElement;
+                goalsInput.placeholder = 'Build a fast, accessible web app...\nSupport real-time collaboration...\n';
+                goalsInput.rows = 4;
+                goalsInput.value = this.state.goals.join('\n');
+                goalsInput.addEventListener('input', () => {
+                        this.state.goals = goalsInput.value
+                                .split('\n')
+                                .map(g => g.trim())
+                                .filter(g => g.length > 0);
+                });
+                this.body.appendChild(goalsInput);
+
+                const hint = dom.$('.kovix-wizard-goals-hint');
+                hint.textContent = 'One goal per line. These will guide the AI agent.';
+                this.body.appendChild(hint);
+        }
+
+        // --- Step 4: Review & Create -----------------------------------------------
+
+        private renderStep4(): void {
+                const heading = dom.$('div');
+                heading.style.cssText = 'font-size: 16px; font-weight: 700; color: #E0E7FF; margin-bottom: 4px;';
+                heading.textContent = 'Review & Create';
+                const subtitle = dom.$('div');
+                subtitle.style.cssText = 'font-size: 12px; color: #8B949E; margin-bottom: 24px;';
+                subtitle.textContent = 'Confirm your project settings before creating.';
+                this.body.appendChild(heading);
+                this.body.appendChild(subtitle);
+
+                // Project Name
+                this.addReviewSection('Project Name', this.state.name || '(untitled)');
+
+                // Description
+                this.addReviewSection('Description', this.state.description || '(no description)');
+
+                // Template
+                const templateLabel = this.state.template
+                        ? `${PROJECT_TEMPLATE_ICONS[this.state.template]} ${PROJECT_TEMPLATE_LABELS[this.state.template]}`
+                        : '(none selected)';
+                this.addReviewSection('Template', templateLabel);
+
+                // Tech Stack
+                if (this.state.techStack.length > 0) {
+                        const tagsContainer = dom.$('.kovix-wizard-review-tags');
+                        for (const tech of this.state.techStack) {
+                                const tag = dom.$('.kovix-wizard-review-tag');
+                                tag.textContent = tech.name;
+                                tagsContainer.appendChild(tag);
+                        }
+                        this.addReviewSection('Tech Stack', '', tagsContainer);
+                } else {
+                        this.addReviewSection('Tech Stack', '(none selected)');
+                }
+
+                // Goals
+                if (this.state.goals.length > 0) {
+                        this.addReviewSection('Goals', this.state.goals.map(g => `\u2022 ${g}`).join('\n'));
+                } else {
+                        this.addReviewSection('Goals', '(none)');
+                }
+        }
+
+        private addReviewSection(label: string, value: string, customElement?: HTMLElement): void {
+                const section = dom.$('.kovix-wizard-review-section');
+                const labelEl = dom.$('.kovix-wizard-review-label');
+                labelEl.textContent = label;
+
+                section.appendChild(labelEl);
+
+                if (customElement) {
+                        section.appendChild(customElement);
+                } else {
+                        const valueEl = dom.$('.kovix-wizard-review-value');
+                        valueEl.textContent = value;
+                        if (value.includes('\n')) {
+                                valueEl.style.whiteSpace = 'pre-wrap';
+                        }
+                        section.appendChild(valueEl);
+                }
+
+                this.body.appendChild(section);
+        }
+
+        // --- Navigation ------------------------------------------------------------
+
+        private updateProgress(): void {
+                this.stepLabel.textContent = `Step ${this.state.step} of 4`;
+
+                for (let i = 0; i < this.progressSteps.length; i++) {
+                        const stepEl = this.progressSteps[i];
+                        stepEl.classList.remove('active', 'completed');
+                        if (i + 1 < this.state.step) {
+                                stepEl.classList.add('completed');
+                        } else if (i + 1 === this.state.step) {
+                                stepEl.classList.add('active');
+                        }
+                }
+        }
+
+        private updateButtons(): void {
+                // Back button
+                this.backBtn.style.display = this.state.step > 1 ? '' : 'none';
+
+                // Next / Create button
+                if (this.state.step === 4) {
+                        this.nextBtn.textContent = '\u2713 Create Project';
+                        this.nextBtn.className = 'kovix-wizard-btn kovix-wizard-btn-create';
+                        this.nextBtn.disabled = !this.canProceed();
+                } else {
+                        this.nextBtn.textContent = 'Next \u2192';
+                        this.nextBtn.className = 'kovix-wizard-btn kovix-wizard-btn-primary';
+                        this.nextBtn.disabled = !this.canProceed();
+                }
+        }
+
+        private canProceed(): boolean {
+                switch (this.state.step) {
+                        case 1:
+                                return this.state.name.length > 0;
+                        case 2:
+                                return this.state.template !== null;
+                        case 3:
+                                return true; // Tech stack & goals are optional
+                        case 4:
+                                return this.state.name.length > 0 && this.state.template !== null;
+                        default:
+                                return false;
+                }
+        }
+
+        private goBack(): void {
+                if (this.state.step > 1) {
+                        this.state.step = (this.state.step - 1) as WizardStep;
+                        this.renderCurrentStep();
+                }
+        }
+
+        private async goForward(): Promise<void> {
+                if (!this.canProceed()) {
+                        return;
+                }
+
+                if (this.state.step < 4) {
+                        this.state.step = (this.state.step + 1) as WizardStep;
+                        this.renderCurrentStep();
+                } else {
+                        // Final step — create the project
+                        await this.createProject();
+                }
+        }
+
+        private async createProject(): Promise<void> {
+                if (!this.state.template) {
+                        return;
+                }
+
+                // Disable buttons during creation
+                this.nextBtn.disabled = true;
+                this.backBtn.disabled = true;
+                this.nextBtn.textContent = 'Creating...';
+
+                const workspaceRoot = this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath ?? '';
+
+                const input: IProjectCreationInput = {
+                        name: this.state.name,
+                        description: this.state.description,
+                        template: this.state.template,
+                        techStack: this.state.techStack,
+                        goals: this.state.goals,
+                        workspaceRoot,
+                };
+
+                try {
+                        const projectService = this.instantiationService.invokeFunction((accessor) => {
+                                return accessor.get(IConstructProjectService);
+                        });
+
+                        const project = await projectService.createProject(input);
+
+                        // Show success state
+                        this.showSuccess(project.name);
+
+                        this.notificationService.info(`Kovix: Project "${project.name}" created successfully!`);
+                        this.logService.info(`[ProjectWizard] Project "${project.name}" created (id: ${project.id})`);
+
+                        // Resolve after a brief delay so the user sees the success state
+                        setTimeout(() => {
+                                this.close(project);
+                        }, 1500);
+                } catch (error) {
+                        const msg = error instanceof Error ? error.message : String(error);
+                        this.logService.error(`[ProjectWizard] Failed to create project: ${msg}`);
+                        this.notificationService.error(`Kovix: Failed to create project: ${msg}`);
+
+                        // Re-enable buttons
+                        this.nextBtn.disabled = false;
+                        this.backBtn.disabled = false;
+                        this.nextBtn.textContent = '\u2713 Create Project';
+                }
+        }
+
+        private showSuccess(projectName: string): void {
+                // Clear body and show success message
+                while (this.body.firstChild) {
+                        this.body.removeChild(this.body.firstChild);
+                }
+
+                const successContainer = dom.$('.kovix-wizard-success');
+                const icon = dom.$('.kovix-wizard-success-icon');
+                icon.textContent = '\u2705'; // ✅
+                const title = dom.$('.kovix-wizard-success-title');
+                title.textContent = 'Project Created!';
+                const subtitle = dom.$('.kovix-wizard-success-subtitle');
+                subtitle.textContent = `"${projectName}" is ready to go.`;
+
+                successContainer.appendChild(icon);
+                successContainer.appendChild(title);
+                successContainer.appendChild(subtitle);
+                this.body.appendChild(successContainer);
+        }
+
+        private cancel(): void {
+                this.close(null);
+        }
+
+        private close(result: IKovixProject | null): void {
+                this.overlay.remove();
+                if (this.resolve) {
+                        this.resolve(result);
+                        this.resolve = null;
+                }
+                this.dispose();
         }
 
         override dispose(): void {
-                this.container = null;
-                this._overlayElement = null;
-                this.indicatorContainer = null;
-                this.contentContainer = null;
-                this._navContainer = null;
-                this.previousButton = null;
-                this.nextButton = null;
-                this.createButton = null;
-                this.techSuggestionsContainer = null;
+                this.overlay?.remove();
                 super.dispose();
         }
-
-        // ── Tech-stack detection from workspace files ─────────────────────────
-
-        private async detectTechStack(): Promise<void> {
-                try {
-                        const workspace = this.workspaceContextService.getWorkspace();
-                        const rootFolder = workspace.folders[0];
-                        if (!rootFolder) {
-                                return;
-                        }
-                        const rootUri = rootFolder.uri;
-
-                        const checks: Array<{ fileName: string; techs: string[] }> = [
-                                { fileName: 'package.json', techs: ['Node.js', 'TypeScript', 'JavaScript'] },
-                                { fileName: 'requirements.txt', techs: ['Python'] },
-                                { fileName: 'pyproject.toml', techs: ['Python'] },
-                                { fileName: 'Cargo.toml', techs: ['Rust'] },
-                                { fileName: 'go.mod', techs: ['Go'] },
-                                { fileName: 'pom.xml', techs: ['Java'] },
-                                { fileName: 'build.gradle', techs: ['Java'] },
-                                { fileName: 'Gemfile', techs: ['Ruby'] },
-                                { fileName: 'composer.json', techs: ['PHP'] },
-                        ];
-
-                        const detected: string[] = [];
-                        for (const check of checks) {
-                                const fileUri = URI.joinPath(rootUri, check.fileName);
-                                try {
-                                        const exists = await this.fileService.exists(fileUri);
-                                        if (exists) {
-                                                for (const tech of check.techs) {
-                                                        if (!detected.includes(tech)) {
-                                                                detected.push(tech);
-                                                        }
-                                                }
-                                        }
-                                } catch {
-                                        // File not accessible — skip silently
-                                }
-                        }
-
-                        this.suggestedTech = detected;
-
-                        // If we're currently on the tech-stack step, update the suggestions UI
-                        if (this.currentStep === 3 && this.techSuggestionsContainer) {
-                                this.renderTechSuggestions(this.techSuggestionsContainer);
-                        }
-                } catch (e) {
-                        this.logService.error('[ConstructProjectWizard] Failed to detect tech stack', e);
-                }
-        }
-
-        // ── Step indicator (circles + title) ──────────────────────────────────
-
-        private renderStepIndicator(parent: HTMLElement): void {
-                const wrapper = dom.$('div.construct-wizard-indicator');
-                wrapper.style.cssText = [
-                        'padding: 20px 24px 12px',
-                        'display: flex',
-                        'flex-direction: column',
-                        'align-items: center',
-                        'flex-shrink: 0',
-                ].join('; ');
-                parent.appendChild(wrapper);
-                this.indicatorContainer = wrapper;
-
-                this.refreshIndicator();
-        }
-
-        private refreshIndicator(): void {
-                if (!this.indicatorContainer) { return; }
-                dom.clearNode(this.indicatorContainer);
-
-                // Circles row
-                const circlesRow = dom.$('div');
-                circlesRow.style.cssText = 'display: flex; align-items: center; gap: 0; margin-bottom: 12px;';
-
-                for (let i = 1; i <= STEP_COUNT; i++) {
-                        const isCompleted = i < this.currentStep;
-                        const isCurrent = i === this.currentStep;
-
-                        const circle = dom.$('div');
-                        const size = isCurrent ? 14 : 10;
-                        circle.style.cssText = [
-                                `width: ${size}px`,
-                                `height: ${size}px`,
-                                'border-radius: 50%',
-                                'display: flex',
-                                'align-items: center',
-                                'justify-content: center',
-                                'flex-shrink: 0',
-                                'transition: all 0.2s ease',
-                                isCurrent
-                                        ? `background: ${COLORS.accent}; box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);`
-                                        : isCompleted
-                                                ? `background: ${COLORS.accent};`
-                                                : `background: transparent; border: 2px solid ${COLORS.border};`,
-                        ].join('; ');
-
-                        if (isCompleted) {
-                                const check = dom.$('span');
-                                check.style.cssText = `color: ${COLORS.bg}; font-size: 8px; font-weight: 700; line-height: 1;`;
-                                check.textContent = '\u2713'; // ✓
-                                circle.appendChild(check);
-                        }
-
-                        circlesRow.appendChild(circle);
-
-                        // Connector line between circles
-                        if (i < STEP_COUNT) {
-                                const line = dom.$('div');
-                                const lineFilled = i < this.currentStep;
-                                line.style.cssText = [
-                                        'width: 40px',
-                                        'height: 2px',
-                                        'flex-shrink: 0',
-                                        'transition: background 0.2s ease',
-                                        lineFilled ? `background: ${COLORS.accent};` : `background: ${COLORS.border};`,
-                                ].join('; ');
-                                circlesRow.appendChild(line);
-                        }
-                }
-
-                this.indicatorContainer.appendChild(circlesRow);
-
-                // Step title text
-                const titleRow = dom.$('div');
-                titleRow.style.cssText = 'display: flex; align-items: center; gap: 8px;';
-
-                const stepLabel = dom.$('span');
-                stepLabel.style.cssText = `color: ${COLORS.accent}; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;`;
-                stepLabel.textContent = `Step ${this.currentStep} of ${STEP_COUNT}`;
-                titleRow.appendChild(stepLabel);
-
-                const separator = dom.$('span');
-                separator.style.cssText = `color: ${COLORS.border}; font-size: 12px;`;
-                separator.textContent = '\u2022'; // •
-                titleRow.appendChild(separator);
-
-                const titleLabel = dom.$('span');
-                titleLabel.style.cssText = `color: ${COLORS.text}; font-size: 13px; font-weight: 500;`;
-                titleLabel.textContent = STEP_TITLES[this.currentStep - 1];
-                titleRow.appendChild(titleLabel);
-
-                this.indicatorContainer.appendChild(titleRow);
-        }
-
-        // ── Content area (scrollable middle) ──────────────────────────────────
-
-        private renderContentArea(parent: HTMLElement): void {
-                const wrapper = dom.$('div.construct-wizard-content');
-                wrapper.style.cssText = [
-                        'flex: 1',
-                        'overflow-y: auto',
-                        'padding: 8px 32px 16px',
-                        'display: flex',
-                        'flex-direction: column',
-                        'align-items: center',
-                ].join('; ');
-                parent.appendChild(wrapper);
-                this.contentContainer = wrapper;
-        }
-
-        private refreshContent(): void {
-                if (!this.contentContainer) { return; }
-                this.stepDisposables.clear();
-                dom.clearNode(this.contentContainer);
-
-                // Max-width inner container for readability
-                const inner = dom.$('div');
-                inner.style.cssText = 'width: 100%; max-width: 560px; display: flex; flex-direction: column;';
-
-                // Subtitle / helper text
-                const subtitle = dom.$('div');
-                subtitle.style.cssText = `color: ${COLORS.dimText}; font-size: 13px; margin-bottom: 20px; line-height: 1.5;`;
-                subtitle.textContent = STEP_SUBTITLES[this.currentStep - 1];
-                inner.appendChild(subtitle);
-
-                // Render current step
-                switch (this.currentStep) {
-                        case 1: this.renderStep1(inner); break;
-                        case 2: this.renderStep2(inner); break;
-                        case 3: this.renderStep3(inner); break;
-                        case 4: this.renderStep4(inner); break;
-                }
-
-                this.contentContainer.appendChild(inner);
-
-                // Also refresh the indicator and nav buttons
-                this.refreshIndicator();
-                this.refreshNavButtons();
-        }
-
-        // ── Step 1: Name Your Project ─────────────────────────────────────────
-
-        private renderStep1(parent: HTMLElement): void {
-                const label = dom.$('label');
-                label.style.cssText = `color: ${COLORS.text}; font-size: 13px; font-weight: 500; margin-bottom: 8px; display: block;`;
-                label.textContent = Nls.PROJECT_NAME;
-                parent.appendChild(label);
-
-                const input = dom.$('input') as HTMLInputElement;
-                input.type = 'text';
-                input.maxLength = 80;
-                input.value = this.projectName;
-                input.placeholder = Nls.PROJECT_NAME_PLACEHOLDER;
-                input.setAttribute('aria-label', 'Project Name');
-                input.style.cssText = [
-                        'width: 100%',
-                        'box-sizing: border-box',
-                        `background: ${COLORS.inputBg}`,
-                        `border: 1px solid ${COLORS.inputBorder}`,
-                        'border-radius: 8px',
-                        'padding: 14px 16px',
-                        `color: ${COLORS.text}`,
-                        'font-size: 18px',
-                        'font-weight: 500',
-                        'outline: none',
-                        'transition: border-color 0.15s ease',
-                ].join('; ');
-
-                this.stepDisposables.add(dom.addDisposableListener(input, dom.EventType.FOCUS, () => {
-                        input.style.borderColor = COLORS.inputFocusBorder;
-                }));
-                this.stepDisposables.add(dom.addDisposableListener(input, dom.EventType.BLUR, () => {
-                        input.style.borderColor = COLORS.inputBorder;
-                }));
-                this.stepDisposables.add(dom.addDisposableListener(input, dom.EventType.INPUT, () => {
-                        this.projectName = input.value;
-                        charCounter.textContent = `${this.projectName.length}/80`;
-                        charCounter.style.color = this.projectName.length > 70 ? COLORS.dangerText : COLORS.dimText;
-                        this.refreshNavButtons();
-                }));
-                this.stepDisposables.add(dom.addDisposableListener(input, dom.EventType.KEY_DOWN, (e) => {
-                        if (e.key === 'Enter' && this.canAdvance()) {
-                                this.goToStep(2);
-                        }
-                }));
-
-                parent.appendChild(input);
-
-                // Character counter
-                const counterRow = dom.$('div');
-                counterRow.style.cssText = 'display: flex; justify-content: space-between; margin-top: 6px;';
-
-                const hint = dom.$('span');
-                hint.style.cssText = `color: ${COLORS.dimText}; font-size: 11px;`;
-                hint.textContent = Nls.PROJECT_NAME_HINT;
-                counterRow.appendChild(hint);
-
-                const charCounter = dom.$('span');
-                charCounter.style.cssText = `color: ${COLORS.dimText}; font-size: 11px;`;
-                charCounter.textContent = `${this.projectName.length}/80`;
-                counterRow.appendChild(charCounter);
-
-                parent.appendChild(counterRow);
-
-                // Auto-focus
-                setTimeout(() => input.focus(), 50);
-        }
-
-        // ── Step 2: Describe Your Idea ────────────────────────────────────────
-
-        private renderStep2(parent: HTMLElement): void {
-                const label = dom.$('label');
-                label.style.cssText = `color: ${COLORS.text}; font-size: 13px; font-weight: 500; margin-bottom: 8px; display: block;`;
-                label.textContent = Nls.PROJECT_DESCRIPTION;
-                parent.appendChild(label);
-
-                const textarea = dom.$('textarea') as HTMLTextAreaElement;
-                textarea.value = this.projectDescription;
-                textarea.placeholder = Nls.PROJECT_DESCRIPTION_PLACEHOLDER;
-                textarea.rows = 8;
-                textarea.setAttribute('aria-label', 'Project Description');
-                textarea.style.cssText = [
-                        'width: 100%',
-                        'box-sizing: border-box',
-                        `background: ${COLORS.inputBg}`,
-                        `border: 1px solid ${COLORS.inputBorder}`,
-                        'border-radius: 8px',
-                        'padding: 14px 16px',
-                        `color: ${COLORS.text}`,
-                        'font-size: 14px',
-                        'line-height: 1.6',
-                        'outline: none',
-                        'resize: vertical',
-                        'min-height: 160px',
-                        'font-family: inherit',
-                        'transition: border-color 0.15s ease',
-                ].join('; ');
-
-                this.stepDisposables.add(dom.addDisposableListener(textarea, dom.EventType.FOCUS, () => {
-                        textarea.style.borderColor = COLORS.inputFocusBorder;
-                }));
-                this.stepDisposables.add(dom.addDisposableListener(textarea, dom.EventType.BLUR, () => {
-                        textarea.style.borderColor = COLORS.inputBorder;
-                }));
-                this.stepDisposables.add(dom.addDisposableListener(textarea, dom.EventType.INPUT, () => {
-                        this.projectDescription = textarea.value;
-                }));
-
-                parent.appendChild(textarea);
-
-                const hint = dom.$('span');
-                hint.style.cssText = `color: ${COLORS.dimText}; font-size: 11px; margin-top: 6px; display: block;`;
-                hint.textContent = Nls.PROJECT_DESCRIPTION_HINT;
-                parent.appendChild(hint);
-
-                // Auto-focus
-                setTimeout(() => textarea.focus(), 50);
-        }
-
-        // ── Step 3: Tech Stack ────────────────────────────────────────────────
-
-        private renderStep3(parent: HTMLElement): void {
-                // ── Selected technologies section ──
-                const selectedLabel = dom.$('div');
-                selectedLabel.style.cssText = `color: ${COLORS.text}; font-size: 13px; font-weight: 500; margin-bottom: 8px;`;
-                selectedLabel.textContent = Nls.SELECTED_TECHNOLOGIES;
-                parent.appendChild(selectedLabel);
-
-                const selectedContainer = dom.$('div');
-                selectedContainer.style.cssText = 'display: flex; flex-wrap: wrap; gap: 8px; min-height: 38px; margin-bottom: 20px;';
-                this.renderSelectedTechChips(selectedContainer);
-                parent.appendChild(selectedContainer);
-
-                // ── Workspace suggestions section ──
-                const suggestionsLabel = dom.$('div');
-                suggestionsLabel.style.cssText = `color: ${COLORS.dimText}; font-size: 12px; font-weight: 500; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;`;
-                suggestionsLabel.textContent = Nls.SUGGESTED_FROM_WORKSPACE;
-                parent.appendChild(suggestionsLabel);
-
-                const suggestionsContainer = dom.$('div');
-                suggestionsContainer.style.cssText = 'display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;';
-                this.techSuggestionsContainer = suggestionsContainer;
-                this.renderTechSuggestions(suggestionsContainer);
-                parent.appendChild(suggestionsContainer);
-
-                // ── Custom input ──
-                const customLabel = dom.$('div');
-                customLabel.style.cssText = `color: ${COLORS.dimText}; font-size: 12px; font-weight: 500; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;`;
-                customLabel.textContent = Nls.ADD_CUSTOM_TECHNOLOGY;
-                parent.appendChild(customLabel);
-
-                const inputRow = dom.$('div');
-                inputRow.style.cssText = 'display: flex; gap: 8px;';
-
-                const customInput = dom.$('input') as HTMLInputElement;
-                customInput.type = 'text';
-                customInput.placeholder = Nls.CUSTOM_TECH_PLACEHOLDER;
-                customInput.setAttribute('aria-label', 'Add custom technology');
-                customInput.style.cssText = [
-                        'flex: 1',
-                        `background: ${COLORS.inputBg}`,
-                        `border: 1px solid ${COLORS.inputBorder}`,
-                        'border-radius: 6px',
-                        'padding: 10px 14px',
-                        `color: ${COLORS.text}`,
-                        'font-size: 13px',
-                        'outline: none',
-                        'transition: border-color 0.15s ease',
-                ].join('; ');
-
-                this.stepDisposables.add(dom.addDisposableListener(customInput, dom.EventType.FOCUS, () => {
-                        customInput.style.borderColor = COLORS.inputFocusBorder;
-                }));
-                this.stepDisposables.add(dom.addDisposableListener(customInput, dom.EventType.BLUR, () => {
-                        customInput.style.borderColor = COLORS.inputBorder;
-                }));
-
-                const addBtn = dom.$('button') as HTMLButtonElement;
-                addBtn.textContent = Nls.ADD;
-                addBtn.setAttribute('aria-label', 'Add technology');
-                addBtn.style.cssText = [
-                        `background: ${COLORS.accent}`,
-                        `color: ${COLORS.bg}`,
-                        'border: none',
-                        'border-radius: 6px',
-                        'padding: 10px 18px',
-                        'font-size: 13px',
-                        'font-weight: 600',
-                        'cursor: pointer',
-                        'flex-shrink: 0',
-                        'transition: opacity 0.15s ease',
-                ].join('; ');
-
-                const addCustomTech = () => {
-                        const value = customInput.value.trim();
-                        if (value && !this.techStack.includes(value)) {
-                                this.techStack.push(value);
-                                customInput.value = '';
-                                this.renderSelectedTechChips(selectedContainer);
-                                this.renderTechSuggestions(suggestionsContainer);
-                                this.refreshNavButtons();
-                        }
-                };
-
-                this.stepDisposables.add(dom.addDisposableListener(addBtn, dom.EventType.CLICK, addCustomTech));
-                this.stepDisposables.add(dom.addDisposableListener(customInput, dom.EventType.KEY_DOWN, (e) => {
-                        if (e.key === 'Enter') {
-                                e.preventDefault();
-                                addCustomTech();
-                        }
-                }));
-
-                inputRow.appendChild(customInput);
-                inputRow.appendChild(addBtn);
-                parent.appendChild(inputRow);
-
-                // Hint
-                const hint = dom.$('span');
-                hint.style.cssText = `color: ${COLORS.dimText}; font-size: 11px; margin-top: 8px; display: block;`;
-                hint.textContent = Nls.ADD_TECH_HINT;
-                parent.appendChild(hint);
-
-                // Auto-focus
-                setTimeout(() => customInput.focus(), 50);
-        }
-
-        private renderSelectedTechChips(container: HTMLElement): void {
-                dom.clearNode(container);
-
-                if (this.techStack.length === 0) {
-                        const empty = dom.$('span');
-                        empty.style.cssText = `color: ${COLORS.dimText}; font-size: 12px; font-style: italic; line-height: 38px;`;
-                        empty.textContent = Nls.NO_TECH_SELECTED;
-                        container.appendChild(empty);
-                        return;
-                }
-
-                for (const tech of this.techStack) {
-                        const chip = dom.$('div');
-                        chip.style.cssText = [
-                                'display: inline-flex',
-                                'align-items: center',
-                                'gap: 6px',
-                                'padding: 6px 12px',
-                                'border-radius: 16px',
-                                'font-size: 13px',
-                                `border: 1px solid ${COLORS.chipSelectedBorder}`,
-                                `background: ${COLORS.chipSelectedBg}`,
-                                `color: ${COLORS.accent}`,
-                        ].join('; ');
-
-                        const label = dom.$('span');
-                        label.textContent = tech;
-                        chip.appendChild(label);
-
-                        const removeBtn = dom.$('span');
-                        removeBtn.style.cssText = [
-                                'cursor: pointer',
-                                'font-size: 14px',
-                                'line-height: 1',
-                                'opacity: 0.7',
-                                'margin-left: 2px',
-                                'transition: opacity 0.15s ease',
-                        ].join('; ');
-                        removeBtn.textContent = '\u00D7'; // ×
-                        this.stepDisposables.add(dom.addDisposableListener(removeBtn, dom.EventType.CLICK, () => {
-                                this.removeTech(tech);
-                                this.renderSelectedTechChips(container);
-                                if (this.techSuggestionsContainer) {
-                                        this.renderTechSuggestions(this.techSuggestionsContainer);
-                                }
-                                this.refreshNavButtons();
-                        }));
-                        chip.appendChild(removeBtn);
-
-                        container.appendChild(chip);
-                }
-        }
-
-        private renderTechSuggestions(container: HTMLElement): void {
-                dom.clearNode(container);
-
-                if (this.suggestedTech.length === 0) {
-                        const detecting = dom.$('span');
-                        detecting.style.cssText = `color: ${COLORS.dimText}; font-size: 12px; font-style: italic;`;
-                        detecting.textContent = Nls.DETECTING_TECH;
-                        container.appendChild(detecting);
-                        return;
-                }
-
-                // Only show suggestions that are not already selected
-                const unselected = this.suggestedTech.filter(t => !this.techStack.includes(t));
-                if (unselected.length === 0) {
-                        const allAdded = dom.$('span');
-                        allAdded.style.cssText = `color: ${COLORS.dimText}; font-size: 12px; font-style: italic;`;
-                        allAdded.textContent = Nls.ALL_TECH_ADDED;
-                        container.appendChild(allAdded);
-                        return;
-                }
-
-                for (const tech of unselected) {
-                        const chip = dom.$('div');
-                        chip.style.cssText = [
-                                'display: inline-flex',
-                                'align-items: center',
-                                'padding: 6px 12px',
-                                'border-radius: 16px',
-                                'font-size: 13px',
-                                'cursor: pointer',
-                                'transition: all 0.15s ease',
-                                'user-select: none',
-                                `border: 1px solid ${COLORS.chipUnselectedBorder}`,
-                                `background: ${COLORS.chipUnselectedBg}`,
-                                `color: ${COLORS.text}`,
-                        ].join('; ');
-                        chip.textContent = tech;
-
-                        // Hover effects
-                        this.stepDisposables.add(dom.addDisposableListener(chip, dom.EventType.MOUSE_OVER, () => {
-                                chip.style.borderColor = COLORS.accent;
-                                chip.style.color = COLORS.accent;
-                        }));
-                        this.stepDisposables.add(dom.addDisposableListener(chip, dom.EventType.MOUSE_OUT, () => {
-                                chip.style.borderColor = COLORS.chipUnselectedBorder;
-                                chip.style.color = COLORS.text;
-                        }));
-
-                        // Click to add — refreshContent() re-renders both chip containers
-                        this.stepDisposables.add(dom.addDisposableListener(chip, dom.EventType.CLICK, () => {
-                                this.addTech(tech);
-                                this.refreshContent();
-                        }));
-
-                        container.appendChild(chip);
-                }
-        }
-
-        private addTech(tech: string): void {
-                if (!this.techStack.includes(tech)) {
-                        this.techStack.push(tech);
-                }
-        }
-
-        private removeTech(tech: string): void {
-                const idx = this.techStack.indexOf(tech);
-                if (idx >= 0) {
-                        this.techStack.splice(idx, 1);
-                }
-        }
-
-        // ── Step 4: Success Criteria (Goals) ──────────────────────────────────
-
-        private renderStep4(parent: HTMLElement): void {
-                const label = dom.$('div');
-                label.style.cssText = `color: ${COLORS.text}; font-size: 13px; font-weight: 500; margin-bottom: 10px;`;
-                label.textContent = Nls.GOALS;
-                parent.appendChild(label);
-
-                // Existing goals list
-                const goalsList = dom.$('div');
-                goalsList.style.cssText = 'margin-bottom: 16px;';
-                this.renderGoalsList(goalsList);
-                parent.appendChild(goalsList);
-
-                // Input for new goal
-                const inputRow = dom.$('div');
-                inputRow.style.cssText = 'display: flex; gap: 8px;';
-
-                const goalInput = dom.$('input') as HTMLInputElement;
-                goalInput.type = 'text';
-                goalInput.placeholder = Nls.GOAL_PLACEHOLDER;
-                goalInput.setAttribute('aria-label', 'Add a goal');
-                goalInput.style.cssText = [
-                        'flex: 1',
-                        `background: ${COLORS.inputBg}`,
-                        `border: 1px solid ${COLORS.inputBorder}`,
-                        'border-radius: 6px',
-                        'padding: 10px 14px',
-                        `color: ${COLORS.text}`,
-                        'font-size: 13px',
-                        'outline: none',
-                        'transition: border-color 0.15s ease',
-                ].join('; ');
-
-                this.stepDisposables.add(dom.addDisposableListener(goalInput, dom.EventType.FOCUS, () => {
-                        goalInput.style.borderColor = COLORS.inputFocusBorder;
-                }));
-                this.stepDisposables.add(dom.addDisposableListener(goalInput, dom.EventType.BLUR, () => {
-                        goalInput.style.borderColor = COLORS.inputBorder;
-                }));
-
-                const addGoalBtn = dom.$('button') as HTMLButtonElement;
-                addGoalBtn.textContent = Nls.ADD;
-                addGoalBtn.setAttribute('aria-label', 'Add goal');
-                addGoalBtn.style.cssText = [
-                        `background: ${COLORS.accent}`,
-                        `color: ${COLORS.bg}`,
-                        'border: none',
-                        'border-radius: 6px',
-                        'padding: 10px 18px',
-                        'font-size: 13px',
-                        'font-weight: 600',
-                        'cursor: pointer',
-                        'flex-shrink: 0',
-                        'transition: opacity 0.15s ease',
-                ].join('; ');
-
-                const addGoal = () => {
-                        const value = goalInput.value.trim();
-                        if (value && !this.goals.includes(value)) {
-                                this.goals.push(value);
-                                goalInput.value = '';
-                                this.renderGoalsList(goalsList);
-                                this.refreshNavButtons();
-                        }
-                };
-
-                this.stepDisposables.add(dom.addDisposableListener(addGoalBtn, dom.EventType.CLICK, addGoal));
-                this.stepDisposables.add(dom.addDisposableListener(goalInput, dom.EventType.KEY_DOWN, (e) => {
-                        if (e.key === 'Enter') {
-                                e.preventDefault();
-                                addGoal();
-                        }
-                }));
-
-                inputRow.appendChild(goalInput);
-                inputRow.appendChild(addGoalBtn);
-                parent.appendChild(inputRow);
-
-                // Validation hint
-                const hint = dom.$('div');
-                hint.style.cssText = `color: ${COLORS.dimText}; font-size: 11px; margin-top: 8px;`;
-                hint.textContent = this.goals.length === 0
-                        ? 'Add at least 1 goal to create your project.'
-                        : `${this.goals.length} goal${this.goals.length > 1 ? 's' : ''} added. You can add more or proceed.`;
-                parent.appendChild(hint);
-
-                // Auto-focus
-                setTimeout(() => goalInput.focus(), 50);
-        }
-
-        private renderGoalsList(container: HTMLElement): void {
-                dom.clearNode(container);
-
-                if (this.goals.length === 0) {
-                        const empty = dom.$('div');
-                        empty.style.cssText = [
-                                'padding: 16px',
-                                'text-align: center',
-                                `border: 1px dashed ${COLORS.border}`,
-                                'border-radius: 8px',
-                                `color: ${COLORS.dimText}`,
-                                'font-size: 12px',
-                        ].join('; ');
-                        empty.textContent = Nls.NO_GOALS_YET;
-                        container.appendChild(empty);
-                        return;
-                }
-
-                for (let i = 0; i < this.goals.length; i++) {
-                        const goal = this.goals[i];
-                        const item = dom.$('div');
-                        item.style.cssText = [
-                                'display: flex',
-                                'align-items: center',
-                                'gap: 10px',
-                                'padding: 10px 14px',
-                                `background: ${COLORS.inputBg}`,
-                                `border: 1px solid ${COLORS.border}`,
-                                'border-radius: 8px',
-                                'margin-bottom: 8px',
-                                'transition: border-color 0.15s ease',
-                        ].join('; ');
-
-                        const num = dom.$('span');
-                        num.style.cssText = `color: ${COLORS.accent}; font-size: 13px; font-weight: 600; min-width: 22px;`;
-                        num.textContent = `${i + 1}.`;
-                        item.appendChild(num);
-
-                        const goalText = dom.$('span');
-                        goalText.style.cssText = `color: ${COLORS.text}; font-size: 13px; flex: 1; line-height: 1.4;`;
-                        goalText.textContent = goal;
-                        item.appendChild(goalText);
-
-                        const removeBtn = dom.$('span');
-                        removeBtn.style.cssText = [
-                                'cursor: pointer',
-                                `color: ${COLORS.dimText}`,
-                                'font-size: 16px',
-                                'line-height: 1',
-                                'padding: 2px 4px',
-                                'border-radius: 3px',
-                                'transition: color 0.15s ease',
-                        ].join('; ');
-                        removeBtn.textContent = '\u00D7'; // ×
-                        this.stepDisposables.add(dom.addDisposableListener(removeBtn, dom.EventType.MOUSE_OVER, () => {
-                                removeBtn.style.color = COLORS.dangerText;
-                        }));
-                        this.stepDisposables.add(dom.addDisposableListener(removeBtn, dom.EventType.MOUSE_OUT, () => {
-                                removeBtn.style.color = COLORS.dimText;
-                        }));
-                        this.stepDisposables.add(dom.addDisposableListener(removeBtn, dom.EventType.CLICK, () => {
-                                this.removeGoal(goal);
-                                this.renderGoalsList(container);
-                                this.refreshNavButtons();
-                        }));
-                        item.appendChild(removeBtn);
-
-                        container.appendChild(item);
-                }
-        }
-
-        private removeGoal(goal: string): void {
-                const idx = this.goals.indexOf(goal);
-                if (idx >= 0) {
-                        this.goals.splice(idx, 1);
-                }
-        }
-
-        // ── Navigation bar ────────────────────────────────────────────────────
-
-        private renderNavBar(parent: HTMLElement): void {
-                const bar = dom.$('div.construct-wizard-nav');
-                bar.style.cssText = [
-                        'padding: 12px 24px 16px',
-                        'display: flex',
-                        'justify-content: space-between',
-                        'align-items: center',
-                        'flex-shrink: 0',
-                        `border-top: 1px solid ${COLORS.border}`,
-                ].join('; ');
-                parent.appendChild(bar);
-                this._navContainer = bar;
-
-                // Previous button (left side)
-                const prevBtn = dom.$('button') as HTMLButtonElement;
-                prevBtn.style.cssText = [
-                        'background: transparent',
-                        `border: 1px solid ${COLORS.border}`,
-                        'border-radius: 6px',
-                        'padding: 8px 20px',
-                        `color: ${COLORS.text}`,
-                        'font-size: 13px',
-                        'cursor: pointer',
-                        'transition: all 0.15s ease',
-                ].join('; ');
-                prevBtn.textContent = Nls.PREVIOUS;
-                prevBtn.setAttribute('aria-label', 'Previous step');
-                this.stepDisposables.add(dom.addDisposableListener(prevBtn, dom.EventType.CLICK, () => {
-                        this.goToStep(this.currentStep - 1);
-                }));
-                this.stepDisposables.add(dom.addDisposableListener(prevBtn, dom.EventType.MOUSE_OVER, () => {
-                        prevBtn.style.borderColor = COLORS.text;
-                }));
-                this.stepDisposables.add(dom.addDisposableListener(prevBtn, dom.EventType.MOUSE_OUT, () => {
-                        prevBtn.style.borderColor = COLORS.border;
-                }));
-                bar.appendChild(prevBtn);
-                this.previousButton = prevBtn;
-
-                // Right-side: Next or Create Project
-                const nextBtn = dom.$('button') as HTMLButtonElement;
-                nextBtn.style.cssText = [
-                        `background: ${COLORS.accent}`,
-                        `color: ${COLORS.bg}`,
-                        'border: none',
-                        'border-radius: 6px',
-                        'padding: 8px 24px',
-                        'font-size: 13px',
-                        'font-weight: 600',
-                        'cursor: pointer',
-                        'transition: all 0.15s ease',
-                ].join('; ');
-                nextBtn.textContent = Nls.NEXT;
-                nextBtn.setAttribute('aria-label', 'Next step');
-                this.stepDisposables.add(dom.addDisposableListener(nextBtn, dom.EventType.CLICK, () => {
-                        if (this.currentStep < STEP_COUNT) {
-                                this.goToStep(this.currentStep + 1);
-                        }
-                }));
-                bar.appendChild(nextBtn);
-                this.nextButton = nextBtn;
-
-                // Create Project button (hidden initially, shown on step 4)
-                const createBtn = dom.$('button') as HTMLButtonElement;
-                createBtn.style.cssText = [
-                        `background: ${COLORS.successAccent}`,
-                        'color: white',
-                        'border: none',
-                        'border-radius: 6px',
-                        'padding: 8px 24px',
-                        'font-size: 13px',
-                        'font-weight: 600',
-                        'cursor: pointer',
-                        'display: none',
-                        'transition: all 0.15s ease',
-                ].join('; ');
-                createBtn.textContent = Nls.CREATE_PROJECT;
-                createBtn.setAttribute('aria-label', 'Create project');
-                this.stepDisposables.add(dom.addDisposableListener(createBtn, dom.EventType.CLICK, () => {
-                        this.createProject();
-                }));
-                bar.appendChild(createBtn);
-                this.createButton = createBtn;
-
-                this.refreshNavButtons();
-        }
-
-        private refreshNavButtons(): void {
-                if (!this.previousButton || !this.nextButton || !this.createButton) { return; }
-
-                const isLastStep = this.currentStep === STEP_COUNT;
-
-                // Previous button visibility
-                this.previousButton.style.display = this.currentStep > 1 ? '' : 'none';
-                this.previousButton.disabled = this.currentStep <= 1;
-                this.previousButton.style.opacity = this.currentStep <= 1 ? '0.4' : '1';
-                this.previousButton.style.cursor = this.currentStep <= 1 ? 'default' : 'pointer';
-
-                // Next button (shown on steps 1-3)
-                this.nextButton.style.display = isLastStep ? 'none' : '';
-                this.nextButton.disabled = !this.canAdvance();
-                this.nextButton.style.opacity = this.canAdvance() ? '1' : '0.5';
-                this.nextButton.style.cursor = this.canAdvance() ? 'pointer' : 'default';
-
-                // Create Project button (shown only on step 4)
-                this.createButton.style.display = isLastStep ? '' : 'none';
-                const canCreate = this.canCreate();
-                this.createButton.disabled = !canCreate;
-                this.createButton.style.opacity = canCreate ? '1' : '0.5';
-                this.createButton.style.cursor = canCreate ? 'pointer' : 'default';
-        }
-
-        // ── Navigation logic ──────────────────────────────────────────────────
-
-        private goToStep(step: number): void {
-                if (step < 1 || step > STEP_COUNT) { return; }
-                if (step > this.currentStep && !this.canAdvance()) { return; }
-                this.currentStep = step;
-                this.refreshContent();
-        }
-
-        private canAdvance(): boolean {
-                switch (this.currentStep) {
-                        case 1: return this.projectName.trim().length > 0 && this.projectName.length <= 80;
-                        case 2: return true; // Description is optional
-                        case 3: return true; // Tech stack is optional
-                        case 4: return this.canCreate();
-                        default: return false;
-                }
-        }
-
-        private canCreate(): boolean {
-                return this.goals.length >= 1
-                        && this.projectName.trim().length > 0
-                        && this.projectName.length <= 80;
-        }
-
-        // ── Create project ────────────────────────────────────────────────────
-
-        private async createProject(): Promise<void> {
-                if (!this.canCreate()) { return; }
-
-                const workspace = this.workspaceContextService.getWorkspace();
-                const rootFolder = workspace.folders[0];
-                if (!rootFolder) {
-                        this.logService.error('[ConstructProjectWizard] No workspace folder found — cannot create project.');
-                        return;
-                }
-                const workspacePath = rootFolder.uri.fsPath;
-
-                // Disable button to prevent double-clicks
-                if (this.createButton) {
-                        this.createButton.disabled = true;
-                        this.createButton.textContent = Nls.CREATING;
-                        this.createButton.style.opacity = '0.6';
-                        this.createButton.style.cursor = 'wait';
-                }
-
-                try {
-                        const input: IProjectCreationInput = {
-                                name: this.projectName.trim(),
-                                description: this.projectDescription.trim(),
-                                techStack: [...this.techStack],
-                                goals: [...this.goals],
-                        };
-
-                        await this.projectService.createProject(input, workspacePath);
-
-                        this.logService.info('[ConstructProjectWizard] Project created successfully:', input.name);
-
-                        // Fire event so the agent view can begin idea refinement
-                        this._onDidCreateProject.fire();
-
-                        // Clean up the wizard overlay
-                        if (this.container) {
-                                dom.clearNode(this.container);
-                        }
-                } catch (e) {
-                        this.logService.error('[ConstructProjectWizard] Failed to create project', e);
-
-                        // Re-enable button on failure
-                        if (this.createButton) {
-                                this.createButton.disabled = false;
-                                this.createButton.textContent = Nls.CREATE_PROJECT;
-                                this.createButton.style.opacity = '1';
-                                this.createButton.style.cursor = 'pointer';
-                        }
-                }
-        }
+}
+
+// --- Public API ---------------------------------------------------------------
+
+/**
+ * Show the project creation wizard.
+ *
+ * @param instantiationService The VS Code instantiation service for DI.
+ * @returns A promise that resolves with the created project, or null if cancelled.
+ */
+export async function showProjectWizard(
+        instantiationService: IInstantiationService,
+): Promise<IKovixProject | null> {
+        return instantiationService.invokeFunction((accessor) => {
+                const workspaceContextService = accessor.get(IWorkspaceContextService);
+                const notificationService = accessor.get(INotificationService);
+                const logService = accessor.get(ILogService);
+
+                const wizard = new ProjectWizard(
+                        instantiationService,
+                        workspaceContextService,
+                        notificationService,
+                        logService,
+                );
+
+                return wizard.show();
+        });
 }

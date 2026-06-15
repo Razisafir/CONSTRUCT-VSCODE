@@ -200,7 +200,7 @@ export const DANGEROUS_COMMAND_PATTERNS: RegExp[] = [
         /\bdd\s+.*of=\/dev\//i,
         /\bchmod\s+(777|666)\s+\//i,
         /\bchown\s+.*\s+\//i,
-        /\b:()\s*\{.*;\s*\}/, // fork bomb
+        /:\s*\(\s*\)\s*\{.*\}\s*;/, // fork bomb: :(){ :|:& };:
         />\/etc\//i,
         /\bmount\b.*\/dev\//i,
         /\bumount\b/i,

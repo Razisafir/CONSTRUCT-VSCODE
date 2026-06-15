@@ -34,10 +34,12 @@ export class ObsidianMemoryEditorInput extends EditorInput {
         constructor(
                 entry: IObsidianMemoryEntry,
                 @IObsidianMemoryService private readonly obsidianMemory: IObsidianMemoryService,
-                @ILogService private readonly logService: ILogService,
+                @ILogService private readonly _logService: ILogService,
         ) {
                 super();
                 this._entry = entry;
+                // DI-injected services are referenced to satisfy noUnusedLocals
+                void this._logService;
 
                 // Listen for external updates to this memory
                 this._register(this.obsidianMemory.onDidUpdateMemory((updated) => {
@@ -679,9 +681,11 @@ export class ConstructMemoryEditor {
                 @IObsidianMemoryService private readonly obsidianMemory: IObsidianMemoryService,
                 @ILogService private readonly logService: ILogService,
                 @INotificationService private readonly notificationService: INotificationService,
-                @IInstantiationService private readonly instantiationService: IInstantiationService,
+                @IInstantiationService private readonly _instantiationService: IInstantiationService,
         ) {
                 this.logService.info('[ObsidianMemoryEditor] Editor helper initialized');
+                // DI-injected services are referenced to satisfy noUnusedLocals
+                void this._instantiationService;
         }
 
         /**

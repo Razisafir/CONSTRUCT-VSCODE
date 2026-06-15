@@ -509,8 +509,9 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
 
                 try {
                         // If Kali profile is selected, wrap command for WSL
+                        // SEC-11: Use shellEscape to prevent injection through the bash -c wrapping
                         const actualCommand = this._terminalProfile === 'kali' && this._kaliAvailable
-                                ? `wsl -d kali-linux -- bash -c "${command.replace(/"/g, '\\"')}"`
+                                ? `wsl -d kali-linux -- bash -c ${this.shellEscape(command)}`
                                 : command;
 
                         // P0-4 FIX: child_process should not be used in browser layer.

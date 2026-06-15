@@ -185,6 +185,8 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
 
         /** Milestone execution state. */
         private _executionState: ExecutionState = ExecutionState.Idle;
+        /** Synchronous lock to prevent race conditions in startExecution. */
+        private _executionStarting: boolean = false;
         private _currentMilestone: IMilestone | null = null;
         private _approvedPlan: IApprovedPlan | null = null;
         private _executionConfig: { mode: ExecutionMode; selectedMilestoneIds?: string[] } | null = null;
@@ -710,12 +712,15 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 };
                 this._completedMilestoneIds = new Set();
 
-                // BUG#4 FIX: Guard against concurrent execution to prevent race conditions
-                // Check state BEFORE setting it — otherwise the guard always triggers
-                if (this._executionState === ExecutionState.Executing) {
+                // BUG#4 FIX: Guard against concurrent execution using synchronous lock.
+                // A simple state check has a TOCTOU race — two rapid calls could both
+                // pass the check before either sets the state. The _executionStarting flag
+                // is set synchronously, preventing any race.
+                if (this._executionStarting || this._executionState === ExecutionState.Executing) {
                         this.logService.warn('[AgentLoop] startExecution called while already executing — ignoring');
                         return;
                 }
+                this._executionStarting = true;
 
                 this._executionState = ExecutionState.Executing;
                 this._currentPlanContext = approvedPlan.task;
@@ -751,6 +756,9 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                         this._executionState = ExecutionState.Error;
                                         this.logService.error('[AgentLoop] Execution failed:', error);
                                 }
+                        } finally {
+                                // Always reset the synchronous lock so startExecution can be called again
+                                this._executionStarting = false;
                         }
                 };
                 runAsync().catch(err => this.logService.error('[AgentLoop] Unhandled execution error:', err));

@@ -817,7 +817,10 @@ export class ConstructProjectServiceImpl extends Disposable implements IConstruc
 
         private getGlobalRegistryPath(): string {
                 // Use the user's home directory for the global project registry
-                const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? '.';
+                // Guard: process.env may not be available in browser contexts (vscode.dev)
+                const homeDir = typeof process !== 'undefined'
+                        ? (process.env.HOME ?? process.env.USERPROFILE ?? '.')
+                        : '.';
                 return `${homeDir}/${GLOBAL_REGISTRY_DIR}/${GLOBAL_REGISTRY_FILE}`;
         }
 

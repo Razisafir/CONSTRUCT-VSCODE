@@ -410,15 +410,20 @@ suite('Phase4 - Source code verification', () => {
                 assert.ok(startExecIdx > -1, 'startExecution method should exist');
 
                 // Find the guard check and the state assignment
-                const methodContent = content.substring(startExecIdx, startExecIdx + 1000);
+                const methodContent = content.substring(startExecIdx, startExecIdx + 5000);
 
-                // The guard check should come BEFORE the state assignment
-                const guardIdx = methodContent.indexOf('if (this._executionState === ExecutionState.Executing)');
+                // Phase 5: The guard now uses _executionStarting synchronous lock
+                const guardIdx = methodContent.indexOf('if (this._executionStarting || this._executionState === ExecutionState.Executing)');
+                const lockIdx = methodContent.indexOf('this._executionStarting = true');
                 const stateAssignIdx = methodContent.indexOf('this._executionState = ExecutionState.Executing;');
+                const lockResetIdx = methodContent.indexOf('this._executionStarting = false');
 
-                assert.ok(guardIdx > -1, 'Guard check should exist');
+                assert.ok(guardIdx > -1, 'Guard check with _executionStarting should exist');
+                assert.ok(lockIdx > -1, 'Synchronous lock should be set');
                 assert.ok(stateAssignIdx > -1, 'State assignment should exist');
-                assert.ok(guardIdx < stateAssignIdx, 'Guard check should come BEFORE state assignment');
+                assert.ok(guardIdx < lockIdx, 'Guard check should come BEFORE lock is set');
+                assert.ok(lockIdx < stateAssignIdx, 'Lock should be set BEFORE state assignment');
+                assert.ok(lockResetIdx > -1, 'Lock should be reset in finally block');
         });
 
         test('common agentLoop.ts has milestone_skipped event type', () => {
@@ -437,5 +442,79 @@ suite('Phase4 - Source code verification', () => {
                 const fs = require('fs');
                 const content = fs.readFileSync('/home/z/my-project/KOVIX/src/vs/workbench/contrib/construct/browser/services/llm/cloudProvider.ts', 'utf-8');
                 assert.ok(content.includes('.catch('), 'apiKeyReady promise should have .catch() handler');
+        });
+});
+
+// ─── Phase 5: Additional fixes ──────────────────────────────────────────
+suite('Phase5 - Additional Critical/High fixes', () => {
+        test('CRITICAL #1: Kali WSL uses shellEscape (not double-quote interpolation)', () => {
+                const fs = require('fs');
+                const content = fs.readFileSync('/home/z/my-project/KOVIX/src/vs/workbench/contrib/construct/browser/services/tools/constructToolRegistryService.ts', 'utf-8');
+                assert.ok(content.includes('this.shellEscape(command)'), 'Kali WSL wrapping should use shellEscape()');
+                assert.ok(!content.includes('bash -c "${command'), 'Kali WSL should NOT use double-quote interpolation');
+        });
+
+        test('CRITICAL #2: API key NOT written to IStorageService', () => {
+                const fs = require('fs');
+                const content = fs.readFileSync('/home/z/my-project/KOVIX/src/vs/workbench/contrib/construct/browser/services/llm/cloudProvider.ts', 'utf-8');
+                assert.ok(!content.includes('this._storageService.store(STORAGE_KEY_CLOUD_API_KEY'), 'API key should NOT be stored to IStorageService');
+        });
+
+        test('CRITICAL #3: process.env guarded in mcpConnectionPool', () => {
+                const fs = require('fs');
+                const content = fs.readFileSync('/home/z/my-project/KOVIX/src/vs/workbench/contrib/construct/browser/services/mcp/mcpConnectionPool.ts', 'utf-8');
+                // Every process.env reference should be guarded
+                const lines = content.split('\n');
+                let unguarded = 0;
+                for (const line of lines) {
+                        if (line.includes('process.env') && !line.includes('typeof process')) {
+                                unguarded++;
+                        }
+                }
+                assert.strictEqual(unguarded, 0, 'No unguarded process.env references should remain');
+        });
+
+        test('CRITICAL #4: process.env guarded in projectService', () => {
+                const fs = require('fs');
+                const content = fs.readFileSync('/home/z/my-project/KOVIX/src/vs/workbench/contrib/construct/browser/services/project/constructProjectServiceImpl.ts', 'utf-8');
+                // The guard is on a nearby line (not same line as process.env), so check the function
+                const homeDirBlock = content.match(/const homeDir[^;]+;/s);
+                assert.ok(homeDirBlock, 'Should have homeDir assignment');
+                const block = homeDirBlock[0];
+                assert.ok(block.includes('typeof process'), 'homeDir assignment should guard with typeof process');
+                assert.ok(block.includes('process.env'), 'Should reference process.env');
+        });
+
+        test('HIGH #7: Synchronous lock _executionStarting exists', () => {
+                const fs = require('fs');
+                const content = fs.readFileSync('/home/z/my-project/KOVIX/src/vs/workbench/contrib/construct/browser/services/agent/agentLoop.ts', 'utf-8');
+                assert.ok(content.includes('_executionStarting'), '_executionStarting lock should exist');
+                assert.ok(content.includes('this._executionStarting = false'), 'Lock should be reset in finally');
+        });
+
+        test('HIGH #9: MCPServerManagerService dispose awaits stopAllServers', () => {
+                const fs = require('fs');
+                const content = fs.readFileSync('/home/z/my-project/KOVIX/src/vs/workbench/contrib/construct/browser/services/mcp/mcpServerManagerService.ts', 'utf-8');
+                assert.ok(content.includes('.then(() => super.dispose())'), 'super.dispose() should be called after stopAllServers resolves');
+        });
+
+        test('HIGH #10: _apiKeyReady updated on key change', () => {
+                const fs = require('fs');
+                const content = fs.readFileSync('/home/z/my-project/KOVIX/src/vs/workbench/contrib/construct/browser/services/llm/cloudProvider.ts', 'utf-8');
+                assert.ok(content.includes('this._apiKeyReady = this._resolveApiKey()'), '_apiKeyReady should be updated on key change');
+        });
+
+        test('MEDIUM #13: Fork bomb regex has proper escaped parentheses', () => {
+                const fs = require('fs');
+                const content = fs.readFileSync('/home/z/my-project/KOVIX/src/vs/platform/construct/common/terminal/terminalExecutor.ts', 'utf-8');
+                // The fork bomb regex should have \( \) not empty ()
+                assert.ok(content.includes(':\\s*\\(\\s*\\)\\s*\\{'), 'Fork bomb regex should escape parentheses');
+        });
+
+        test('Fork bomb regex actually matches bash fork bomb', () => {
+                // Fork bomb format: :(){ :|:& };: — the ; comes AFTER }, not before
+                const pattern = /:\s*\(\s*\)\s*\{.*\}\s*;/;
+                assert.strictEqual(pattern.test(':(){ :|:& };:'), true, 'Should match bash fork bomb');
+                assert.strictEqual(pattern.test(': ( ) { :|:& };'), true, 'Should match with spaces');
         });
 });

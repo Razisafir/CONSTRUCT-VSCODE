@@ -506,7 +506,14 @@ export class MCPServerManagerService extends Disposable implements IMCPServerMan
         }
 
         override dispose(): void {
-                this.stopAllServers().catch(e => this.logService.error('[MCP Manager] Error stopping all servers:', e));
-                super.dispose();
+                // BUG#10 FIX: Stop servers BEFORE disposing emitters to prevent
+                // firing events on disposed emitters. stopAllServers fires
+                // onDidChangeConnection events which need the emitters to be alive.
+                this.stopAllServers()
+                        .then(() => super.dispose())
+                        .catch(e => {
+                                this.logService.error('[MCP Manager] Error stopping all servers:', e);
+                                super.dispose(); // Always dispose even if stopAllServers fails
+                        });
         }
 }

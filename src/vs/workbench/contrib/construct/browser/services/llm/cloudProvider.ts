@@ -87,7 +87,9 @@ export class CloudProvider extends Disposable implements IConstructAIProvider {
 
                 // Listen for key changes and re-resolve
                 this._register(this._keyManager.onDidChangeKey(() => {
-                        this._resolveApiKey();
+                        // BUG#5 FIX: Store the promise so callers awaiting _apiKeyReady
+                        // will wait for the new key to be resolved before making API calls.
+                        this._apiKeyReady = this._resolveApiKey();
                 }));
 
                 // Log after key resolution completes
@@ -111,8 +113,8 @@ export class CloudProvider extends Disposable implements IConstructAIProvider {
                                 const key = await this._keyManager.getKey(activeProvider.provider);
                                 if (key) {
                                         this._apiKey = key;
-                                        // Also sync to IStorageService for backward compatibility
-                                        this._storageService.store(STORAGE_KEY_CLOUD_API_KEY, key, 0 /* StorageScope.APPLICATION */, 1 /* StorageTarget.MACHINE */);
+                                        // SEC-4: Do NOT sync API key to IStorageService — it stores plaintext JSON on disk.
+                                        // The OS keychain (ISecureKeyManager) is the only secure storage path.
                                         return;
                                 }
                         }
@@ -120,7 +122,8 @@ export class CloudProvider extends Disposable implements IConstructAIProvider {
                         // ISecureKeyManager may not be available in all contexts
                 }
 
-                // Fallback: read from IStorageService (backward compatibility with existing users)
+                // Fallback: read from IStorageService (legacy — keys should be migrated to OS keychain)
+                // SEC-4: Reading from storage is acceptable (user already put it there), but we no longer write to it.
                 this._apiKey = this._storageService.get(STORAGE_KEY_CLOUD_API_KEY, 0) ?? '';
 
                 // Secondary fallback: read from IConfigurationService
