@@ -677,10 +677,12 @@ export class MCPConnectionPool extends Disposable {
 
         // --- Lifecycle --------------------------------------------------------
 
-        override dispose(): void {
+        override async dispose(): Promise<void> {
                 this.healthCheckTimer?.dispose();
+                // BUG#10 FIX: Await all disconnects before calling super.dispose()
+                // to prevent operating on disposed emitters
                 const disconnectPromises = Array.from(this.connections.keys()).map(name => this.disconnect(name));
-                Promise.all(disconnectPromises).catch(e => this.logService.error('[MCP] Error during bulk disconnect:', e));
+                await Promise.allSettled(disconnectPromises);
                 super.dispose();
         }
 }

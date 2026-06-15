@@ -1,8 +1,9 @@
+// Copyright (c) 2025 Razisafir. All rights reserved.
+// Kovix proprietary code. See CONSTRUCT_LICENSE.txt.
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Copyright (c) Kovix. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-
 
 import { Disposable } from '../../../../../../base/common/lifecycle.js';
 import { Emitter } from '../../../../../../base/common/event.js';
@@ -70,7 +71,7 @@ export class ConstructAIService extends Disposable implements IConstructAIServic
                 // Instantiate all providers
                 const ollama = new OllamaProvider(logService, configurationService);
                 const xenova = new XenovaProvider(logService, configurationService);
-                const cloud = new CloudProvider(logService, configurationService, this._keyManager);
+                const cloud = new CloudProvider(logService, configurationService, storageService, this._keyManager);
 
                 this._providers.set('ollama', ollama);
                 this._providers.set('xenova', xenova);
@@ -78,8 +79,9 @@ export class ConstructAIService extends Disposable implements IConstructAIServic
 
                 // Listen for provider status changes
                 for (const [type, provider] of this._providers) {
-                        this._register(provider.onDidChangeStatus(() => {
-                                this.logService.info('[ConstructAIService] Provider ' + type + ' status changed to: ' + provider.checkStatus());
+                        this._register(provider.onDidChangeStatus(async () => {
+                                const status = await provider.checkStatus();
+                                this.logService.info('[ConstructAIService] Provider ' + type + ' status changed to: ' + status);
                         }));
                         this._register(provider.onDidChangeActiveModel((model) => {
                                 if (provider === this._activeProvider) {
@@ -206,7 +208,7 @@ export class ConstructAIService extends Disposable implements IConstructAIServic
                 // Merge the caller's signal with our stream controller
                 const mergedOptions: IChatOptions = { ...options };
                 if (options?.signal) {
-                        options.signal.addEventListener('abort', () => streamController.abort());
+                        options.signal.addEventListener('abort', () => streamController.abort(), { once: true });
                 }
                 mergedOptions.signal = streamController.signal;
 

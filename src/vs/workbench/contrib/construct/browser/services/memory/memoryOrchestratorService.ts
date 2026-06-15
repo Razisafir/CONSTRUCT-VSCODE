@@ -1,3 +1,5 @@
+// Copyright (c) 2025 Razisafir. All rights reserved.
+// Kovix proprietary code. See CONSTRUCT_LICENSE.txt.
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -39,9 +41,6 @@ export class MemoryOrchestratorService extends Disposable implements IMemoryOrch
 
         /** Timestamp of last successful consolidation, used by getMemoryStats(). */
         private _lastConsolidationTime: number = 0;
-
-        /** Per-project consolidation timestamps for idempotency checks. */
-        private _lastConsolidationPerProject: Map<string, number> | undefined;
 
         /** Rolling window of query durations (ms), kept to the last 10 queries. */
         private _queryTimes: number[] = [];
@@ -189,77 +188,46 @@ export class MemoryOrchestratorService extends Disposable implements IMemoryOrch
         async consolidate(projectId: string): Promise<void> {
                 this.logService.info(`[MemoryOrchestrator] Consolidating memory for ${projectId}...`);
 
-                // P5: Make consolidation idempotent — track last consolidation time per project
                 const now = Date.now();
-                const minConsolidationInterval = 60_000; // 1 minute minimum between consolidations
-                if (this._lastConsolidationPerProject) {
-                        const lastTime = this._lastConsolidationPerProject.get(projectId) ?? 0;
-                        if (now - lastTime < minConsolidationInterval) {
-                                this.logService.info(`[MemoryOrchestrator] Skipping consolidation for ${projectId} — last run was ${now - lastTime}ms ago (min interval: ${minConsolidationInterval}ms)`);
-                                return;
-                        }
-                } else {
-                        this._lastConsolidationPerProject = new Map<string, number>();
-                }
-
                 const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
-                let oldEvents: IEpisodicMemoryEntry[];
-                try {
-                        oldEvents = this.episodicMemory.getEventsByTimeRange(projectId, 0, oneWeekAgo);
-                } catch (error) {
-                        this.logService.warn(`[MemoryOrchestrator] Failed to get episodic events for consolidation:`, error instanceof Error ? error.message : String(error));
-                        oldEvents = [];
-                }
+                const oldEvents = this.episodicMemory.getEventsByTimeRange(projectId, 0, oneWeekAgo);
 
-                // P5: Handle partial failures — each consolidation step independently
                 if (oldEvents.length > 0) {
-                        try {
-                                const summary = this.summarizeEvents(oldEvents);
-                                await this.semanticMemory.storeKnowledge({
+                        const summary = this.summarizeEvents(oldEvents);
+                        await this.semanticMemory.storeKnowledge({
+                                projectId,
+                                content: summary,
+                                tags: ['auto-consolidated', 'episodic-summary'],
+                                embedding: []
+                        });
+
+                        // Sync consolidation summary to Supermemory if enabled
+                        if (this.constructMemory.isInitialized && this.constructMemory.config.autoLearn) {
+                                await this.constructMemory.addMemory(summary, {
+                                        type: 'consolidation',
                                         projectId,
-                                        content: summary,
-                                        tags: ['auto-consolidated', 'episodic-summary'],
-                                        embedding: []
+                                        tags: 'auto-consolidated,episodic-summary'
                                 });
-
-                                // Sync consolidation summary to Supermemory if enabled
-                                if (this.constructMemory.isInitialized && this.constructMemory.config.autoLearn) {
-                                        await this.constructMemory.addMemory(summary, {
-                                                type: 'consolidation',
-                                                projectId,
-                                                tags: 'auto-consolidated,episodic-summary'
-                                        });
-                                }
-                        } catch (error) {
-                                this.logService.warn(`[MemoryOrchestrator] Semantic consolidation failed (continuing):`, error instanceof Error ? error.message : String(error));
                         }
                 }
 
-                try {
-                        const successfulEvents = oldEvents.filter((e: IEpisodicMemoryEntry) => e.success);
-                        if (successfulEvents.length > 0) {
-                                await this.proceduralMemory.extractPatternsFromEpisodes(
-                                        projectId,
-                                        successfulEvents.map((e: IEpisodicMemoryEntry) => `${e.action}: ${e.outcome}`)
-                                );
-                        }
-                } catch (error) {
-                        this.logService.warn(`[MemoryOrchestrator] Procedural consolidation failed (continuing):`, error instanceof Error ? error.message : String(error));
+                const successfulEvents = oldEvents.filter((e: IEpisodicMemoryEntry) => e.success);
+                if (successfulEvents.length > 0) {
+                        await this.proceduralMemory.extractPatternsFromEpisodes(
+                                projectId,
+                                successfulEvents.map((e: IEpisodicMemoryEntry) => `${e.action}: ${e.outcome}`)
+                        );
                 }
 
-                try {
-                        const ctx = this.workingMemory.getCurrentContext(projectId);
-                        if (ctx && ctx.tokensUsed > ctx.tokenBudget * 0.8) {
-                                this.workingMemory.pruneContext(projectId, ctx.tokenBudget * 0.6);
-                        }
-                } catch (error) {
-                        this.logService.warn(`[MemoryOrchestrator] Working memory pruning failed (continuing):`, error instanceof Error ? error.message : String(error));
+                const ctx = this.workingMemory.getCurrentContext(projectId);
+                if (ctx && ctx.tokensUsed > ctx.tokenBudget * 0.8) {
+                        this.workingMemory.pruneContext(projectId, ctx.tokenBudget * 0.6);
                 }
 
                 this._lastConsolidationTime = Date.now();
-                this._lastConsolidationPerProject.set(projectId, now);
 
                 const stats = this.getMemoryStats(projectId);
+                // BUG#9 FIX: Removed redundant second _lastConsolidationTime assignment
                 this._onDidConsolidate.fire({ projectId, stats });
 
                 this.logService.info(`[MemoryOrchestrator] Consolidation complete for ${projectId}`);

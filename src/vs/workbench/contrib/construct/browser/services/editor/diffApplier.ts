@@ -31,6 +31,12 @@ export class DiffApplierService extends Disposable implements IDiffApplier {
                 super();
                 const workspace = this.workspaceContextService.getWorkspace();
                 this._workspaceRoot = workspace.folders[0]?.uri ?? null;
+                // BUG#8 FIX: Update _workspaceRoot when workspace folders change
+                this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => {
+                        const ws = this.workspaceContextService.getWorkspace();
+                        this._workspaceRoot = ws.folders[0]?.uri ?? null;
+                        this.logService.info("[DiffApplier] Workspace root updated:", this._workspaceRoot?.toString());
+                }));
                 this.logService.info("[DiffApplier] Service created");
         }
 

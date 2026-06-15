@@ -1,3 +1,5 @@
+// Copyright (c) 2025 Razisafir. All rights reserved.
+// Kovix proprietary code. See CONSTRUCT_LICENSE.txt.
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -20,8 +22,6 @@ import {
         MEMORY_STORE_FILE,
         MEMORY_STORE_VERSION,
 } from '../../../../../../platform/construct/common/memory/obsidianMemoryTypes.js';
-// SEC-P5: Safe JSON parsing for untrusted input
-import { safeJsonParse } from '../../../../../../platform/construct/common/constructTypes.js';
 
 /**
  * Directory relative to home for KOVIX data.
@@ -207,17 +207,17 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
                         const textLower = query.text.toLowerCase();
                         const tokens = textLower.split(/\s+/).filter(t => t.length > 1);
 
-                        const scored = results.map(entry => ({
-                                entry,
-                                score: this.computeScore(entry, textLower, tokens),
-                        }));
+                                const scored = results.map(entry => ({
+                                        entry,
+                                        score: this.computeScore(entry, textLower, tokens),
+                                }));
 
-                        // Filter out zero-score entries
-                        scored = scored.filter(s => s.score > 0);
+                                // Filter out zero-score entries
+                                const filtered = scored.filter(s => s.score > 0);
 
-                        // Sort by score descending
-                        scored.sort((a, b) => b.score - a.score);
-                        results = scored.map(s => s.entry);
+                                // Sort by score descending
+                                filtered.sort((a, b) => b.score - a.score);
+                                results = filtered.map(s => s.entry);
                 } else {
                         // No text query — sort by most recently updated
                         results = [...results].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -399,17 +399,15 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
 
         async importFromJson(jsonString: string): Promise<number> {
                 try {
-                        const parsed = safeJsonParse<unknown>(jsonString, null);
-                        const rawEntries: unknown[] = Array.isArray(parsed)
+                        const parsed = JSON.parse(jsonString);
+                        const entries: IObsidianMemoryEntry[] = Array.isArray(parsed)
                                 ? parsed
-                                : Array.isArray((parsed as Record<string, unknown>)?.entries)
-                                        ? (parsed as Record<string, unknown>).entries as unknown[]
-                                        : [];
+                                : parsed?.entries ?? [];
 
                         const store = await this.loadStore();
                         let importedCount = 0;
 
-                        for (const raw of rawEntries) {
+                        for (const raw of entries) {
                                 if (!this.isValidEntry(raw)) {
                                         continue;
                                 }
@@ -473,20 +471,18 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
 
                         try {
                                 const parsed = this.parseYamlFrontmatter(frontmatter);
-                                const pTitle = parsed.title as string | undefined;
-                                const pCategory = parsed.category as string | undefined;
-                                if (!pTitle || !pCategory) {
+                                if (!parsed.title || !parsed.category) {
                                         continue;
                                 }
 
                                 // Validate category
-                                if (!MEMORY_CATEGORIES.includes(pCategory as MemoryCategory)) {
+                                if (!MEMORY_CATEGORIES.includes(parsed.category as MemoryCategory)) {
                                         continue;
                                 }
 
                                 // Skip duplicates
                                 const isDuplicate = store.entries.some(
-                                        e => e.title.toLowerCase() === pTitle.toLowerCase() && e.category === pCategory
+                                        e => e.title.toLowerCase() === parsed.title.toLowerCase() && e.category === parsed.category
                                 );
                                 if (isDuplicate) {
                                         continue;
@@ -494,27 +490,21 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
 
                                 // Extract content from body (remove the title heading)
                                 let content = body.trim();
-                                const titleLine = `# ${pTitle}`;
+                                const titleLine = `# ${parsed.title}`;
                                 if (content.startsWith(titleLine)) {
                                         content = content.substring(titleLine.length).trim();
                                 }
 
-                                const pTags = Array.isArray(parsed.tags) ? parsed.tags as string[] : [];
-                                const pId = typeof parsed.id === 'string' ? parsed.id : generateUuid();
-                                const pCreated = typeof parsed.created === 'string' ? new Date(parsed.created).getTime() : Date.now();
-                                const pUpdated = typeof parsed.updated === 'string' ? new Date(parsed.updated).getTime() : Date.now();
-                                const pMetadata = parsed.metadata as Record<string, unknown> | undefined;
-
                                 const entry: IObsidianMemoryEntry = {
-                                        id: pId,
-                                        title: pTitle,
+                                        id: parsed.id ?? generateUuid(),
+                                        title: parsed.title,
                                         content,
-                                        category: pCategory as MemoryCategory,
-                                        tags: pTags,
-                                        createdAt: pCreated,
-                                        updatedAt: pUpdated,
+                                        category: parsed.category as MemoryCategory,
+                                        tags: parsed.tags ?? [],
+                                        createdAt: parsed.created ? new Date(parsed.created).getTime() : Date.now(),
+                                        updatedAt: parsed.updated ? new Date(parsed.updated).getTime() : Date.now(),
                                         source: 'imported' as MemorySource,
-                                        metadata: pMetadata,
+                                        metadata: parsed.metadata,
                                 };
 
                                 store.entries.push(entry);
@@ -617,7 +607,7 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
 
                         if (fs && filePath) {
                                 const data = await fs.promises.readFile(filePath, 'utf-8');
-                                const parsed = safeJsonParse<IObsidianMemoryStore>(data, { version: MEMORY_STORE_VERSION, entries: [] });
+                                const parsed = JSON.parse(data) as IObsidianMemoryStore;
 
                                 if (parsed.version === MEMORY_STORE_VERSION && Array.isArray(parsed.entries)) {
                                         this._cachedStore = parsed;
@@ -703,39 +693,44 @@ export class ObsidianMemoryServiceImpl extends Disposable implements IObsidianMe
                 return tags;
         }
 
-        private isValidEntry(raw: unknown): raw is IObsidianMemoryEntry {
-                return typeof raw === 'object' && raw !== null
-                        && typeof (raw as Record<string, unknown>).title === 'string'
-                        && typeof (raw as Record<string, unknown>).content === 'string'
-                        && typeof (raw as Record<string, unknown>).category === 'string'
-                        && MEMORY_CATEGORIES.includes((raw as Record<string, unknown>).category as MemoryCategory);
+        private isValidEntry(raw: any): raw is IObsidianMemoryEntry {
+                return raw
+                        && typeof raw.title === 'string'
+                        && typeof raw.content === 'string'
+                        && typeof raw.category === 'string'
+                        && MEMORY_CATEGORIES.includes(raw.category);
         }
 
         private parseExtractionResponse(response: string): Array<{ title: string; content: string; category: MemoryCategory; tags: string[] }> {
-                let jsonStr = response.trim();
-                const fenceMatch = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-                if (fenceMatch) {
-                        jsonStr = fenceMatch[1];
-                }
+                try {
+                        let jsonStr = response.trim();
+                        const fenceMatch = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+                        if (fenceMatch) {
+                                jsonStr = fenceMatch[1];
+                        }
 
-                const parsed = safeJsonParse<unknown[]>(jsonStr, []);
-                if (!Array.isArray(parsed)) {
-                        this.logService.warn('[ObsidianMemory] Auto-extract response is not an array');
+                        const parsed = JSON.parse(jsonStr);
+                        if (!Array.isArray(parsed)) {
+                                this.logService.warn('[ObsidianMemory] Auto-extract response is not an array');
+                                return [];
+                        }
+
+                        return parsed.filter((item: any) =>
+                                typeof item?.title === 'string' &&
+                                typeof item?.content === 'string' &&
+                                typeof item?.category === 'string' &&
+                                MEMORY_CATEGORIES.includes(item.category) &&
+                                Array.isArray(item?.tags)
+                        );
+                } catch (error) {
+                        const msg = error instanceof Error ? error.message : String(error);
+                        this.logService.warn(`[ObsidianMemory] Failed to parse extraction response: ${msg}`);
                         return [];
                 }
-
-                return parsed.filter((item: unknown): item is { title: string; content: string; category: MemoryCategory; tags: string[] } =>
-                        typeof item === 'object' && item !== null &&
-                        typeof (item as Record<string, unknown>).title === 'string' &&
-                        typeof (item as Record<string, unknown>).content === 'string' &&
-                        typeof (item as Record<string, unknown>).category === 'string' &&
-                        MEMORY_CATEGORIES.includes((item as Record<string, unknown>).category as MemoryCategory) &&
-                        Array.isArray((item as Record<string, unknown>).tags)
-                );
         }
 
-        private parseYamlFrontmatter(yaml: string): Record<string, unknown> {
-                const result: Record<string, unknown> = {};
+        private parseYamlFrontmatter(yaml: string): Record<string, any> {
+                const result: Record<string, any> = {};
                 const lines = yaml.split('\n');
 
                 for (const line of lines) {

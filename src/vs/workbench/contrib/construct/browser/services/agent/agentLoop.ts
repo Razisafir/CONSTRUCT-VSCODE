@@ -1,9 +1,11 @@
+// Copyright (c) 2025 Razisafir. All rights reserved.
+// Kovix proprietary code. See CONSTRUCT_LICENSE.txt.
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { Emitter, Event } from '../../../../../../base/common/event.js';
+import { Emitter } from '../../../../../../base/common/event.js';
 import { Disposable } from '../../../../../../base/common/lifecycle.js';
 import { ILogService } from '../../../../../../platform/log/common/log.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
@@ -35,74 +37,11 @@ import { redactSecrets } from '../../../../../../platform/construct/common/secur
 import { IPendingChangesService } from '../../../../../../platform/construct/common/diff/pendingChanges.js';
 import { IUniversalMemoryService } from '../../../../../../platform/construct/common/memory/universalMemoryService.js';
 import { IObsidianMemoryService } from '../../../../../../platform/construct/common/memory/obsidianMemoryService.js';
-import { IConstructToolRegistry } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
+import { IConstructToolRegistry, IToolDefinition as IRegistryToolDefinition } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
 // H3: Prompt sanitizer for memory injection prevention
-import { PromptSanitizer } from '../../../../../../platform/construct/common/agent/promptSanitizer.js';
-// SEC-P2: Injection detection in agent output
-import { detectInjectionInOutput, truncateForInjection } from '../../../../../../platform/construct/common/security/promptSanitiser.js';
-// SEC-P2: Injection detection in agent output
-// F-F-004: Configuration service for configurable max rounds
-import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
+import { sanitizeMemoryContext } from '../../../../../../platform/construct/common/agent/promptSanitizer.js';
 
-// F-F-004: MAX_ROUNDS is now configurable via construct.agent.maxRounds setting.
-// The default is 15 and can be adjusted between 5-50.
-// See constructApiConfig.ts for the configuration registration.
-
-// P5: Token estimation heuristic — 1 token ≈ 4 characters
-const TOKENS_PER_CHAR = 0.25;
-const RESERVED_TOKENS_FOR_RESPONSE = 2000;
-
-/**
- * Estimate the number of tokens in a text string using a simple heuristic.
- * 1 token ≈ 4 characters. This is a rough approximation suitable for
- * context window budgeting; actual token counts may vary by tokenizer.
- */
-function estimateTokens(text: string): number {
-        return Math.ceil(text.length * TOKENS_PER_CHAR);
-}
-
-/**
- * Token-aware conversation history truncation.
- * Keeps the system prompt (first message if role=system) and the most recent
- * messages that fit within the model's context window, minus reserved tokens
- * for the response.
- */
-function truncateConversationToFit(
-        messages: IChatMessage[],
-        contextWindowTokens: number,
-        systemPrompt?: string
-): IChatMessage[] {
-        const budget = contextWindowTokens - RESERVED_TOKENS_FOR_RESPONSE;
-        if (budget <= 0) { return messages.slice(-2); }
-
-        // Calculate system prompt tokens if present
-        const systemTokens = systemPrompt ? estimateTokens(systemPrompt) : 0;
-        const remainingBudget = budget - systemTokens;
-        if (remainingBudget <= 0) { return messages.slice(-2); }
-
-        // Walk backwards through messages, accumulating tokens
-        let usedTokens = 0;
-        let cutIndex = 0;
-        const isFirstSystem = messages.length > 0 && messages[0].role === 'system';
-
-        for (let i = messages.length - 1; i >= 0; i--) {
-                const msgTokens = estimateTokens(messages[i].content) +
-                        (messages[i].toolCalls ? estimateTokens(JSON.stringify(messages[i].toolCalls)) : 0);
-                if (usedTokens + msgTokens > remainingBudget) {
-                        cutIndex = i + 1;
-                        break;
-                }
-                usedTokens += msgTokens;
-        }
-
-        if (cutIndex === 0) { return messages; }
-
-        // Preserve the first system message if present
-        if (isFirstSystem && cutIndex > 0) {
-                return [messages[0], ...messages.slice(cutIndex)];
-        }
-        return messages.slice(cutIndex);
-}
+const MAX_ROUNDS = 15;
 
 /**
  * Cached result of a tool execution, used to avoid double-execution
@@ -244,10 +183,14 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         /** Active snapshot ID for the current task (for undo support). */
         private _activeSnapshotId: string | null = null;
 
+        /** Milestone execution state. */
+        private _executionState: ExecutionState = ExecutionState.Idle;
+        private _currentMilestone: IMilestone | null = null;
+        private _approvedPlan: IApprovedPlan | null = null;
+        private _executionConfig: { mode: ExecutionMode; selectedMilestoneIds?: string[] } | null = null;
+        private _milestoneResumeResolver: (() => void) | null = null;
         private _currentPlanContext: string | null = null;
-        get currentPlanContext(): string | null {
-                return this._currentPlanContext;
-        }
+        private _completedMilestoneIds: Set<string> = new Set();
 
         constructor(
                 @ILogService private readonly logService: ILogService,
@@ -268,15 +211,9 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 @IUniversalMemoryService private readonly universalMemory: IUniversalMemoryService,
                 @IObsidianMemoryService private readonly obsidianMemory: IObsidianMemoryService,
                 @IConstructToolRegistry private readonly toolRegistry: IConstructToolRegistry,
-                @IConfigurationService private readonly configurationService: IConfigurationService,
         ) {
                 super();
-                this.logService.info('[AgentLoop] Service created with error recovery, snapshots, file watcher, pending changes, universal memory, obsidian memory, tool registry, and config service');
-        }
-
-        // F-F-004: Read max rounds from configuration
-        private get maxRounds(): number {
-                return this.configurationService.getValue<number>('construct.agent.maxRounds') || 15;
+                this.logService.info('[AgentLoop] Service created with error recovery, snapshots, file watcher, pending changes, universal memory, obsidian memory, and tool registry');
         }
 
         get isRunning(): boolean {
@@ -284,14 +221,11 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         }
 
         get executionState(): ExecutionState {
-                return this._kovixExecutionState;
+                return this._executionState;
         }
 
         get currentMilestone(): IMilestone | null {
-                if (this._kovixExecutionState.type === 'paused_at_milestone') {
-                        return this._kovixExecutionState.milestone;
-                }
-                return null;
+                return this._currentMilestone;
         }
 
         /**
@@ -326,7 +260,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 try {
                         let roundCount = 0;
 
-                        while (roundCount < this.maxRounds) {
+                        while (roundCount < MAX_ROUNDS) {
                                 roundCount++;
 
                                 // Tool result cache: prevents double-execution during planning.
@@ -345,7 +279,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                 const timeoutId = setTimeout(() => timeoutController.abort(), 60_000);
                                 // Chain user's abort signal with the timeout
                                 if (signal) {
-                                        signal.addEventListener('abort', () => timeoutController.abort());
+                                        signal.addEventListener('abort', () => timeoutController.abort(), { once: true });
                                 }
 
                                 const stream = this.aiService.chat(
@@ -392,17 +326,9 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                                         }
                                                         break;
                                                 }
-                                                case 'done': {
+                                                case 'done':
                                                         stopReason = event.stopReason;
-                                                        // SEC-P2: Scan the accumulated LLM response for injection patterns
-                                                        if (currentText) {
-                                                                const injectionCheck = detectInjectionInOutput(currentText);
-                                                                if (injectionCheck.detected) {
-                                                                        this.logService.warn(`[AgentLoop] ⚠️ Potential injection detected in planning LLM response. Patterns: ${injectionCheck.patterns.join(', ')}`);
-                                                                }
-                                                        }
                                                         break;
-                                                }
                                                 case 'error':
                                                         throw new Error(event.text);
                                         }
@@ -430,17 +356,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                                 } else {
                                                         // Fallback: should not happen, but execute once if cache miss
                                                         this.logService.warn(`[AgentLoop] Cache miss for tool ${toolCall.id}, executing as fallback`);
-                                                        let input: Record<string, unknown>;
-                                                        try {
-                                                                input = JSON.parse(toolCall.arguments);
-                                                        } catch (parseError) {
-                                                                conversationMessages.push({
-                                                                        role: 'tool',
-                                                                        content: `Error: Your tool call produced invalid JSON. Please fix and try again. Error: ${parseError instanceof Error ? parseError.message : String(parseError)}`
-                                                                });
-                                                                roundCount++;
-                                                                continue;
-                                                        }
+                                                        const input = JSON.parse(toolCall.arguments);
                                                         const result = await this.executeTool(toolCall.name, input, true, signal);
                                                         conversationMessages.push({
                                                                 role: 'tool',
@@ -459,14 +375,8 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         // Parse the plan from the response
                         const steps = this.parsePlan(fullResponse);
 
-                        // P5: Plan quality validation
-                        const validatedSteps = this.validatePlan(steps, this.getAllPlanningTools());
-                        if (validatedSteps !== steps) {
-                                this.logService.info('[AgentLoop] Plan was modified during validation (duplicates removed or invalid tools filtered)');
-                        }
-
                         return {
-                                steps: validatedSteps,
+                                steps,
                                 summary: fullResponse,
                                 rawResponse: fullResponse,
                         };
@@ -528,9 +438,9 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         let roundCount = 0;
                         let finalSummary = '';
 
-                        while (roundCount < this.maxRounds) {
+                        while (roundCount < MAX_ROUNDS) {
                                 roundCount++;
-                                this.logService.info(`[AgentLoop] Round ${roundCount}/${this.maxRounds}`);
+                                this.logService.info(`[AgentLoop] Round ${roundCount}/${MAX_ROUNDS}`);
 
                                 const assistantToolCalls: IToolCall[] = [];
                                 const toolResults: { toolUseId: string; toolName: string; result: string; success: boolean; filePath?: string }[] = [];
@@ -544,7 +454,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                 const timeoutId = setTimeout(() => timeoutController.abort(), 60_000);
                                 // Chain user's abort signal with the timeout
                                 if (signal) {
-                                        signal.addEventListener('abort', () => timeoutController.abort());
+                                        signal.addEventListener('abort', () => timeoutController.abort(), { once: true });
                                 }
 
                                 const stream = this.aiService.chat(
@@ -594,7 +504,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
 
                                                         // Execute the tool with error recovery
                                                         let toolResult = await this.executeTool(event.toolName, event.toolInput, false, signal);
-                                                        const success = !toolResult.startsWith('Error:');
+                                                        let success = !toolResult.startsWith('Error:');
 
                                                         // Error recovery: if tool failed, attempt recovery
                                                         if (!success && this.errorRecovery) {
@@ -672,19 +582,9 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                                         break;
                                                 }
 
-                                                case 'done': {
+                                                case 'done':
                                                         stopReason = event.stopReason;
-                                                        // SEC-P2: Scan the accumulated LLM response for injection patterns
-                                                        if (currentText) {
-                                                                const injectionCheck = detectInjectionInOutput(currentText);
-                                                                if (injectionCheck.detected) {
-                                                                        this.logService.warn(`[AgentLoop] ⚠️ Potential injection detected in LLM response. Patterns: ${injectionCheck.patterns.join(', ')}`);
-                                                                        // Flag the response but don't block — log the warning for monitoring
-                                                                        yield { type: 'error', text: `[SECURITY] Potential prompt injection detected in LLM output. Patterns: ${injectionCheck.patterns.join(', ')}. Response is being monitored.`, recoverable: true };
-                                                                }
-                                                        }
                                                         break;
-                                                }
 
                                                 case 'error':
                                                         yield { type: 'error', text: event.text, recoverable: true };
@@ -723,30 +623,23 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                         this._conversationHistory.push({ role: 'user', content: task });
                                         this._conversationHistory.push({ role: 'assistant', content: currentText || finalSummary || 'Task completed.' });
 
-                                        // P5: Token-aware conversation history truncation replaces simple count cap.
-                                        // Determine the active model's context window for budgeting.
-                                        const activeModel = this.aiService.getActiveModel();
-                                        const contextWindow = activeModel?.contextWindowTokens ?? 8192;
-                                        this._conversationHistory = truncateConversationToFit(
-                                                this._conversationHistory,
-                                                contextWindow,
-                                                systemPrompt
-                                        );
-                                        // Safety: still enforce a hard cap of 200 messages to prevent pathological growth
-                                        if (this._conversationHistory.length > 200) {
+                                        // H2: Cap conversation history at 50 messages, keeping first system message if any
+                                        const MAX_HISTORY = 50;
+                                        if (this._conversationHistory.length > MAX_HISTORY) {
                                                 const firstMsg = this._conversationHistory[0];
-                                                if (firstMsg?.role === 'system') {
-                                                        this._conversationHistory = [firstMsg, ...this._conversationHistory.slice(-199)];
+                                                const isSystem = firstMsg?.role === 'system';
+                                                if (isSystem) {
+                                                        // Keep the system message + most recent (MAX_HISTORY - 1) messages
+                                                        this._conversationHistory = [
+                                                                firstMsg,
+                                                                ...this._conversationHistory.slice(-(MAX_HISTORY - 1))
+                                                        ];
                                                 } else {
-                                                        this._conversationHistory = this._conversationHistory.slice(-200);
+                                                        this._conversationHistory = this._conversationHistory.slice(-MAX_HISTORY);
                                                 }
                                         }
                                         break;
                                 }
-                        }
-
-                        if (roundCount >= this.maxRounds) {
-                                yield { type: 'error', text: `Maximum rounds (${this.maxRounds}) reached — task may be incomplete. Consider increasing the limit in settings.`, recoverable: true } as AgentLoopEvent;
                         }
 
                         // Store task summary in memory
@@ -759,13 +652,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
 
                         // Auto-extract universal memory from completed task
                         if (this.universalMemory && finalSummary) {
-                                this.universalMemory.addMemory({
-                                        content: `Task: ${task}\nSummary: ${finalSummary.substring(0, 500)}`,
-                                        type: 'fact',
-                                        projectId: this._currentPlanContext ?? 'default',
-                                        projectName: this._currentPlanContext ?? 'default',
-                                        tags: ['auto-extracted'],
-                                }).catch(() => { /* non-critical */ });
+                                this.universalMemory.autoExtractFromTask(task, finalSummary.substring(0, 500)).catch(() => { /* non-critical */ });
                         }
 
                         // Record assistant turn and auto-extract from Obsidian memory
@@ -779,33 +666,8 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 } catch (error) {
                         const msg = error instanceof Error ? error.message : String(error);
                         this.logService.error(`[AgentLoop] Error: ${msg}`);
-
-                        // P5: Enhanced error recovery — classify and attempt recovery
-                        const classifiedError = this.classifyAgentError(msg);
-                        if (classifiedError === 'context_window_exceeded') {
-                                // Truncate history and retry once
-                                this.logService.info('[AgentLoop] Context window exceeded — truncating conversation history');
-                                const activeModel = this.aiService.getActiveModel();
-                                const contextWindow = activeModel?.contextWindowTokens ?? 8192;
-                                this._conversationHistory = truncateConversationToFit(
-                                        this._conversationHistory,
-                                        contextWindow
-                                );
-                                this._onError.fire({ text: 'Context window exceeded. Conversation history has been truncated. Please retry.', recoverable: true });
-                                yield { type: 'error', text: 'Context window exceeded. Conversation history has been truncated. Please retry.', recoverable: true };
-                        } else if (classifiedError === 'rate_limit_hit') {
-                                this._onError.fire({ text: 'Rate limit hit. Please wait a moment and try again.', recoverable: true });
-                                yield { type: 'error', text: 'Rate limit hit. Please wait a moment and try again.', recoverable: true };
-                        } else if (classifiedError === 'model_unavailable') {
-                                this._onError.fire({ text: 'Model unavailable. Attempting to fall back to next provider. Please retry.', recoverable: true });
-                                yield { type: 'error', text: 'Model unavailable. Attempting to fall back to next provider. Please retry.', recoverable: true };
-                        } else if (classifiedError === 'tool_execution_timeout') {
-                                this._onError.fire({ text: 'Tool execution timed out. Please try again or simplify your request.', recoverable: true });
-                                yield { type: 'error', text: 'Tool execution timed out. Please try again or simplify your request.', recoverable: true };
-                        } else {
-                                this._onError.fire({ text: msg, recoverable: false });
-                                yield { type: 'error', text: msg, recoverable: false };
-                        }
+                        this._onError.fire({ text: msg, recoverable: false });
+                        yield { type: 'error', text: msg, recoverable: false };
                 } finally {
                         this._isRunning = false;
                         this._activeSnapshotId = null;
@@ -813,29 +675,170 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         }
 
         /**
-         * Run execution with an approved plan, supporting milestone-based pausing.
-         * Delegates to startExecution() with a default IExecutionModeConfig.
+         * Run the planning phase with a pre-refined idea description.
+         * The refined idea provides more detail than a raw prompt.
          */
-        async *runWithApprovedPlan(approvedPlan: IApprovedPlan, signal?: AbortSignal): AsyncGenerator<AgentLoopEvent> {
-                const defaultConfig: import('../../../../../../platform/construct/common/agent/executionMode.js').IExecutionModeConfig = {
-                        mode: ExecutionMode.EVERY_MILESTONE,
-                };
-                yield* this.startExecution(approvedPlan, defaultConfig, signal);
+        async runPlanningPhaseWithIdea(refinedDescription: string, signal?: AbortSignal): Promise<IPlanResult> {
+                this.logService.info(`[AgentLoop] Planning phase started with refined idea: ${refinedDescription.substring(0, 100)}...`);
+                const task = `Based on the following refined specification, analyze the workspace and create a detailed implementation plan:\n\n${refinedDescription}`;
+                return this.runPlanningPhase(task, signal);
         }
 
         /**
-         * Reset the execution state to idle and clear the current milestone.
-         * Called by the VIEW after processing a terminal state (Complete/Error).
+         * Run execution with an approved plan, supporting milestone-based pausing.
          */
-        resetState(): void {
-                this._kovixExecutionState = { type: 'idle' };
+        async *runWithApprovedPlan(approvedPlan: IApprovedPlan, signal?: AbortSignal): AsyncGenerator<AgentLoopEvent> {
+                const selectedSteps = approvedPlan.steps.filter(s => s.selected);
+                if (selectedSteps.length === 0) {
+                        yield { type: 'error', text: 'No steps selected for execution.', recoverable: false };
+                        return;
+                }
+
+                const taskDescription = selectedSteps.map(s => `${s.action}: ${s.target}`).join('\n');
+                const enhancedTask = `${approvedPlan.task}\n\nExecute these specific steps:\n${taskDescription}`;
+
+                yield* this.run(enhancedTask, signal);
+        }
+
+        /**
+         * Start milestone-aware execution from an approved plan.
+         */
+        startExecution(approvedPlan: IApprovedPlan, signal?: AbortSignal): void {
+                this._approvedPlan = approvedPlan;
+                this._executionConfig = {
+                        mode: approvedPlan.executionMode as ExecutionMode,
+                };
+                this._completedMilestoneIds = new Set();
+                this._executionState = ExecutionState.Executing;
+                this._currentPlanContext = approvedPlan.task;
+
+                // Run the execution in the background
+                // BUG#4 FIX: Guard against concurrent execution to prevent race conditions
+                if (this._executionState === ExecutionState.Executing) {
+                        this.logService.warn('[AgentLoop] startExecution called while already executing — ignoring');
+                        return;
+                }
+                const runAsync = async () => {
+                        try {
+                                const selectedSteps = approvedPlan.steps.filter(s => s.selected);
+                                const taskDescription = selectedSteps.map(s => `${s.action}: ${s.target}`).join('\n');
+                                const enhancedTask = `${approvedPlan.task}\n\nExecute these specific steps:\n${taskDescription}`;
+
+                                const stream = this.run(enhancedTask, signal);
+                                for await (const event of stream) {
+                                        // Check for milestone pauses
+                                        if (event.type === 'tool_result' && event.success) {
+                                                const shouldPause = this.shouldPauseAtMilestone(event);
+                                                if (shouldPause && this._currentMilestone) {
+                                                        this._executionState = ExecutionState.PausedAtMilestone;
+                                                        this._onDidMilestoneEvent.fire({ type: 'milestone_paused', milestone: this._currentMilestone } as AgentLoopEvent);
+                                                        // Wait for resume
+                                                        await this._waitForResume();
+                                                }
+                                        }
+                                }
+                                this._executionState = ExecutionState.Complete;
+                        } catch (error) {
+                                // BUG#4 FIX: Properly handle abort vs real errors
+                                if (signal.aborted) {
+                                        this._executionState = ExecutionState.Aborted;
+                                } else {
+                                        this._executionState = ExecutionState.Error;
+                                        this.logService.error('[AgentLoop] Execution failed:', error);
+                                }
+                        }
+                };
+                runAsync().catch(err => this.logService.error('[AgentLoop] Unhandled execution error:', err));
+        }
+
+        /**
+         * Resume from the current milestone pause.
+         */
+        resumeFromMilestone(): void {
+                if (this._milestoneResumeResolver) {
+                        this._executionState = ExecutionState.Executing;
+                        const milestone = this._currentMilestone;
+                        this._milestoneResumeResolver();
+                        this._milestoneResumeResolver = null;
+                        if (milestone) {
+                                this._completedMilestoneIds.add(milestone.id);
+                        }
+                        this._currentMilestone = null;
+                }
+        }
+
+        /**
+         * Skip the current milestone and move to the next.
+         */
+        skipCurrentMilestone(): void {
+                if (this._milestoneResumeResolver) {
+                        this._executionState = ExecutionState.Executing;
+                        const milestone = this._currentMilestone;
+                        this._milestoneResumeResolver();
+                        this._milestoneResumeResolver = null;
+                        if (milestone) {
+                                this._completedMilestoneIds.add(milestone.id);
+                        }
+                        this._currentMilestone = null;
+                }
+        }
+
+        /**
+         * Wait for the user to resume from a milestone pause.
+         */
+        private _waitForResume(): Promise<void> {
+                return new Promise<void>((resolve) => {
+                        this._milestoneResumeResolver = resolve;
+                });
+        }
+
+        /**
+         * Check if the agent should pause at a milestone based on the execution mode.
+         */
+        private shouldPauseAtMilestone(event: { type: string; toolId?: string; toolName?: string }): boolean {
+                if (!this._executionConfig || !this._approvedPlan) {
+                        return false;
+                }
+
+                const milestones = this._approvedPlan.milestones;
+                if (!milestones || milestones.length === 0) {
+                        return false;
+                }
+
+                const mode = this._executionConfig.mode;
+
+                // Full auto: never pause
+                if (mode === ExecutionMode.FullAuto) {
+                        return false;
+                }
+
+                // Find the next uncompleted milestone
+                const nextMilestone = milestones.find(m => !this._completedMilestoneIds.has(m.id) && !m.completed);
+                if (!nextMilestone) {
+                        return false;
+                }
+
+                // Set current milestone if not already set
+                if (!this._currentMilestone || this._currentMilestone.id !== nextMilestone.id) {
+                        this._currentMilestone = nextMilestone;
+                }
+
+                switch (mode) {
+                        case ExecutionMode.EveryMilestone:
+                                return true;
+                        case ExecutionMode.MajorMilestone:
+                                return nextMilestone.isMajor;
+                        case ExecutionMode.Selective:
+                                return this._executionConfig.selectedMilestoneIds?.includes(nextMilestone.id) ?? false;
+                        default:
+                                return false;
+                }
         }
 
         /**
          * Extract milestones from a plan's steps.
          * Groups consecutive steps into milestones, marking major ones
          * at natural boundaries (e.g., after file creation steps).
-         * Mark every other milestone as isMajor: true.
          */
         extractMilestonesFromPlan(steps: IPlanStep[]): IMilestone[] {
                 if (steps.length === 0) {
@@ -861,13 +864,18 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         if (isNaturalBoundary) {
                                 const firstStep = steps[currentGroup[0]];
                                 const lastStep = steps[currentGroup[currentGroup.length - 1]];
+                                const isMajor = currentGroup.some(idx =>
+                                        steps[idx].action === 'Create' || steps[idx].action === 'Run'
+                                );
 
                                 milestones.push({
                                         id: `milestone-${milestoneIndex}`,
-                                        label: `${firstStep.action}: ${firstStep.target}${currentGroup.length > 1 ? ` -> ${lastStep.target}` : ''}`,
+                                        name: `${firstStep.action}: ${firstStep.target}${currentGroup.length > 1 ? ` -> ${lastStep.target}` : ''}`,
+                                        description: `Steps ${currentGroup[0] + 1}-${currentGroup[currentGroup.length - 1] + 1}`,
+                                        index: milestoneIndex,
+                                        isMajor,
                                         stepIndices: [...currentGroup],
-                                        isMajor: milestoneIndex % 2 === 0,
-                                        status: 'pending',
+                                        completed: false,
                                 });
 
                                 currentGroup = [];
@@ -880,10 +888,14 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         const firstStep = steps[currentGroup[0]];
                         milestones.push({
                                 id: `milestone-${milestoneIndex}`,
-                                label: `${firstStep.action}: ${firstStep.target}`,
+                                name: `${firstStep.action}: ${firstStep.target}`,
+                                description: `Steps ${currentGroup[0] + 1}-${currentGroup[currentGroup.length - 1] + 1}`,
+                                index: milestoneIndex,
+                                isMajor: currentGroup.some(idx =>
+                                        steps[idx].action === 'Create' || steps[idx].action === 'Run'
+                                ),
                                 stepIndices: [...currentGroup],
-                                isMajor: milestoneIndex % 2 === 0,
-                                status: 'pending',
+                                completed: false,
                         });
                 }
 
@@ -1095,9 +1107,7 @@ Guidelines:
                                 const projectId = this.workspaceContextService.getWorkspace().folders[0]?.name ?? 'default';
                                 prompt = await this.memoryOrchestrator.injectContextIntoPrompt(prompt, projectId);
                                 // H3: Sanitize memory-injected prompt to prevent injection attacks
-                                prompt = PromptSanitizer.wrapMemoryBlock(prompt);
-                                // SEC-P2: Enforce content size limit on the injected prompt
-                                prompt = truncateForInjection(prompt, 'memoryOrchestrator');
+                                prompt = sanitizeMemoryContext(prompt);
                         } catch (error) {
                                 this.logService.warn('[AgentLoop] Memory context injection failed, using base prompt:', error instanceof Error ? error.message : String(error));
                         }
@@ -1106,10 +1116,10 @@ Guidelines:
                 // Inject universal memory context (cross-project knowledge)
                 if (this.universalMemory) {
                         try {
-                                const universalContext = await this.universalMemory.getContextForTask(task, this._currentPlanContext ?? 'default');
+                                const universalContext = await this.universalMemory.getContextForTask(task, 5);
                                 if (universalContext) {
                                         // H3: Sanitize universal memory context before appending
-                                        const sanitizedContext = PromptSanitizer.sanitize(truncateForInjection(universalContext, 'universalMemory'));
+                                        const sanitizedContext = sanitizeMemoryContext(universalContext);
                                         prompt += `\n\n[Universal Knowledge]\n${sanitizedContext}`;
                                 }
                         } catch (error) {
@@ -1123,7 +1133,7 @@ Guidelines:
                                 const obsidianContext = this.obsidianMemory.getRelevantContext(task, 5);
                                 if (obsidianContext) {
                                         // H3: Sanitize Obsidian memory context before appending
-                                        const sanitizedContext = PromptSanitizer.sanitize(truncateForInjection(obsidianContext, 'obsidianMemory'));
+                                        const sanitizedContext = sanitizeMemoryContext(obsidianContext);
                                         prompt += `\n\n${sanitizedContext}`;
                                 }
                         } catch (error) {
@@ -1132,26 +1142,6 @@ Guidelines:
                 }
 
                 return prompt;
-        }
-
-        /**
-         * P5: Classify an agent error into categories for targeted recovery.
-         */
-        private classifyAgentError(message: string): 'context_window_exceeded' | 'rate_limit_hit' | 'model_unavailable' | 'tool_execution_timeout' | 'unknown' {
-                const lower = message.toLowerCase();
-                if (lower.includes('context') && (lower.includes('exceed') || lower.includes('too long') || lower.includes('too many tokens') || lower.includes('max_tokens') || lower.includes('token limit'))) {
-                        return 'context_window_exceeded';
-                }
-                if (lower.includes('rate limit') || lower.includes('429') || lower.includes('too many requests') || lower.includes('quota')) {
-                        return 'rate_limit_hit';
-                }
-                if (lower.includes('model') && (lower.includes('not found') || lower.includes('unavailable') || lower.includes('not available') || lower.includes('not loaded'))) {
-                        return 'model_unavailable';
-                }
-                if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('deadline exceeded')) {
-                        return 'tool_execution_timeout';
-                }
-                return 'unknown';
         }
 
         /**
@@ -1188,65 +1178,6 @@ Guidelines:
                 }
 
                 return steps;
-        }
-
-        /**
-         * P5: Validate a plan's quality.
-         * - At least 1 step
-         * - No duplicate steps (same action + target)
-         * - Each step references a valid tool (check against registered tools)
-         * If validation fails, log warnings and return a cleaned-up plan.
-         */
-        private validatePlan(steps: IPlanStep[], availableTools: IToolDefinition[]): IPlanStep[] {
-                if (steps.length === 0) {
-                        this.logService.warn('[AgentLoop] Plan validation: no steps found, creating fallback plan');
-                        return [{
-                                index: 0,
-                                action: 'Read',
-                                target: 'workspace',
-                                description: 'Explore workspace to understand structure',
-                        }];
-                }
-
-                // Build set of valid tool names (action types map to tools)
-                const validToolNames = new Set(availableTools.map(t => t.name));
-                // Also allow the bracket-style action types from parsePlan
-                const validActions = new Set(['Read', 'Create', 'Edit', 'Run']);
-                // Map action types to tool names
-                const actionToTool: Record<string, string> = {
-                        'Read': 'read_file',
-                        'Create': 'write_file',
-                        'Edit': 'edit_file',
-                        'Run': 'run_command',
-                };
-
-                const seen = new Set<string>();
-                const deduped: IPlanStep[] = [];
-                let reindex = 0;
-
-                for (const step of steps) {
-                        // Check for duplicates
-                        const key = `${step.action}:${step.target}`;
-                        if (seen.has(key)) {
-                                this.logService.warn(`[AgentLoop] Plan validation: removing duplicate step "${key}"`);
-                                continue;
-                        }
-                        seen.add(key);
-
-                        // Check if action maps to a valid tool
-                        const toolName = actionToTool[step.action];
-                        if (toolName && !validToolNames.has(toolName) && !validActions.has(step.action)) {
-                                this.logService.warn(`[AgentLoop] Plan validation: step "${key}" references unavailable tool "${toolName}", keeping as-is`);
-                                // Keep the step — it may still be useful context for the agent
-                        }
-
-                        deduped.push({
-                                ...step,
-                                index: reindex++,
-                        });
-                }
-
-                return deduped;
         }
 
         /**
@@ -1316,162 +1247,7 @@ Guidelines:
                 return [...corePlanning, ...extraReadOnly];
         }
 
-        // --- Phase 5 (Kovix): Milestone-Aware Pausable Execution ---
-
-        private _kovixExecutionState: import('../../../../../../platform/construct/common/agent/milestoneStateMachine.js').ExecutionState = { type: 'idle' };
-        private _resumeResolver: (() => void) | null = null;
-        private _onMilestoneReached = new Emitter<import('../../../../../../platform/construct/common/agent/milestoneStateMachine.js').IMilestone>();
-        private _currentApprovedPlan: import('../../../../../../platform/construct/common/agent/milestoneStateMachine.js').IApprovedPlan | null = null;
-        private _currentModeConfig: import('../../../../../../platform/construct/common/agent/executionMode.js').IExecutionModeConfig | null = null;
-
-        /** @internal current approved plan for milestone-aware execution */
-        get currentApprovedPlan() { return this._currentApprovedPlan; }
-        /** @internal current execution mode config */
-        get currentModeConfig() { return this._currentModeConfig; }
-
-        getExecutionState(): import('../../../../../../platform/construct/common/agent/milestoneStateMachine.js').ExecutionState {
-                return this._kovixExecutionState;
-        }
-
-        get onMilestoneReached(): Event<import('../../../../../../platform/construct/common/agent/milestoneStateMachine.js').IMilestone> {
-                return this._onMilestoneReached.event;
-        }
-
-        resumeFromMilestone(_milestoneId: string): void {
-                if (this._resumeResolver) {
-                        this._resumeResolver();
-                        this._resumeResolver = null;
-                        this._kovixExecutionState = { type: 'running', currentStepIndex: 0, currentMilestoneId: _milestoneId };
-                }
-        }
-
-        skipCurrentMilestone(): void {
-                if (this._resumeResolver) {
-                        // Mark current milestone as skipped
-                        if (this._currentMilestone) {
-                                this._currentMilestone.status = 'skipped';
-                        }
-                        this._resumeResolver();
-                        this._resumeResolver = null;
-                        this._kovixExecutionState = { type: 'running', currentStepIndex: 0, currentMilestoneId: '' };
-                }
-        }
-
-        async *startExecution(
-                plan: import('../../../../../../platform/construct/common/agent/milestoneStateMachine.js').IApprovedPlan,
-                modeConfig: import('../../../../../../platform/construct/common/agent/executionMode.js').IExecutionModeConfig,
-                signal?: AbortSignal,
-        ): AsyncGenerator<AgentLoopEvent> {
-                this._currentApprovedPlan = plan;
-                this._currentModeConfig = modeConfig;
-                this._kovixExecutionState = { type: 'running', currentStepIndex: 0, currentMilestoneId: plan.milestones[0]?.id ?? '' };
-
-                try {
-                // Build task from approved plan steps
-                const stepDescriptions = plan.selectedSteps.map(s => `${s.action}: ${s.target} — ${s.description}`);
-                const task = `Execute the following approved plan steps:\n${stepDescriptions.join('\n')}`;
-
-                // Delegate to the existing run() method but intercept milestone events
-                const stream = this.run(task, signal);
-
-                let stepCount = 0;
-                for await (const event of stream) {
-                        // Track step completions for milestone detection
-                        if (event.type === 'tool_result') {
-                                stepCount++;
-                        }
-
-                        // Check if we've completed a milestone
-                        if (event.type === 'tool_result' || event.type === 'complete') {
-                                const completedMilestone = this._checkMilestoneCompletion(stepCount, plan, modeConfig);
-                                if (completedMilestone && event.type === 'tool_result') {
-                                        // Generate a summary of what was done
-                                        const summary = `Completed ${stepCount} steps including ${completedMilestone.label}`;
-                                        completedMilestone.status = 'completed';
-                                        completedMilestone.completedAt = Date.now();
-                                        completedMilestone.summary = summary;
-
-                                        // Yield milestone event
-                                        yield { type: 'milestone_reached', milestone: completedMilestone, summary };
-                                        this._onMilestoneReached.fire(completedMilestone);
-
-                                        // Check if we should pause
-                                        const shouldPause = this._shouldPauseAtMilestone(completedMilestone, modeConfig);
-                                        if (shouldPause) {
-                                                this._kovixExecutionState = { type: 'paused_at_milestone', milestoneId: completedMilestone.id, milestone: completedMilestone, summary };
-
-                                                // Wait for resume
-                                                await new Promise<void>((resolve) => {
-                                                        this._resumeResolver = resolve;
-                                                });
-
-                                                if (signal?.aborted) { break; }
-                                                yield { type: 'milestone_resumed', milestoneId: completedMilestone.id };
-                                        }
-                                }
-                        }
-
-                        yield event;
-                }
-
-                if (!signal?.aborted) {
-                        const completedMilestones = plan.milestones.filter(m => m.status === 'completed').length;
-                        this._kovixExecutionState = { type: 'completed', totalSteps: plan.selectedSteps.length, milestonesCompleted: completedMilestones };
-                } else {
-                        this._kovixExecutionState = { type: 'aborted', reason: 'User cancelled' };
-                }
-                } catch (err) {
-                        const msg = err instanceof Error ? err.message : String(err);
-                        this._kovixExecutionState = { type: 'error', message: msg, stepIndex: 0 };
-                        this._onError.fire({ text: msg, recoverable: false });
-                        yield { type: 'error', text: msg, recoverable: false };
-                } finally {
-                        if (this._kovixExecutionState.type === 'running') {
-                                this._kovixExecutionState = { type: 'idle' };
-                        }
-                        this._isRunning = false;
-                }
-        }
-
-        private _checkMilestoneCompletion(stepCount: number, plan: import('../../../../../../platform/construct/common/agent/milestoneStateMachine.js').IApprovedPlan, _modeConfig: import('../../../../../../platform/construct/common/agent/executionMode.js').IExecutionModeConfig): import('../../../../../../platform/construct/common/agent/milestoneStateMachine.js').IMilestone | null {
-                for (const milestone of plan.milestones) {
-                        if (milestone.status !== 'pending') { continue; }
-                        const maxStepIndex = Math.max(...milestone.stepIndices, -1);
-                        // If we've completed enough steps to have passed this milestone's steps
-                        if (stepCount >= maxStepIndex + 1) {
-                                return milestone;
-                        }
-                }
-                return null;
-        }
-
-        private _shouldPauseAtMilestone(milestone: import('../../../../../../platform/construct/common/agent/milestoneStateMachine.js').IMilestone, config: import('../../../../../../platform/construct/common/agent/executionMode.js').IExecutionModeConfig): boolean {
-                switch (config.mode) {
-                        case ExecutionMode.EVERY_MILESTONE:
-                                return true;
-                        case ExecutionMode.MAJOR_MILESTONE:
-                                return milestone.isMajor;
-                        case ExecutionMode.SELECTIVE:
-                                return (config.selectedMilestoneIds ?? []).includes(milestone.id);
-                        case ExecutionMode.FULL_AUTO:
-                                return false;
-                        default:
-                                return false;
-                }
-        }
-
-        async runPlanningPhaseWithIdea(task: string, refinedIdea: import('../../../../../../platform/construct/common/agent/ideaRefinementTypes.js').IRefinedIdea | undefined, signal?: AbortSignal): Promise<IPlanResult> {
-                if (!refinedIdea) {
-                        return this.runPlanningPhase(task, signal);
-                }
-
-                // Enhance the task with the refined idea context
-                const enhancedTask = `${task}\n\nRefined Project Idea:\nDescription: ${refinedIdea.refinedDescription}\nScope: ${refinedIdea.scope}\nOut of scope: ${refinedIdea.outOfScope.join(', ')}\nConstraints: ${refinedIdea.constraints.join(', ')}\nSuccess criteria: ${refinedIdea.successCriteria.join(', ')}\nAssumptions: ${refinedIdea.assumptions.join(', ')}`;
-                return this.runPlanningPhase(enhancedTask, signal);
-        }
-
         override dispose(): void {
                 super.dispose();
-                this._onMilestoneReached.dispose();
         }
 }

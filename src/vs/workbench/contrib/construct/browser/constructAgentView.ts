@@ -669,7 +669,8 @@ export class ConstructAgentViewPane extends ViewPane {
                 // BUG 2 FIX: Create a real AbortController and bridge cancellation
                 this._abortController = new AbortController();
                 const abortController = this._abortController;
-                this.currentCancellationToken.token.onCancellationRequested(() => abortController.abort());
+                // BUG#6 FIX: Store the disposable to prevent listener leak
+			this._register(this.currentCancellationToken.token.onCancellationRequested(() => abortController.abort()));
                 this.taskStartTime = Date.now();
                 this.planningStartTime = Date.now();
                 this.planningEndTime = 0;
@@ -950,7 +951,8 @@ export class ConstructAgentViewPane extends ViewPane {
                 // BUG 2 FIX: Create a real AbortController and bridge cancellation
                 this._abortController = new AbortController();
                 const abortController = this._abortController;
-                this.currentCancellationToken.token.onCancellationRequested(() => abortController.abort());
+                // BUG#6 FIX: Store the disposable to prevent listener leak
+			this._register(this.currentCancellationToken.token.onCancellationRequested(() => abortController.abort()));
 
                 // Clear and re-initialize progress panel for execution phase
                 if (this.progressPanel) {
