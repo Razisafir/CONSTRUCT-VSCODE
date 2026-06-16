@@ -83,6 +83,7 @@ import { IConstructSessionService } from '../../../../platform/construct/common/
 import { ConstructSessionServiceImpl } from './services/session/constructSessionServiceImpl.js';
 import { showProjectWizard } from './constructProjectWizard.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+import { IStorageService } from '../../../../platform/storage/common/storage.js';
 import { ConstructOnboardingWizard } from './constructOnboarding.js';
 import './constructMemoryConfig';
 import './constructApiConfig';
@@ -791,6 +792,44 @@ registerAction2(class OpenOnboardingWizardAction extends Action2 {
                 wizard.show();
         }
 });
+
+/**
+ * Auto-opens the onboarding wizard on first launch (when the
+ * `construct.onboarding.complete` profile-storage flag is not yet set).
+ *
+ * Fixes audit finding F-011: the wizard existed but was never auto-triggered,
+ * so new users landed on an empty chat panel with no AI provider configured.
+ *
+ * The wizard's `finish` handler sets the flag via `IStorageService.store(...)`,
+ * so this contribution only fires the wizard once per profile. If the user
+ * closes the wizard without finishing, it will re-open on the next launch —
+ * intentional nagging until onboarding is completed.
+ */
+class ConstructOnboardingAutoOpenContribution extends Disposable implements IWorkbenchContribution {
+        static readonly ID = 'workbench.contrib.constructOnboardingAutoOpen';
+
+        constructor(
+                @IInstantiationService private readonly instantiationService: IInstantiationService,
+                @IStorageService private readonly storageService: IStorageService,
+                @ILogService private readonly logService: ILogService,
+        ) {
+                super();
+
+                try {
+                        if (ConstructOnboardingWizard.isComplete(this.storageService)) {
+                                return;
+                        }
+                        this.logService.info('[ConstructOnboarding] First launch detected — auto-opening setup wizard.');
+                        const wizard = this.instantiationService.createInstance(ConstructOnboardingWizard);
+                        wizard.show();
+                } catch (error) {
+                        // Never block workbench startup on onboarding
+                        this.logService.error('[ConstructOnboarding] Auto-open failed:', error);
+                }
+        }
+}
+
+Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(ConstructOnboardingAutoOpenContribution, LifecyclePhase.Restored);
 
 // --- Phase 8: Semantic Memory -- Index Workspace Command ---
 
