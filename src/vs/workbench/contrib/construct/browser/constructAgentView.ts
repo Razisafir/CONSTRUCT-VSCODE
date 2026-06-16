@@ -198,6 +198,23 @@ export class ConstructAgentViewPane extends ViewPane {
                 sessionHistoryBtn.onclick = () => { this.showSessionHistory(); };
                 modelPickerBar.appendChild(sessionHistoryBtn);
 
+                // F-005 / Section 6.6: Document-to-skill converter button.
+                // Triggers the construct.skill.createFromCurrentEditor command
+                // which converts the currently active editor's document into a
+                // structured skill manifest via the LLM.
+                const skillBtn = dom.$('button.construct-skill-btn') as HTMLButtonElement;
+                skillBtn.textContent = '\u2728'; // ✨
+                skillBtn.style.cssText = `
+                        background: transparent; border: none; color: #4A5568;
+                        cursor: pointer; font-size: 13px; padding: 2px 4px;
+                        border-radius: 3px;
+                `;
+                skillBtn.title = 'Create Skill from Current Document';
+                skillBtn.onclick = () => {
+                        this.commandService.executeCommand('construct.skill.createFromCurrentEditor');
+                };
+                modelPickerBar.appendChild(skillBtn);
+
                 modelPickerBar.appendChild(settingsBtn);
                 modelPickerBar.appendChild(providerLabel);
                 container.appendChild(modelPickerBar);

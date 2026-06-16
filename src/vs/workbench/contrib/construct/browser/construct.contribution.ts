@@ -61,6 +61,13 @@ import { MCPProcessService } from './services/mcp/mcpProcess.js';
 import { TerminalExecutorService } from './services/terminal/terminalExecutor.js';
 import { DiffApplierService } from './services/editor/diffApplier.js';
 import { AgentLoopService } from './services/agent/agentLoop.js';
+// F-005 / Section 6.6: Document-to-skill converter — LLM-backed extractor
+// that turns a Markdown runbook/checklist into a structured skill manifest.
+import { IDocumentToSkillConverter } from '../../../../platform/construct/common/skill/documentToSkillConverter.js';
+import { DocumentToSkillConverterService } from './services/skills/documentToSkillConverterService.js';
+// F-005: Services used by the createFromCurrentEditor command.
+import { IEditorService } from '../../../../workbench/services/editor/common/editorService.js';
+import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { ISecureKeyManager } from '../../../../platform/construct/common/security/secureKeyManager.js';
 import { SecureKeyManagerService } from './services/security/secureKeyManager.js';
 import { IAgentErrorRecovery } from '../../../../platform/construct/common/recovery/agentErrorRecovery.js';
@@ -511,6 +518,11 @@ registerSingleton(IConstructAIService, ConstructAIService, InstantiationType.Del
 // Built-in tools (read_file, write_file, run_terminal, search_codebase, web_search)
 // + Kali WSL2 integration + command safety blocklist
 registerSingleton(IConstructToolRegistry, ConstructToolRegistryService, InstantiationType.Delayed);
+
+// F-005 / Section 6.6: Document-to-skill converter singleton.
+// Depends on IConstructAIService (for LLM calls) and IConstructToolRegistry
+// (to know which tool names are valid for the manifest's allowedTools field).
+registerSingleton(IDocumentToSkillConverter, DocumentToSkillConverterService, InstantiationType.Delayed);
 
 // Command: Switch AI Provider
 registerAction2(class SwitchAIProviderAction extends Action2 {
@@ -963,6 +975,89 @@ registerAction2(class ProviderStatusAction extends Action2 {
                 } catch (error) {
                         logService.error('[Construct] Failed to get provider status:', error);
                         notificationService.error('Failed to get provider status: ' + (error instanceof Error ? error.message : String(error)));
+                }
+        }
+});
+
+// F-005 / Section 6.6: Document-to-skill converter command.
+// Converts the currently active editor's document into a skill manifest
+// via the LLM, then opens the result in a new editor for review/save.
+registerAction2(class CreateSkillFromCurrentEditorAction extends Action2 {
+        constructor() {
+                super({
+                        id: 'construct.skill.createFromCurrentEditor',
+                        title: localize2('createSkillFromCurrentEditor', "Create Skill from Current Document"),
+                        f1: true,
+                        category: localize2('constructCategorySkill', "Construct"),
+                });
+        }
+        async run(accessor: ServicesAccessor): Promise<void> {
+                const editorService = accessor.get(IEditorService);
+                const converter = accessor.get(IDocumentToSkillConverter);
+                const workspaceContext = accessor.get(IWorkspaceContextService);
+                const notificationService = accessor.get(INotificationService);
+                const logService = accessor.get(ILogService);
+
+                // Get the active editor's text content.
+                const control = editorService.activeTextEditorControl as
+                        | { getValue?: () => string; getModel?: () => unknown }
+                        | undefined;
+                if (!control || typeof control.getValue !== 'function') {
+                        notificationService.error('No active text editor. Open a Markdown document first.');
+                        return;
+                }
+                const content = control.getValue();
+                if (!content || content.trim().length < 50) {
+                        notificationService.error('Document is empty or too short (<50 chars) to extract a skill.');
+                        return;
+                }
+
+                // Get the file path from the active editor input.
+                const activeEditor = editorService.activeEditor;
+                const resource = activeEditor?.resource;
+                const sourcePath = resource?.fsPath ?? 'untitled.md';
+
+                // Get workspace root for later save.
+                const workspaceRoot = workspaceContext.getWorkspace().folders[0]?.uri.fsPath;
+                if (!workspaceRoot) {
+                        notificationService.error('No workspace folder open. Open a workspace to use the skill converter.');
+                        return;
+                }
+
+                const progress = notificationService.notify({
+                        severity: 1, // Info
+                        message: 'Converting document to skill... (this may take 10-30 seconds)',
+                });
+                progress.progress.infinite();
+
+                try {
+                        const result = await converter.convert({
+                                content,
+                                sourcePath,
+                        });
+
+                        // Display warnings if any.
+                        if (result.warnings.length > 0) {
+                                notificationService.warn('Skill converted with warnings: ' + result.warnings.join('; '));
+                        }
+
+                        // Save the skill to <workspace>/.kovix/skills/<name>.json.
+                        const savedPath = await converter.saveSkill(result.manifest, workspaceRoot);
+
+                        progress.progress.done();
+                        notificationService.info(`Skill "${result.manifest.name}" saved to ${savedPath}`);
+
+                        // Open the saved file in a new editor for review.
+                        const uriModule = await import('../../../../base/common/uri.js');
+                        const fileUri = uriModule.URI.file(savedPath);
+                        await editorService.openEditor({ resource: fileUri });
+
+                        logService.info(`[DocToSkill] Skill "${result.manifest.name}" created from ${sourcePath}`);
+                } catch (error) {
+                        progress.progress.done();
+                        const msg = error instanceof Error ? error.message : String(error);
+                        logService.error('[DocToSkill] Conversion failed:', msg);
+                        notificationService.error('Skill conversion failed: ' + msg);
                 }
         }
 });
