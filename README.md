@@ -100,35 +100,51 @@ For detailed build instructions, see [BUILD.md](./BUILD.md).
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|---|---|
-| `Ctrl+Shift+K` | Open Kovix Agent panel |
-| `Ctrl+Shift+I` | Show inline agent |
-| `Ctrl+Enter` | Send message |
-| `Ctrl+Shift+Enter` | Accept all pending diffs |
-| `Ctrl+Shift+Escape` | Reject all pending diffs |
+> macOS users: replace `Ctrl` with `Cmd` for any shortcut marked "all platforms".
+
+| Shortcut (Win/Linux) | macOS | Action | Source |
+|---|---|---|---|
+| `Ctrl+Shift+L` | `Cmd+Shift+L` | Open the Kovix Agent panel | `construct.focusPanel` |
+| `Ctrl+Shift+I` | `Cmd+Shift+I` | Show inline agent | `construct.showInlineAgent` |
+| `Enter` | `Enter` | Send message (in chat input) | inline DOM handler in `constructAgentView.ts` |
+| `Shift+Enter` | `Shift+Enter` | Insert a newline (in chat input) | inline DOM handler |
+| `Ctrl+Shift+Enter` | `Cmd+Shift+Enter` | Accept all pending diffs | `construct.acceptAllDiffs` |
+| `Ctrl+Shift+Escape` | `Cmd+Shift+Escape` | Reject all pending diffs | `construct.rejectAllDiffs` |
+| `Ctrl+Shift+P` | `Cmd+Shift+P` | Open the Command Palette (VS Code built-in) | VS Code |
 
 ## Commands
 
 All Kovix commands are available from the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 
-| Command | Description |
-|---|---|
-| `construct.focusPanel` | Open the Kovix Agent panel (`Ctrl+Shift+K`) |
-| `construct.newChat` | Start a new chat session |
-| `construct.setApiKey` | Set Anthropic API key (stored in OS keychain) |
-| `construct.clearApiKey` | Remove stored API key |
-| `construct.switchProvider` | Switch between Ollama / Xenova / Cloud providers |
-| `construct.selectModel` | Select the active AI model |
-| `construct.indexWorkspace` | Index workspace for semantic search |
-| `construct.openMemoryPanel` | Open the Memory panel |
-| `construct.searchMemories` | Search stored memories |
-| `construct.addMemory` | Add a manual memory entry |
-| `construct.testCloudConnection` | Test cloud AI connection |
-| `construct.testMemoryConnection` | Test memory service connection |
-| `construct.openApiSettings` | Open Kovix API settings |
-| `construct.undoTask` | Undo last agent task |
-| `construct.showInlineAgent` | Show inline agent (`Ctrl+Shift+I`) |
+| Command | Description | Shortcut |
+|---|---|---|
+| `construct.focusPanel` | Open the Kovix Agent panel | `Ctrl+Shift+L` |
+| `construct.newChat` | Start a new chat session | — |
+| `construct.showInlineAgent` | Show inline agent | `Ctrl+Shift+I` |
+| `construct.acceptAllDiffs` | Accept all pending diffs from the last agent run | `Ctrl+Shift+Enter` |
+| `construct.rejectAllDiffs` | Reject all pending diffs from the last agent run | `Ctrl+Shift+Escape` |
+| `construct.undoTask` | Undo last agent task | — |
+| `construct.setApiKey` | Set Anthropic API key (stored in OS keychain) | — |
+| `construct.clearApiKey` | Remove stored API key | — |
+| `construct.switchProvider` | Switch between Ollama / Xenova / Cloud providers | — |
+| `construct.selectModel` | Select the active AI model | — |
+| `construct.providerStatus` | Show current AI provider status and connection state | — |
+| `construct.testCloudConnection` | Test cloud AI connection | — |
+| `construct.testMemoryConnection` | Test memory service connection | — |
+| `construct.openApiSettings` | Open Kovix API settings | — |
+| `construct.indexWorkspace` | Index workspace for semantic search | — |
+| `construct.openMemoryPanel` | Open the Memory panel | — |
+| `construct.searchMemories` | Search stored memories | — |
+| `construct.addMemory` | Add a manual memory entry | — |
+| `construct.openOnboarding` | Open the onboarding wizard (re-run anytime) | — |
+| `construct.newProject` | Create a new Kovix project | — |
+| `construct.openProjectWizard` | Open the project wizard | — |
+| `construct.loadProject` | Load an existing Kovix project | — |
+| `construct.mcp.startServer` | Start an MCP server | — |
+| `construct.mcp.stopServer` | Stop a running MCP server | — |
+| `construct.skill.createFromCurrentEditor` | Convert the active editor's content into a Kovix skill manifest (see [Skills](#skills)) | — |
+
+> **Note:** `construct.skill.createFromCurrentEditor` is delivered in PR #70 (doc-to-skill converter). It is available once that PR is merged.
 
 ## Configuration
 
