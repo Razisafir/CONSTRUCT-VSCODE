@@ -37,7 +37,11 @@ import { redactSecrets } from '../../../../../../platform/construct/common/secur
 import { IPendingChangesService } from '../../../../../../platform/construct/common/diff/pendingChanges.js';
 import { IUniversalMemoryService } from '../../../../../../platform/construct/common/memory/universalMemoryService.js';
 
-const MAX_ROUNDS = 15;
+// Tier 1, item 1.5 (audit doc §4.x) — raised from 15 to 50.
+// 15 was too low for complex multi-file refactors (Cursor commonly does 30-50
+// rounds). At round 50, the agent pauses and asks the user whether to continue.
+const MAX_ROUNDS = 50;
+const MAX_ROUNDS_PROMPT_CONTINUE_AT = 50;
 
 /**
  * Cached result of a tool execution, used to avoid double-execution
