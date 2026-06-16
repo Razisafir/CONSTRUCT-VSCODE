@@ -154,6 +154,28 @@ Kovix stores workspace settings in `.kovix/settings.json`:
 | `embeddingModel` | Embedding model for semantic search (default: `nomic-embed-text`) |
 | `enableSecurityTools` | Enable security tools (nmap, Ghidra, Nuclei) in agent |
 
+### Web Search Settings (VS Code settings.json)
+
+The agent's `web_search` tool uses a real search backend (no LLM hallucination). Configure it via standard VS Code settings:
+
+```json
+{
+  "construct.webSearch.provider": "tavily",
+  "construct.webSearch.apiKey": "tvly-xxxxxxxxxxxxxxxxxxxxxx",
+  "construct.webSearch.maxResults": 5,
+  "construct.webSearch.cacheTtlMs": 600000
+}
+```
+
+| Setting | Description |
+|---|---|
+| `construct.webSearch.provider` | Search backend: `disabled` (default — tool returns a clear error) or `tavily` |
+| `construct.webSearch.apiKey` | API key for the configured provider. Get a Tavily key at <https://tavily.com> |
+| `construct.webSearch.maxResults` | Max results per query (1-20, default 5) |
+| `construct.webSearch.cacheTtlMs` | Cache duration in ms (default 600000 = 10 min; set 0 to disable) |
+
+> The agent will NEVER fabricate search results. If no provider is configured, the tool returns a clear error message that surfaces in the chat — no silent hallucination.
+
 ## Security Tooling
 
 Kovix integrates professional security tools directly into the agent loop. Every security tool has a **safety gate** -- the agent must receive explicit user confirmation before execution.

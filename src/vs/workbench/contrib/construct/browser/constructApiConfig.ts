@@ -163,3 +163,48 @@ const mcpConfiguration: IConfigurationNode = {
 };
 
 Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).registerConfiguration(mcpConfiguration);
+
+// --- Phase 21: Web Search Configuration (F-009 fix) ---
+
+const webSearchConfiguration: IConfigurationNode = {
+        id: 'construct.webSearch',
+        order: 105,
+        title: localize('construct.webSearch', "Construct -- Web Search"),
+        type: 'object',
+        properties: {
+                'construct.webSearch.provider': {
+                        type: 'string',
+                        enum: ['disabled', 'tavily'],
+                        default: 'disabled',
+                        enumDescriptions: [
+                                localize('construct.webSearch.provider.disabled', "Web search is disabled. The web_search tool will return a clear error message when invoked."),
+                                localize('construct.webSearch.provider.tavily', "Use the Tavily Search API (https://tavily.com) — purpose-built for AI agents, returns clean markdown snippets."),
+                        ],
+                        description: localize('construct.webSearch.provider', "Web search backend used by the agent's web_search tool. The tool is only functional when a provider is configured AND the corresponding API key is set."),
+                        scope: 1 /* ConfigurationScope.APPLICATION */
+                },
+                'construct.webSearch.apiKey': {
+                        type: 'string',
+                        default: '',
+                        description: localize('construct.webSearch.apiKey', "API key for the configured web search provider. Required for the web_search tool to function. For Tavily, get a key at https://tavily.com."),
+                        scope: 1 /* ConfigurationScope.APPLICATION */
+                },
+                'construct.webSearch.maxResults': {
+                        type: 'number',
+                        default: 5,
+                        minimum: 1,
+                        maximum: 20,
+                        description: localize('construct.webSearch.maxResults', "Maximum number of search results to return per query. Higher values increase context length and API cost."),
+                        scope: 4 /* ConfigurationScope.WINDOW */
+                },
+                'construct.webSearch.cacheTtlMs': {
+                        type: 'number',
+                        default: 600000,
+                        minimum: 0,
+                        description: localize('construct.webSearch.cacheTtlMs', "Cache duration in milliseconds for repeated queries. Set to 0 to disable caching. Default: 10 minutes."),
+                        scope: 4 /* ConfigurationScope.WINDOW */
+                }
+        }
+};
+
+Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).registerConfiguration(webSearchConfiguration);

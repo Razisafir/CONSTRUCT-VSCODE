@@ -70,6 +70,10 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
         private _kaliAvailable: boolean = false;
         private _onlineMode: boolean = false;
 
+        // F-009 fix: web search result cache. Key: `${provider}:${query}`. Value: { result, expiresAt }.
+        // Bounded by cacheTtlMs (default 10 min). Cleared when provider changes.
+        private readonly _webSearchCache: Map<string, { result: string; expiresAt: number }> = new Map();
+
         constructor(
                 @ILogService private readonly logService: ILogService,
                 @INotificationService _notificationService: INotificationService,
@@ -607,54 +611,151 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         };
                 }
 
-                try {
-                        // Use OpenAI-compatible web search (graceful fallback if SDK not available)
-                        // The z-ai-web-dev-sdk is available in the desktop app but may not
-                        // be in the compilation environment. Web search will work at runtime.
-                        const searchUrl = this._configurationService.getValue<string>('construct.cloud.baseUrl') || 'https://api.openai.com/v1';
-                        const apiKey = this._configurationService.getValue<string>('construct.cloud.apiKey');
+                // F-009 fix: read web search provider + API key from settings.
+                // The previous implementation asked the LLM to SIMULATE search results via the
+                // chat-completions endpoint — that produced plausible-sounding but hallucinated
+                // content. The fix uses a real search backend (Tavily) and returns a clear
+                // error if no backend is configured.
+                const provider = this._configurationService.getValue<'disabled' | 'tavily'>('construct.webSearch.provider') ?? 'disabled';
+                const apiKey = this._configurationService.getValue<string>('construct.webSearch.apiKey') ?? '';
+                const maxResults = this._configurationService.getValue<number>('construct.webSearch.maxResults') ?? 5;
+                const cacheTtlMs = this._configurationService.getValue<number>('construct.webSearch.cacheTtlMs') ?? 600000;
 
-                        if (!apiKey) {
-                                return {
-                                success: false,
-                                output: 'Web search requires a cloud API key. Configure it in Construct: Cloud settings.',
-                                truncated: false,
-                                };
-                        }
-
-                        // Use a simple fetch to a search API
-                        const response = await fetch(searchUrl + '/chat/completions', {
-                                method: 'POST',
-                                headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + apiKey,
-                                },
-                                body: JSON.stringify({
-                                model: 'gpt-4o-mini',
-                                messages: [{ role: 'user', content: `Search the web for: ${query}. Return the most relevant results with URLs and descriptions.` }],
-                                max_tokens: 2000,
-                                }),
-                        });
-
-                        if (!response.ok) {
-                                return { success: false, output: `Web search API error: ${response.status}`, truncated: false };
-                        }
-
-                        const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-                        const output = data.choices?.[0]?.message?.content ?? 'No results found.';
-
-                        return {
-                                success: true,
-                                output: output || 'No results found.',
-                                truncated: false,
-                        };
-                } catch (error) {
+                if (provider === 'disabled' || !apiKey) {
                         return {
                                 success: false,
-                                output: `Web search failed: ${error instanceof Error ? error.message : String(error)}`,
+                                output: 'Web search is not configured. Set "construct.webSearch.provider" to "tavily" and provide an API key in "construct.webSearch.apiKey". Get a Tavily key at https://tavily.com. The agent will not simulate search results — this is intentional to prevent hallucinated content.',
                                 truncated: false,
                         };
                 }
+
+                // Cache check (skipped when cacheTtlMs === 0)
+                const cacheKey = `${provider}:${query}`;
+                if (cacheTtlMs > 0) {
+                        const cached = this._webSearchCache.get(cacheKey);
+                        const now = Date.now();
+                        if (cached && cached.expiresAt > now) {
+                                this.logService.trace(`[ConstructWebSearch] Cache hit for query: ${query}`);
+                                return { success: true, output: cached.result, truncated: false };
+                        } else if (cached) {
+                                this._webSearchCache.delete(cacheKey);
+                        }
+                }
+
+                try {
+                        let rawOutput: string;
+
+                        if (provider === 'tavily') {
+                                rawOutput = await this.executeTavilySearch(query, apiKey, maxResults);
+                        } else {
+                                // Future providers (Brave, Serper, etc.) plug in here.
+                                return {
+                                        success: false,
+                                        output: `Web search provider "${provider}" is not implemented. Supported providers: tavily.`,
+                                        truncated: false,
+                                };
+                        }
+
+                        // Cache the successful result
+                        if (cacheTtlMs > 0) {
+                                this._webSearchCache.set(cacheKey, {
+                                        result: rawOutput,
+                                        expiresAt: Date.now() + cacheTtlMs,
+                                });
+                                // Bound cache size — evict oldest entries if > 100
+                                if (this._webSearchCache.size > 100) {
+                                        const oldestKey = this._webSearchCache.keys().next().value;
+                                        if (oldestKey) { this._webSearchCache.delete(oldestKey); }
+                                }
+                        }
+
+                        return {
+                                success: true,
+                                output: rawOutput,
+                                truncated: false,
+                        };
+                } catch (error) {
+                        const msg = error instanceof Error ? error.message : String(error);
+                        this.logService.warn(`[ConstructWebSearch] Search failed for query "${query}": ${msg}`);
+                        return {
+                                success: false,
+                                output: `Web search failed: ${msg}`,
+                                truncated: false,
+                        };
+                }
+        }
+
+        /**
+         * Calls the Tavily Search API.
+         * Docs: https://docs.tavily.com/docs/rest-api/api-reference
+         * Returns a markdown-formatted string suitable for LLM consumption.
+         */
+        private async executeTavilySearch(query: string, apiKey: string, maxResults: number): Promise<string> {
+                const response = await fetch('https://api.tavily.com/search', {
+                        method: 'POST',
+                        headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + apiKey,
+                        },
+                        body: JSON.stringify({
+                                query,
+                                max_results: maxResults,
+                                // Tavily-specific options tuned for AI agent consumption:
+                                // - "basic" depth is fast & cheap; "advanced" is slower & 2x credit cost.
+                                //   Default to basic; users wanting deeper research can switch in a future setting.
+                                search_depth: 'basic',
+                                // Ask Tavily to include a short answer snippet — useful for the LLM.
+                                include_answer: true,
+                                // Exclude raw HTML content (we want clean text only, to bound context length).
+                                include_raw_content: false,
+                        }),
+                });
+
+                if (!response.ok) {
+                        let errBody = '';
+                        try { errBody = await response.text(); } catch { /* ignore */ }
+                        if (response.status === 401) {
+                                throw new Error('Tavily API rejected the key (401). Check "construct.webSearch.apiKey".');
+                        }
+                        if (response.status === 429) {
+                                throw new Error('Tavily rate limit exceeded (429). Wait a minute and try again, or upgrade your Tavily plan.');
+                        }
+                        throw new Error(`Tavily API error ${response.status}: ${errBody.slice(0, 200)}`);
+                }
+
+                const data = await response.json() as {
+                        answer?: string;
+                        results?: Array<{
+                                title: string;
+                                url: string;
+                                content?: string;
+                                score?: number;
+                                published_date?: string;
+                        }>;
+                };
+
+                const results = data.results ?? [];
+                if (results.length === 0 && !data.answer) {
+                        return `No web search results found for query: "${query}"`;
+                }
+
+                // Format as markdown for clean LLM consumption
+                const lines: string[] = [];
+                if (data.answer) {
+                        lines.push(`**Quick answer:** ${data.answer}`, '');
+                }
+                lines.push(`**Web search results for "${query}"** (${results.length} results):`, '');
+                for (let i = 0; i < results.length; i++) {
+                        const r = results[i];
+                        const published = r.published_date ? ` _(${r.published_date.slice(0, 10)})_` : '';
+                        lines.push(`${i + 1}. **[${r.title}](${r.url})**${published}`);
+                        if (r.content) {
+                                lines.push(`   ${r.content.trim()}`);
+                        }
+                        lines.push('');
+                }
+
+                return lines.join('\n');
         }
 
         private async executeListDirectory(input: Record<string, unknown>): Promise<IToolResult> {
