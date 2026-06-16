@@ -71,6 +71,8 @@ export interface IToolResult {
                 tool?: string;
                 /** Whether the tool was configured/available at execution time */
                 configured?: boolean;
+                /** Execution mode (e.g. 'sync', 'async', 'mcp') — informational */
+                mode?: string;
         };
 }
 

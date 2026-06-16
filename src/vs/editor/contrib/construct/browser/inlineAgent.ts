@@ -473,8 +473,8 @@ export class KovixInlineEditController extends Disposable implements IEditorCont
                 const decorationIds = this._editor.deltaDecorations([], [
                         {
                                 range,
-                                description: 'kovix-inline-edit-preview',
                                 options: {
+                                        description: 'kovix-inline-edit-preview',
                                         after: {
                                                 content: newText,
                                                 inlineClassName: 'kovix-inline-edit-ghost-text',
@@ -561,30 +561,43 @@ registerEditorAction(KovixInlineEditAction);
 // Register commands for Tab-accept and Esc-cancel
 // (these are also handled inside the widget input, but having editor commands
 // allows keybinding customization and works even when the input isn't focused)
-registerEditorCommand(new EditorCommand({
-        id: 'kovix.inlineEdit.accept',
-        precondition: undefined,
-        handler: (_accessor: ServicesAccessor, editor: ICodeEditor) => {
+class KovixInlineEditAcceptCommand extends EditorCommand {
+        constructor() {
+                super({
+                        id: 'kovix.inlineEdit.accept',
+                        precondition: undefined,
+                        kbOpts: {
+                                kbExpr: undefined,
+                                primary: KeyCode.Tab,
+                                weight: KeybindingWeight.EditorContrib,
+                        },
+                });
+        }
+
+        public override runEditorCommand(_accessor: ServicesAccessor, editor: ICodeEditor, _args: any): void {
                 const controller = editor.getContribution<KovixInlineEditController>(KovixInlineEditController.ID);
                 controller?.accept();
-        },
-        kbOpts: {
-                kbExpr: undefined,
-                primary: KeyCode.Tab,
-                weight: KeybindingWeight.EditorContrib,
-        },
-}));
+        }
+}
 
-registerEditorCommand(new EditorCommand({
-        id: 'kovix.inlineEdit.cancel',
-        precondition: undefined,
-        handler: (_accessor: ServicesAccessor, editor: ICodeEditor) => {
+class KovixInlineEditCancelCommand extends EditorCommand {
+        constructor() {
+                super({
+                        id: 'kovix.inlineEdit.cancel',
+                        precondition: undefined,
+                        kbOpts: {
+                                kbExpr: undefined,
+                                primary: KeyCode.Escape,
+                                weight: KeybindingWeight.EditorContrib,
+                        },
+                });
+        }
+
+        public override runEditorCommand(_accessor: ServicesAccessor, editor: ICodeEditor, _args: any): void {
                 const controller = editor.getContribution<KovixInlineEditController>(KovixInlineEditController.ID);
                 controller?.hide();
-        },
-        kbOpts: {
-                kbExpr: undefined,
-                primary: KeyCode.Escape,
-                weight: KeybindingWeight.EditorContrib,
-        },
-}));
+        }
+}
+
+registerEditorCommand(new KovixInlineEditAcceptCommand());
+registerEditorCommand(new KovixInlineEditCancelCommand());

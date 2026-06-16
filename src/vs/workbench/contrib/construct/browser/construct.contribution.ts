@@ -1511,7 +1511,7 @@ class ConstructInlineCompletionContribution extends Disposable implements IWorkb
                 super();
                 // Register the provider for all document types. The provider itself
                 // respects the construct.autocomplete.enabled setting.
-                this._register(languageFeaturesService.inlineCompletionProvider.register(
+                this._register(languageFeaturesService.inlineCompletionsProvider.register(
                         { pattern: '**' },
                         instantiationService.createInstance(KovixInlineCompletionProvider)
                 ));
