@@ -87,6 +87,7 @@ import { ConstructOnboardingWizard } from './constructOnboarding.js';
 import './constructMemoryConfig';
 import './constructApiConfig';
 import './constructApiSettings';
+import './constructAutocompleteConfig';
 
 const constructViewIcon = registerIcon('construct-view-icon', Codicon.robot, localize('constructViewIcon', 'View icon of the Kovix Agent view.'));
 const constructMemoryIcon = registerIcon('construct-memory-icon', Codicon.symbolEvent, localize('constructMemoryIcon', 'View icon of the Kovix Memory view.'));
@@ -1493,3 +1494,30 @@ registerAction2(class UiuxStackGuidelinesAction extends Action2 {
                 }
         }
 });
+
+// --- Patch A: Register KovixInlineCompletionProvider (Tab autocomplete) ----
+// Tier 1, item 1.1 — wires IConstructAIService.complete() to VS Code's
+// InlineCompletionItemProvider API. See audit doc §4.1 and §7.1.
+import { KovixInlineCompletionProvider } from './services/editor/kovixInlineCompletionProvider.js';
+import { registerInlineCompletionsProvider } from '../../../../editor/contrib/inlineCompletions/browser/inlineCompletions.contribution.js';
+
+class ConstructInlineCompletionContribution extends Disposable implements IWorkbenchContribution {
+        static readonly ID = 'workbench.contrib.constructInlineCompletion';
+
+        constructor(
+                @IInstantiationService instantiationService: IInstantiationService,
+        ) {
+                super();
+                // Register the provider for all document types ('**').
+                // The provider itself respects the construct.autocomplete.enabled setting.
+                registerInlineCompletionsProvider(
+                        { pattern: '**' },
+                        instantiationService.createInstance(KovixInlineCompletionProvider)
+                );
+        }
+}
+
+Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
+        ConstructInlineCompletionContribution,
+        LifecyclePhase.Restored
+);
