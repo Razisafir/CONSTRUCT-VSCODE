@@ -37,6 +37,12 @@ import { LoadingState, FileChangeEntry, TaskMetrics } from '../../../../platform
 import { IRefinedIdea, IRefinementQuestion, IRefinementAnswer } from '../../../../platform/construct/common/agent/ideaRefinementTypes.js';
 import { IIdeaRefinementService } from '../../../../platform/construct/common/agent/ideaRefinementService.js';
 import { IConstructSessionService } from '../../../../platform/construct/common/session/constructSessionService.js';
+// F-004 FIX: SQLite-backed chat history persistence.
+// Before this import, ConstructChatHistoryService was registered in the main
+// process and exposed over IPC, but had ZERO callers in the renderer. The DB
+// file (.construct/chat-history.db) was never created. This wire-up makes the
+// service actually persist user messages and agent responses across restarts.
+import { IConstructChatHistory } from '../../../../platform/construct/common/memory/vectorStore.js';
 import { ISelectablePlanStep, IApprovedPlan, IMilestone } from '../../../../platform/construct/common/agent/milestoneStateMachine.js';
 import { showStopModePicker } from './constructStopModePicker.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
@@ -77,6 +83,10 @@ export class ConstructAgentViewPane extends ViewPane {
         private executionState: ExecutionState = 'idle';
         private currentCancellationToken: CancellationTokenSource | null = null;
         private _abortController: AbortController | null = null;
+
+        // F-004 FIX: Active chat-history session ID for SQLite persistence.
+        // null = no active session; ensureChatSession() will create one on demand.
+        private _chatSessionId: string | null = null;
 
         // Performance metrics tracking
         private taskStartTime = 0;
@@ -137,6 +147,8 @@ export class ConstructAgentViewPane extends ViewPane {
                 @IIdeaRefinementService private readonly ideaRefinementService: IIdeaRefinementService,
                 @IConstructSessionService private readonly sessionService: IConstructSessionService,
                 @IQuickInputService private readonly quickInputService: IQuickInputService,
+                // F-004 FIX: Inject the SQLite chat history service.
+                @IConstructChatHistory private readonly chatHistory: IConstructChatHistory,
         ) {
                 super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, telemetryService, hoverService);
         }
@@ -298,6 +310,10 @@ export class ConstructAgentViewPane extends ViewPane {
                         this.inputBox.value = '';
                         this.inputBox.style.height = '36px';
                         this.updateClearBtnVisibility();
+
+                        // F-004 FIX: Persist the user message to SQLite chat history.
+                        // Fire-and-forget; failures are logged inside the helper.
+                        this.persistUserMessage(text);
 
                         // Auto-learn from user message
                         if (this.constructMemory.config.enabled && this.constructMemory.config.autoLearn) {
@@ -891,6 +907,13 @@ export class ConstructAgentViewPane extends ViewPane {
 
                         this.setExecutionState(abortController.signal.aborted ? 'stopped' : 'complete');
 
+                        // F-004 FIX: Persist the agent's final accumulated response to SQLite.
+                        // fullText contains the complete assistant output (plan + execution log).
+                        // Skip persistence if aborted (the message would be incomplete/misleading).
+                        if (!abortController.signal.aborted && fullText) {
+                                this.persistAssistantMessage(fullText);
+                        }
+
                         // Transition back to idle after a brief delay so the user can
                         // see the final state indicator, then send another message.
                         setTimeout(() => { this.setExecutionState('idle'); }, 1500);
@@ -1032,6 +1055,12 @@ export class ConstructAgentViewPane extends ViewPane {
                 // Clear conversation history so the agent doesn't remember previous turns
                 this.agentLoop.clearConversationHistory();
 
+                // F-004 FIX: Start a fresh chat-history session on clear.
+                // The previous session remains in the SQLite DB for the session-history picker.
+                // Setting _chatSessionId = null forces the next sendMessage() to call
+                // ensureChatSession(), which creates a brand-new session row.
+                this._chatSessionId = null;
+
                 // Re-render welcome message
                 const welcome = dom.$('.construct-welcome');
                 welcome.style.cssText = `padding: 16px; text-align: center;`;
@@ -1084,6 +1113,62 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 this.setExecutionState('idle');
                 this.updateClearBtnVisibility();
+        }
+
+        /**
+         * F-004 FIX: Ensure the SQLite chat-history DB is initialized and a
+         * session exists for the current chat. Called lazily by
+         * persistUserMessage() and persistAssistantMessage() so we don't
+         * pay the init cost until the user actually sends a message.
+         *
+         * All failures are caught and logged — chat history persistence
+         * is non-critical and must never block the agent loop.
+         */
+        private async ensureChatSession(): Promise<string | null> {
+                if (this._chatSessionId) { return this._chatSessionId; }
+                try {
+                        const workspaceRoot = this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath;
+                        if (!workspaceRoot) { return null; }
+                        const ok = await this.chatHistory.initialize(workspaceRoot);
+                        if (!ok) {
+                                this.logService.warn('[AgentView] Chat history DB init failed (non-blocking)');
+                                return null;
+                        }
+                        // Title = first 60 chars of the next user message — caller will
+                        // overwrite via updateSessionFromFirstMessage if needed. For now
+                        // use a default; the session row's title can be refined later.
+                        const session = await this.chatHistory.createSession(`Chat ${new Date().toLocaleString()}`);
+                        this._chatSessionId = session.id;
+                        this.logService.info(`[AgentView] Chat history session created: ${session.id}`);
+                        return session.id;
+                } catch (err) {
+                        this.logService.warn('[AgentView] ensureChatSession failed (non-blocking):', err instanceof Error ? err.message : String(err));
+                        return null;
+                }
+        }
+
+        /**
+         * F-004 FIX: Persist a user message to the SQLite chat-history DB.
+         * Fire-and-forget — must never block the agent loop. Errors are logged.
+         */
+        private persistUserMessage(text: string): void {
+                this.ensureChatSession().then(sessionId => {
+                        if (!sessionId) { return; }
+                        return this.chatHistory.addMessage(sessionId, 'user', text);
+                }).catch(err => {
+                        this.logService.warn('[AgentView] persistUserMessage failed (non-blocking):', err instanceof Error ? err.message : String(err));
+                });
+        }
+
+        /**
+         * F-004 FIX: Persist the agent's final response to the SQLite chat-history DB.
+         * Fire-and-forget — must never block the agent loop. Errors are logged.
+         */
+        private persistAssistantMessage(text: string): void {
+                if (!this._chatSessionId) { return; }
+                this.chatHistory.addMessage(this._chatSessionId, 'assistant', text).catch(err => {
+                        this.logService.warn('[AgentView] persistAssistantMessage failed (non-blocking):', err instanceof Error ? err.message : String(err));
+                });
         }
 
         /**
