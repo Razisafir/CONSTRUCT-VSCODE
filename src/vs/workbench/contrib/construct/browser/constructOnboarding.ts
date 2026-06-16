@@ -1320,4 +1320,20 @@ export class ConstructOnboardingWizard extends Disposable {
                                 case 'agentReachSkipped':
                                         break;
                                 case 'configSaved':
-                                        // Config saved — co
+                                        // Config saved — continue with onboarding flow
+                                        break;
+                                default:
+                                        // Unknown message type — ignore
+                                        break;
+                        }
+                });
+
+                // ---- Initialization ----
+                renderOllamaStatus({ type: 'ollamaStatus', status: 'checking' });
+        </script>
+</head>
+<body>
+</body>
+</html>`;
+        }
+}
