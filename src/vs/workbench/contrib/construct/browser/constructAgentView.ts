@@ -157,6 +157,8 @@ export class ConstructAgentViewPane extends ViewPane {
                 `;
 
                 this.modelPickerBtn = dom.$('button.construct-model-picker') as HTMLButtonElement;
+                this.modelPickerBtn.setAttribute('aria-label', 'Select AI model — click to change');
+                this.modelPickerBtn.setAttribute('title', 'Select AI model');
                 this.modelPickerBtn.style.cssText = `
                         background: #141B2D; border: 1px solid #1A1F2E; border-radius: 4px;
                         color: #E0E7FF; font-size: 11px; padding: 4px 10px; cursor: pointer;
@@ -174,6 +176,8 @@ export class ConstructAgentViewPane extends ViewPane {
                 // --- Phase 4: Settings gear icon ---
                 const settingsBtn = dom.$('button.construct-settings-btn') as HTMLButtonElement;
                 settingsBtn.textContent = '\u2699'; // ⚙
+                settingsBtn.setAttribute('aria-label', 'Open agent settings');
+                settingsBtn.setAttribute('title', 'Settings');
                 settingsBtn.style.cssText = `
                         background: transparent; border: none; color: #4A5568;
                         cursor: pointer; font-size: 14px; padding: 2px 4px;
@@ -189,6 +193,8 @@ export class ConstructAgentViewPane extends ViewPane {
                 // Session history button
                 const sessionHistoryBtn = dom.$('button.construct-session-history-btn') as HTMLButtonElement;
                 sessionHistoryBtn.textContent = '\uD83D\uDCDC'; // 📜
+                sessionHistoryBtn.setAttribute('aria-label', 'Open session history — restore a previous chat session');
+                sessionHistoryBtn.setAttribute('title', 'Session history');
                 sessionHistoryBtn.style.cssText = `
                         background: transparent; border: none; color: #4A5568;
                         cursor: pointer; font-size: 13px; padding: 2px 4px;
@@ -207,6 +213,13 @@ export class ConstructAgentViewPane extends ViewPane {
                 this.messageContainer.style.cssText = `
                         flex: 1; overflow-y: auto; padding: 10px;
                 `;
+                // F-008 fix: mark the chat log as a live region so screen readers announce
+                // new agent messages. role='log' + aria-live='polite' is the standard pattern
+                // for chat UIs (per WAI-ARIA Authoring Practices).
+                this.messageContainer.setAttribute('role', 'log');
+                this.messageContainer.setAttribute('aria-live', 'polite');
+                this.messageContainer.setAttribute('aria-label', 'Agent chat messages');
+                this.messageContainer.setAttribute('tabindex', '0');
 
                 // Welcome message
                 const welcome = dom.$('.construct-welcome');
@@ -257,6 +270,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 this.inputBox.className = 'construct-chat-input';
                 this.inputBox.rows = 1;
                 this.inputBox.placeholder = 'Ask Kovix anything...';
+                this.inputBox.setAttribute('aria-label', 'Message the Kovix agent. Press Enter to send, Shift+Enter for a newline.');
                 this.inputBox.style.cssText = `
                         flex: 1; background: #0A0E1A; border: 1px solid #1A1F2E;
                         border-radius: 4px; padding: 8px 10px; color: #E0E7FF;
@@ -271,6 +285,8 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 this.sendBtn = dom.$('button.construct-send-btn') as HTMLButtonElement;
                 this.sendBtn.textContent = '\u2192'; // Right arrow
+                this.sendBtn.setAttribute('aria-label', 'Send message');
+                this.sendBtn.setAttribute('title', 'Send message (Enter)');
                 this.sendBtn.style.cssText = `
                         background: #00E5FF; color: #0A0E1A; border: none;
                         border-radius: 4px; padding: 6px 12px; cursor: pointer;
@@ -279,6 +295,8 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 this.stopBtn = dom.$('button.construct-stop-btn') as HTMLButtonElement;
                 this.stopBtn.textContent = '\u25A0'; // Stop square
+                this.stopBtn.setAttribute('aria-label', 'Stop the running agent task');
+                this.stopBtn.setAttribute('title', 'Stop');
                 this.stopBtn.style.cssText = `
                         background: #FF4444; color: white; border: none;
                         border-radius: 4px; padding: 6px 10px; cursor: pointer;
@@ -346,6 +364,8 @@ export class ConstructAgentViewPane extends ViewPane {
                 // --- Phase 4: Clear button ---
                 this.clearBtn = dom.$('button.construct-clear-btn') as HTMLButtonElement;
                 this.clearBtn.textContent = '\uD83D\uDDB1'; // 🗑
+                this.clearBtn.setAttribute('aria-label', 'Clear chat messages — starts a fresh session');
+                this.clearBtn.setAttribute('title', 'Clear chat');
                 this.clearBtn.style.cssText = `
                         background: transparent; color: #4A5568; border: none;
                         cursor: pointer; font-size: 14px; padding: 4px 6px;
@@ -624,6 +644,7 @@ export class ConstructAgentViewPane extends ViewPane {
 
                         const selectAllBtn = dom.$('button') as HTMLButtonElement;
                         selectAllBtn.textContent = 'Select All';
+                        selectAllBtn.setAttribute('aria-label', 'Select all plan steps');
                         selectAllBtn.style.cssText = `
                                 background: #1A2744; border: 1px solid #2D3A5C; border-radius: 3px;
                                 color: #E0E7FF; font-size: 11px; padding: 3px 8px; cursor: pointer;
@@ -636,6 +657,7 @@ export class ConstructAgentViewPane extends ViewPane {
 
                         const deselectAllBtn = dom.$('button') as HTMLButtonElement;
                         deselectAllBtn.textContent = 'Deselect All';
+                        deselectAllBtn.setAttribute('aria-label', 'Deselect all plan steps');
                         deselectAllBtn.style.cssText = `
                                 background: #1A2744; border: 1px solid #2D3A5C; border-radius: 3px;
                                 color: #E0E7FF; font-size: 11px; padding: 3px 8px; cursor: pointer;
@@ -694,6 +716,7 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 const approveBtn = dom.$('button') as HTMLButtonElement;
                 approveBtn.textContent = '\u2705 Approve';
+                approveBtn.setAttribute('aria-label', 'Approve the plan and start execution');
                 approveBtn.style.cssText = `
                         background: #00C853; color: white; border: none;
                         border-radius: 4px; padding: 6px 14px; cursor: pointer;
@@ -702,6 +725,7 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 const cancelBtn = dom.$('button') as HTMLButtonElement;
                 cancelBtn.textContent = '\u274C Cancel';
+                cancelBtn.setAttribute('aria-label', 'Cancel the plan and discard');
                 cancelBtn.style.cssText = `
                         background: #FF4444; color: white; border: none;
                         border-radius: 4px; padding: 6px 14px; cursor: pointer;
@@ -1287,6 +1311,7 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 const acceptBtn = dom.$('button') as HTMLButtonElement;
                 acceptBtn.textContent = '\u2705 Accept';
+                acceptBtn.setAttribute('aria-label', 'Accept the proposed file change');
                 acceptBtn.style.cssText = `
                         background: #00C853; color: white; border: none;
                         border-radius: 3px; padding: 4px 10px; cursor: pointer;
@@ -1295,6 +1320,7 @@ export class ConstructAgentViewPane extends ViewPane {
 
                 const rejectBtn = dom.$('button') as HTMLButtonElement;
                 rejectBtn.textContent = '\u274C Reject';
+                rejectBtn.setAttribute('aria-label', 'Reject the proposed file change');
                 rejectBtn.style.cssText = `
                         background: #FF4444; color: white; border: none;
                         border-radius: 3px; padding: 4px 10px; cursor: pointer;
