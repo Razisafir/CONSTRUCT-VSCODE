@@ -182,3 +182,45 @@ const mcpConfiguration: IConfigurationNode = {
 };
 
 Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).registerConfiguration(mcpConfiguration);
+
+// F-012 fix: register previously-unregistered configuration keys so users can set them via Settings UI.
+const generalConfiguration: IConfigurationNode = {
+        id: 'construct.general',
+        title: localize('constructGeneralTitle', "Kovix General"),
+        type: 'object',
+        properties: {
+                'construct.ideaRefinement.enabled': {
+                        type: 'boolean',
+                        default: true,
+                        description: localize('construct.ideaRefinementEnabled', "Enable the idea-refinement step that asks clarifying questions before planning. When disabled, prompts go straight to the planning phase."),
+                        scope: 1,
+                },
+                'construct.onlineMode': {
+                        type: 'boolean',
+                        default: false,
+                        description: localize('constructOnlineMode', "Enable online mode. When disabled, tools that require network access (web_search, MCP servers with remote endpoints) will refuse to run, preventing accidental network calls during local-only workflows."),
+                        scope: 1,
+                },
+                'construct.terminal.kaliWSL': {
+                        type: 'boolean',
+                        default: false,
+                        description: localize('constructTerminalKaliWSL', "Enable Kali Linux WSL terminal integration on Windows. When enabled, Kovix will attempt to route security-tooling commands through 'wsl.exe -d kali-linux'."),
+                        scope: 1,
+                },
+                'construct.provider.default': {
+                        type: 'string',
+                        enum: ['ollama', 'xenova', 'cloud'],
+                        default: 'ollama',
+                        description: localize('constructProviderDefault', "Default LLM provider to use when no override is selected in the model picker."),
+                        scope: 1,
+                },
+                'construct.provider.model': {
+                        type: 'string',
+                        default: '',
+                        description: localize('constructProviderModel', "Default model identifier for the chosen provider (e.g. 'llama3.2:3b' for Ollama, 'Xenova/gpt2' for Xenova, or your cloud model id)."),
+                        scope: 1,
+                },
+        }
+};
+
+Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).registerConfiguration(generalConfiguration);

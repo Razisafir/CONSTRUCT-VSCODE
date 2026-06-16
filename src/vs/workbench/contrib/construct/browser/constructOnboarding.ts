@@ -194,8 +194,7 @@ export class ConstructOnboardingWizard extends Disposable {
 
                         case 'installAgentReach': {
                                 try {
-                                        const terminalExecutor = (await import('../../../../platform/construct/common/terminal/terminalExecutor.js')).ITerminalExecutor;
-                                        // Since we can't easily get the service accessor here, just notify
+                                        // Notify user to use the command palette for automated setup
                                         this.notificationService.info('Agent Reach: Starting installation. Run "Construct: Install Agent Reach" from the command palette for automated setup.');
                                         this.postMessage({ type: 'agentReachInstalled' });
                                 } catch {
@@ -1320,4 +1319,42 @@ export class ConstructOnboardingWizard extends Disposable {
                                 case 'agentReachSkipped':
                                         break;
                                 case 'configSaved':
-                                        // Config saved — co
+                                        // Config saved — continue to next step
+                                        break;
+                                case 'configSaveError':
+                                        // Show error to user; allow retry
+                                        const errEl = document.getElementById('config-save-error');
+                                        if (errEl) {
+                                                errEl.textContent = msg.error || 'Failed to save configuration';
+                                                errEl.style.display = 'block';
+                                        }
+                                        break;
+                                case 'providerDetected':
+                                        // Auto-detected provider info from system scan
+                                        renderProviderStatus(msg);
+                                        break;
+                                case 'stepAdvance':
+                                        // Host requests advancing to a specific step
+                                        if (typeof msg.step === 'number') {
+                                                goToStep(msg.step);
+                                        }
+                                        break;
+                                default:
+                                        // Unknown message — log for debugging
+                                        console.warn('[Kovix Onboarding] Unhandled message type:', msg.type);
+                                        break;
+                        }
+                });
+
+                // ---- Initial boot ----
+                // Notify host that webview is ready
+                vscode.postMessage({ type: 'webviewReady' });
+
+                // Kick off the initial Ollama status check
+                vscode.postMessage({ type: 'checkOllama' });
+        })();
+        </script>
+</body>
+</html>`;
+        }
+}

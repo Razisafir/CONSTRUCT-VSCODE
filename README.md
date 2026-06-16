@@ -5,7 +5,7 @@
 **AI-native development environment with autonomous coding agents**
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/Razisafir/KOVIX)
-[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](./CONSTRUCT_LICENSE.txt)
+[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](./LICENSE.txt)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/Razisafir/KOVIX)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/Razisafir/KOVIX/actions)
 
@@ -46,7 +46,7 @@ The agent uses a plan/act loop: it reasons through the steps, calls tools (file 
 3. **Download and install Kovix** from [Releases](https://github.com/Razisafir/KOVIX/releases)
 4. **Launch Kovix** -- the setup wizard opens automatically and walks you through provider setup
 
-Re-open the wizard anytime via the Command Palette: `Kovix: Open Setup Wizard`
+Re-open the wizard anytime via the Command Palette: `Construct: Open Setup Wizard`
 
 ## Built on Code-OSS
 
@@ -284,7 +284,7 @@ Kovix integrates **Agent Reach**, an internet research toolkit that gives the AI
 Agent Reach is available as an MCP server and can be installed via the setup wizard:
 
 1. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-2. Run `Kovix: Open Setup Wizard`
+2. Run `Construct: Open Setup Wizard`
 3. Select **Agent Reach** from the integrations list and follow the prompts
 
 Or configure it manually by adding the MCP server to your settings:
@@ -489,6 +489,6 @@ Kovix is built on the [VS Code open-source project](https://github.com/microsoft
 
 ## License
 
-This project is licensed under a Proprietary license. See [CONSTRUCT_LICENSE.txt](./CONSTRUCT_LICENSE.txt) for details.
+This project is licensed under a Proprietary license. See [LICENSE.txt](./LICENSE.txt) for details.
 
 Kovix is a fork of [Code-OSS](https://github.com/microsoft/vscode) by Microsoft, used under the MIT License.

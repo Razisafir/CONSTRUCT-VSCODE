@@ -8,7 +8,7 @@
     "name": "Razisafir"
   },
   "homepage": "https://github.com/Razisafir/KOVIX",
-  "license": "SEE LICENSE IN KOVIX_LICENSE.txt",
+  "license": "SEE LICENSE IN LICENSE.txt",
   "main": "./out/main.js",
   "type": "module",
   "private": true,
