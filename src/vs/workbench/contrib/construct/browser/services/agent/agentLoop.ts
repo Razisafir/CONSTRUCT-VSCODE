@@ -655,8 +655,14 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
          */
         startExecution(approvedPlan: IApprovedPlan, signal?: AbortSignal): void {
                 this._approvedPlan = approvedPlan;
+                // F-009 FIX: Propagate the user's milestone selection into the
+                // execution config. Previously this only stored the mode and
+                // silently dropped selectedMilestoneIds — so even if the picker
+                // had returned the IDs, they would never have reached the
+                // shouldPauseAtMilestone() check at line 770.
                 this._executionConfig = {
                         mode: approvedPlan.executionMode as ExecutionMode,
+                        selectedMilestoneIds: approvedPlan.selectedMilestoneIds,
                 };
                 this._completedMilestoneIds = new Set();
                 this._executionState = ExecutionState.Executing;

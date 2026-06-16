@@ -26,16 +26,35 @@ interface IMilestonePickItem extends IQuickPickItem {
 }
 
 /**
+ * F-009 FIX: Return type of showStopModePicker.
+ *
+ * Before this fix, the picker returned only ExecutionMode and silently
+ * discarded the user's milestone selection in Selective mode. The
+ * milestone picker UI was functionally inert — the user clicked
+ * checkboxes but nothing remembered their choice.
+ */
+export interface IStopModeSelection {
+        /** The selected execution mode. */
+        readonly mode: ExecutionMode;
+        /**
+         * IDs of milestones the user chose to pause at (Selective mode only).
+         * Undefined for non-Selective modes. Empty array means "pause at
+         * none" (effectively automatic within Selective mode).
+         */
+        readonly selectedMilestoneIds?: string[];
+}
+
+/**
  * Show the stop mode picker and return the selected execution mode.
  * Optionally shows a second picker for milestone selection in Selective mode.
  * @param quickInputService The quick input service for showing pickers.
  * @param milestones The milestones available for selective mode.
- * @returns The selected execution mode, or undefined if cancelled.
+ * @returns The selection (mode + optional milestone IDs), or undefined if cancelled.
  */
 export async function showStopModePicker(
         quickInputService: IQuickInputService,
         milestones?: IMilestone[],
-): Promise<ExecutionMode | undefined> {
+): Promise<IStopModeSelection | undefined> {
         const configs = Object.values(DEFAULT_EXECUTION_MODE_CONFIGS);
 
         const items: IExecutionModePickItem[] = configs.map(config => ({
@@ -56,7 +75,11 @@ export async function showStopModePicker(
 
         const selectedMode = (pick as IExecutionModePickItem).mode;
 
-        // If Selective mode and milestones are available, show milestone picker
+        // If Selective mode and milestones are available, show milestone picker.
+        // F-009 FIX: Actually CAPTURE the user's selection and return it. Previously
+        // the picker was shown but the result was discarded (see the old comment
+        // that admitted 'the picker is informational here').
+        let selectedMilestoneIds: string[] | undefined;
         if (selectedMode === ExecutionMode.Selective && milestones && milestones.length > 0) {
                 const milestoneItems: IMilestonePickItem[] = milestones.map(m => ({
                         label: `${m.isMajor ? '\u2B50' : '\uD83D\uDFE2'} ${m.name}`,
@@ -66,15 +89,21 @@ export async function showStopModePicker(
                         milestoneId: m.id,
                 }));
 
-                await quickInputService.pick(milestoneItems, {
+                const pickedMilestones = await quickInputService.pick(milestoneItems, {
                         placeHolder: 'Select milestones to pause at...',
                         title: 'Select Pause Points',
                         canPickMany: true,
                 });
-                // Note: The actual milestone selection is stored in the approved plan.
-                // The picker is informational here; the selection is used when building
-                // the IApprovedPlan in the agent view.
+
+                // User pressed Escape — cancel the whole flow.
+                if (pickedMilestones === undefined) {
+                        return undefined;
+                }
+
+                // Extract the milestone IDs from the picked items.
+                selectedMilestoneIds = (pickedMilestones as IMilestonePickItem[])
+                        .map(item => item.milestoneId);
         }
 
-        return selectedMode;
+        return { mode: selectedMode, selectedMilestoneIds };
 }

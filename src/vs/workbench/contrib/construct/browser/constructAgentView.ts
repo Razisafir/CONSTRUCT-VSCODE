@@ -711,14 +711,19 @@ export class ConstructAgentViewPane extends ViewPane {
                 approveBtn.onclick = async () => {
                         // Show stop mode picker
                         const milestones = this.agentLoop.extractMilestonesFromPlan(plan.steps);
-                        const selectedMode = await showStopModePicker(this.quickInputService, milestones);
-                        if (!selectedMode) { return; } // cancelled
+                        // F-009 FIX: showStopModePicker now returns both the mode AND
+                        // the user's milestone selection (for Selective mode). Previously
+                        // it returned only the mode and discarded the milestone IDs.
+                        const selection = await showStopModePicker(this.quickInputService, milestones);
+                        if (!selection) { return; } // cancelled
 
                         const approvedPlan: IApprovedPlan = {
                                 task,
                                 steps: this.selectableSteps,
-                                executionMode: selectedMode,
+                                executionMode: selection.mode,
                                 milestones,
+                                // F-009 FIX: propagate the user's milestone selection.
+                                selectedMilestoneIds: selection.selectedMilestoneIds,
                                 approved: true,
                                 approvedAt: Date.now(),
                         };
