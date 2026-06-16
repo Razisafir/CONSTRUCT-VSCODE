@@ -126,10 +126,12 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
                 private modelEntryAccessor: IStatusbarEntryAccessor | undefined;
                 private agentReachEntryAccessor: IStatusbarEntryAccessor | undefined;
                 private ponytailEntryAccessor: IStatusbarEntryAccessor | undefined;
+                private changesEntryAccessor: IStatusbarEntryAccessor | undefined;
 
                 constructor(
                                 @IStatusbarService private readonly statusbarService: IStatusbarService,
                                 @IConstructAIService private readonly aiService: IConstructAIService,
+                                @IPendingChangesService private readonly pendingChangesService: IPendingChangesService,
                 ) {
                                 super();
 
@@ -159,13 +161,20 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
                                                 this.updateModelStatus();
                                 }));
 
-                                // Pending changes (right side)
-                                this._register(this.statusbarService.addEntry({
+                                // Pending changes (right side) — F-012 fix: actually wire to onDidChangePendingChanges
+                                this.changesEntryAccessor = this._register(this.statusbarService.addEntry({
                                                 name: localize('constructChanges', "Kovix Changes"),
                                                 text: '$(diff-added) 0 pending',
                                                 ariaLabel: localize('constructChangesAria', "No changes awaiting approval"),
                                                 tooltip: localize('constructChangesTooltip', "No changes awaiting approval"),
+                                                command: 'construct.focusPanel',
                                 }, 'construct.changes', StatusbarAlignment.RIGHT, 50));
+
+                                // Update on pending-changes events
+                                this._register(this.pendingChangesService.onDidChangePendingChanges(() => {
+                                                this.updatePendingChangesStatus();
+                                }));
+                                this.updatePendingChangesStatus();
 
                                 // Agent Reach status (left side, priority 49)
                                 this.agentReachEntryAccessor = this._register(this.statusbarService.addEntry({
@@ -214,6 +223,25 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
                                                 ariaLabel: localize('constructAgentReachAria', `Agent Reach: ${message || status}`),
                                                 tooltip: localize('constructAgentReachTooltip', `Agent Reach status: ${message || status} — click to check`),
                                                 command: 'construct.checkAgentReach',
+                                });
+                }
+
+                /** F-012 fix: refresh the pending-changes status bar entry from the service. */
+                private updatePendingChangesStatus(): void {
+                                if (!this.changesEntryAccessor) { return; }
+                                const count = this.pendingChangesService.pendingEntries.length;
+                                const text = count === 0 ? '$(diff-added) 0 pending' : `$(diff-added) ${count} pending`;
+                                const ariaLabel = count === 0
+                                                ? localize('constructChangesAria', "No changes awaiting approval")
+                                                : localize('constructChangesAriaN', `${count} change${count === 1 ? '' : 's'} awaiting approval`);
+                                const tooltip = count === 0
+                                                ? localize('constructChangesTooltip', "No changes awaiting approval")
+                                                : localize('constructChangesTooltipN', `${count} change${count === 1 ? '' : 's'} awaiting approval — click to review`);
+                                this.changesEntryAccessor.update({
+                                                name: localize('constructChanges', "Kovix Changes"),
+                                                text,
+                                                ariaLabel,
+                                                tooltip,
                                 });
                 }
 
@@ -1220,12 +1248,12 @@ registerAction2(class ReadWebpageAction extends Action2 {
                 const url = await quickInput.input({
                         prompt: 'Enter webpage URL to read',
                         placeHolder: 'https://example.com',
-                        validateInput: (value) => {
+                        validateInput: async (value) => {
                                 if (!value) { return 'URL cannot be empty'; }
                                 if (!value.startsWith('http://') && !value.startsWith('https://')) {
                                         return 'URL must start with http:// or https://';
                                 }
-                                return undefined as unknown as string;
+                                return undefined;
                         },
                 });
 

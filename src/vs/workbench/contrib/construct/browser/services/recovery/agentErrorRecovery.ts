@@ -21,12 +21,17 @@ import {
 
 /**
  * Default error recovery configuration.
+ * F-007 fix: exponential backoff with jitter + non-retryable error types.
  */
 const DEFAULT_CONFIG: IErrorRecoveryConfig = {
 	maxRetries: 3,
 	autoRetry: true,
 	retryDelayMs: 1000,
+	backoffMultiplier: 2,
+	maxBackoffMs: 30_000,
+	jitterMs: 500,
 	injectErrorContext: true,
+	nonRetryableErrorTypes: ['file_permission', 'file_not_found'],
 };
 
 /**
@@ -146,13 +151,19 @@ export class AgentErrorRecoveryService extends Disposable implements IAgentError
 	 * requestUserIntervention().
 	 */
 	async attemptRecovery(error: IStepError): Promise<IRecoveryResult> {
-		if (this._config.autoRetry && error.retryCount < this._config.maxRetries) {
+		const isRetryable = !this._config.nonRetryableErrorTypes.includes(error.errorType);
+
+		if (this._config.autoRetry && isRetryable && error.retryCount < this._config.maxRetries) {
 			const nextAttempt = error.retryCount + 1;
+			const delayMs = this.computeBackoffDelay(nextAttempt);
 
-			this.logService.info(`[AgentErrorRecovery] Auto-retry attempt ${nextAttempt}/${this._config.maxRetries} for step ${error.stepIndex}`);
+			this.logService.info(
+				`[AgentErrorRecovery] Auto-retry attempt ${nextAttempt}/${this._config.maxRetries} ` +
+				`for step ${error.stepIndex} (type=${error.errorType}) after ${delayMs}ms backoff`
+			);
 
-			// Wait the configured delay before returning the retry decision
-			await this.delay(this._config.retryDelayMs);
+			// F-007 fix: exponential backoff with jitter
+			await this.delay(delayMs);
 
 			const result: IRecoveryResult = {
 				strategy: 'retry',
@@ -164,8 +175,15 @@ export class AgentErrorRecoveryService extends Disposable implements IAgentError
 			return result;
 		}
 
-		// Retries exhausted or auto-retry disabled — ask the user
-		this.logService.info(`[AgentErrorRecovery] Retries exhausted for step ${error.stepIndex}, requesting user intervention`);
+		if (!isRetryable) {
+			this.logService.info(
+				`[AgentErrorRecovery] Skipping auto-retry for non-retryable error type ${error.errorType} ` +
+				`on step ${error.stepIndex}; requesting user intervention`
+			);
+		}
+
+		// Retries exhausted, auto-retry disabled, or error is non-retryable
+		this.logService.info(`[AgentErrorRecovery] Requesting user intervention for step ${error.stepIndex}`);
 		const strategy = await this.requestUserIntervention(error);
 
 		const result: IRecoveryResult = {
@@ -175,6 +193,18 @@ export class AgentErrorRecoveryService extends Disposable implements IAgentError
 
 		this._onRecoveryAttempt.fire(result);
 		return result;
+	}
+
+	/**
+	 * F-007 fix: compute the exponential backoff delay for a given attempt number.
+	 * Formula: min(retryDelayMs * backoffMultiplier^(attempt-1), maxBackoffMs) +/- jitterMs
+	 */
+	private computeBackoffDelay(attempt: number): number {
+		const exp = Math.pow(this._config.backoffMultiplier, attempt - 1);
+		const base = this._config.retryDelayMs * exp;
+		const capped = Math.min(base, this._config.maxBackoffMs);
+		const jitter = (Math.random() * 2 - 1) * this._config.jitterMs;
+		return Math.max(0, Math.round(capped + jitter));
 	}
 
 	/**

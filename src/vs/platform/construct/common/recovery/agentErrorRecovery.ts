@@ -77,16 +77,31 @@ export interface IRecoveryResult {
 
 /**
  * Configuration for error recovery behavior.
+ *
+ * F-007 fix: added backoffMultiplier, maxBackoffMs, jitterMs, and
+ * nonRetryableErrorTypes so retries use exponential backoff with jitter
+ * and skip errors that will never succeed on retry.
  */
 export interface IErrorRecoveryConfig {
 	/** Maximum number of automatic retries before asking the user. Default: 3. */
 	maxRetries: number;
 	/** Whether to automatically retry without asking the user first. Default: true. */
 	autoRetry: boolean;
-	/** Delay in ms between retries. Default: 1000. */
+	/** Base delay in ms between retries (delay for attempt N is retryDelayMs * backoffMultiplier^(N-1), capped at maxBackoffMs). Default: 1000. */
 	retryDelayMs: number;
+	/** Multiplier applied to the delay between successive retries. Default: 2 (exponential backoff). */
+	backoffMultiplier: number;
+	/** Maximum delay in ms between retries (caps exponential growth). Default: 30000. */
+	maxBackoffMs: number;
+	/** +/- jitter in ms applied to each delay to avoid thundering-herd retries. Default: 500. */
+	jitterMs: number;
 	/** Whether to inject error context into the next LLM call. Default: true. */
 	injectErrorContext: boolean;
+	/**
+	 * Error types that should NOT be auto-retried (they will never succeed on retry).
+	 * Defaults to file_permission and file_not_found.
+	 */
+	nonRetryableErrorTypes: StepErrorType[];
 }
 
 /**

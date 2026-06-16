@@ -46,7 +46,7 @@ export interface IToolDefinition {
         /** Whether this tool requires network access */
         requiresNetwork: boolean;
         /** Category for UI grouping */
-        category: 'file' | 'terminal' | 'search' | 'network' | 'system' | 'security';
+        category: 'file' | 'terminal' | 'search' | 'network' | 'system' | 'security' | 'design' | 'behavior';
 }
 
 /**
@@ -67,6 +67,12 @@ export interface IToolResult {
                 bytesProcessed?: number;
                 /** Exit code for terminal commands */
                 exitCode?: number;
+                /** Name of the tool that produced this result (for MCP routing) */
+                tool?: string;
+                /** Whether the tool was configured/enabled at execution time */
+                configured?: boolean;
+                /** Mode the tool was invoked in (e.g. ponytail mode) */
+                mode?: string;
         };
 }
 
