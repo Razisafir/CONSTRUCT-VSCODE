@@ -12,107 +12,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  construct-unit-tests:
-    name: Construct Unit Tests (Node ${{ matrix.node }})
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 1: Full VS Code fork compile
+  #
+  # This is the heavy job — 25-40 min on a real runner. Uses 8GB heap as
+  # documented in the README. Caches node_modules by package-lock hash to
+  # speed up subsequent runs.
+  # ─────────────────────────────────────────────────────────────────────────
+  compile:
+    name: Full Compile (Code-OSS fork)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        node: ['20', '24']
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Setup Node ${{ matrix.node }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node }}
-          cache: 'npm'
-
-      - name: Install test-only dependencies
-        # We only need mocha + ts-node + typescript to run the construct unit tests.
-        # Full npm install requires ~3GB and 10+ minutes; we skip it for CI speed.
-        run: |
-          npm install --no-save --no-package-lock \
-            mocha@^10.2.0 \
-            ts-node@^10.9.1 \
-            typescript@^5.1.0 \
-            @types/mocha@^9.1.1 \
-            @types/node@^20.0.0
-
-      - name: Run construct unit tests
-        env:
-          # KOVIX package.json has "type": "module" which makes Node treat
-          # .ts files as ESM. The construct tests use CommonJS (suite/test
-          # TDD interface). We isolate them in a temp dir to avoid the
-          # package.json type conflict.
-          TS_NODE_TRANSPILE_ONLY: 'true'
-        run: |
-          # Set up isolated test environment that doesn't inherit type:module
-          mkdir -p /tmp/kovix-test-isolated/src /tmp/kovix-test-isolated/test
-
-          # Copy the helper source files (zero VS Code deps)
-          cp src/vs/platform/construct/common/editor/kovixInlineCompletionHelpers.ts /tmp/kovix-test-isolated/src/
-          cp src/vs/platform/construct/common/agent/promptSanitizer.ts /tmp/kovix-test-isolated/src/
-
-          # Copy all test files
-          cp test/unit/construct/services/*.test.ts /tmp/kovix-test-isolated/test/
-          cp test/unit/construct/agent/*.test.ts /tmp/kovix-test-isolated/test/ 2>/dev/null || true
-
-          # Fix imports to point to the local src dir, drop .js extensions
-          sed -i 's|../../../../src/vs/platform/construct/common/editor/kovixInlineCompletionHelpers.js|../src/kovixInlineCompletionHelpers|g' /tmp/kovix-test-isolated/test/*.test.ts
-          sed -i 's|../../../../src/vs/platform/construct/common/agent/promptSanitizer.js|../src/promptSanitizer|g' /tmp/kovix-test-isolated/test/*.test.ts
-
-          # Symlink node_modules from the main checkout
-          ln -sf "$(pwd)/node_modules" /tmp/kovix-test-isolated/node_modules
-
-          # Write a CommonJS package.json (no type:module)
-          cat > /tmp/kovix-test-isolated/package.json << 'PKGJSON'
-          {
-            "name": "kovix-test-isolated",
-            "version": "1.0.0",
-            "private": true
-          }
-          PKGJSON
-
-          # Write a minimal tsconfig
-          cat > /tmp/kovix-test-isolated/tsconfig.json << 'TSJSON'
-          {
-            "compilerOptions": {
-              "target": "ES2022",
-              "module": "commonjs",
-              "moduleResolution": "node",
-              "esModuleInterop": true,
-              "strict": true,
-              "skipLibCheck": true,
-              "types": ["mocha", "node"]
-            },
-            "include": ["test/**/*.ts", "src/**/*.ts"]
-          }
-          TSJSON
-
-          # Run mocha with TDD interface (suite/test) — required for the existing tests
-          cd /tmp/kovix-test-isolated
-          npx mocha --require ts-node/register --ui tdd --timeout 10000 --reporter spec 'test/**/*.test.ts'
-
-      - name: Upload test results on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-node-${{ matrix.node }}
-          path: /tmp/kovix-test-isolated/
-          retention-days: 7
-
-  compile-check:
-    name: TypeScript Compile Check (smoke)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    continue-on-error: true  # Full VS Code compile is heavy; treat as informational for now
-
+    timeout-minutes: 75
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -123,24 +33,172 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
-      - name: Check that new construct source files are syntactically valid TypeScript
-        # We don't do a full VS Code compile (needs 8GB heap + 25+ min).
-        # Instead we type-check just the new files using tsc --noEmit on a
-        # minimal tsconfig that skips lib checks.
+      - name: Configure npm for large installs
         run: |
-          npx -y typescript@5.4 --noEmit --strict --skipLibCheck \
-            --module commonjs --moduleResolution node --target ES2022 \
-            --esModuleInterop --resolveJsonModule \
-            src/vs/platform/construct/common/editor/kovixInlineCompletionHelpers.ts \
-            2>&1 | tee /tmp/compile.log || true
+          # VS Code's npm install is heavy (3GB+). Use a larger fetch timeout
+          # and retries to survive transient registry failures.
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set fetch-timeout 300000
 
-          # If the helpers file compiles cleanly, we're good. The provider
-          # and inlineAgent files have VS Code imports we can't resolve
-          # without the full dependency tree, so we skip them in CI for now.
-          if grep -q "error TS" /tmp/compile.log; then
-            echo "TypeScript errors found in helpers file"
-            cat /tmp/compile.log
+      - name: Install dependencies (full)
+        run: npm install --no-audit --no-fund --progress=false
+
+      - name: Compile with 8GB heap
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: node ./node_modules/gulp/bin/gulp.js compile
+
+      - name: Verify out/ directory was populated
+        run: |
+          if [ ! -d out ] || [ -z "$(ls -A out 2>/dev/null)" ]; then
+            echo "ERROR: out/ directory is empty — compile failed silently"
             exit 1
           fi
-          echo "Helpers file compiles cleanly."
+          echo "Compile produced $(find out -type f | wc -l) files"
+
+      - name: Type-check new construct source files
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: |
+          # Type-check just the new construct source files we added, using
+          # the project's own tsconfig. This catches type errors that the
+          # gulp compile might miss due to skipLibCheck.
+          echo "Type-checking new construct source files..."
+          node ./node_modules/typescript/bin/tsc --noEmit \
+            --project tsconfig.json \
+            2>&1 | tee /tmp/tsc.log || true
+
+          # Filter for errors in construct files specifically
+          if grep -E "src/vs/(platform|workbench|editor)/contrib/construct.*error TS" /tmp/tsc.log; then
+            echo "TypeScript errors found in construct source files"
+            exit 1
+          fi
+          echo "No construct-specific TypeScript errors."
+
+      - name: Upload compile log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compile-log
+          path: |
+            /tmp/tsc.log
+            out/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 2: Construct unit tests (fast — runs in parallel with compile)
+  #
+  # Uses an isolated test env to work around the package.json type:module
+  # conflict with the TDD-style tests.
+  # ─────────────────────────────────────────────────────────────────────────
+  construct-tests:
+    name: Construct Unit Tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '24']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install test-only dependencies
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund \
+            mocha@^10.2.0 \
+            ts-node@^10.9.1 \
+            typescript@^5.1.0 \
+            @types/mocha@^9.1.1 \
+            @types/node@^20.0.0
+
+      - name: Run construct unit tests (isolated env)
+        env:
+          TS_NODE_TRANSPILE_ONLY: 'true'
+        run: |
+          mkdir -p /tmp/kovix-test-isolated/src /tmp/kovix-test-isolated/test
+
+          # Copy zero-dep helper sources
+          cp src/vs/platform/construct/common/editor/kovixInlineCompletionHelpers.ts /tmp/kovix-test-isolated/src/
+          cp src/vs/platform/construct/common/agent/promptSanitizer.ts /tmp/kovix-test-isolated/src/
+
+          # Copy test files
+          cp test/unit/construct/services/*.test.ts /tmp/kovix-test-isolated/test/
+          cp test/unit/construct/agent/*.test.ts /tmp/kovix-test-isolated/test/ 2>/dev/null || true
+
+          # Fix imports
+          sed -i 's|../../../../src/vs/platform/construct/common/editor/kovixInlineCompletionHelpers.js|../src/kovixInlineCompletionHelpers|g' /tmp/kovix-test-isolated/test/*.test.ts
+          sed -i 's|../../../../src/vs/platform/construct/common/agent/promptSanitizer.js|../src/promptSanitizer|g' /tmp/kovix-test-isolated/test/*.test.ts
+
+          # Symlink node_modules
+          ln -sf "$(pwd)/node_modules" /tmp/kovix-test-isolated/node_modules
+
+          # CommonJS package.json (no type:module)
+          cat > /tmp/kovix-test-isolated/package.json << 'EOF'
+          {"name":"kovix-test-isolated","version":"1.0.0","private":true}
+          EOF
+
+          cat > /tmp/kovix-test-isolated/tsconfig.json << 'EOF'
+          {
+            "compilerOptions": {
+              "target":"ES2022","module":"commonjs","moduleResolution":"node",
+              "esModuleInterop":true,"strict":true,"skipLibCheck":true,
+              "types":["mocha","node"]
+            },
+            "include":["test/**/*.ts","src/**/*.ts"]
+          }
+          EOF
+
+          cd /tmp/kovix-test-isolated
+          npx mocha --require ts-node/register --ui tdd --timeout 10000 --reporter spec 'test/**/*.test.ts'
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-node-${{ matrix.node }}
+          path: /tmp/kovix-test-isolated/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 3: Full mocha test suite (test-unit-construct) — runs after compile
+  #
+  # This runs the official npm script test-unit-construct from package.json.
+  # It will only succeed if the package.json type:module issue is resolved
+  # or if the test files are migrated to ESM. For now it's informational.
+  # ─────────────────────────────────────────────────────────────────────────
+  full-test-suite:
+    name: Full test-unit-construct (npm script)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: construct-tests  # don't bother if the isolated tests already failed
+    continue-on-error: true  # informational — known to fail due to type:module
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install test-only dependencies
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund \
+            mocha@^10.2.0 ts-node@^10.9.1 typescript@^5.1.0 \
+            @types/mocha@^9.1.1 @types/node@^20.0.0
+
+      - name: Run npm run test-unit-construct
+        continue-on-error: true
+        run: npm run test-unit-construct || echo "Expected failure — package.json type:module conflict. See isolated tests job for actual results."
