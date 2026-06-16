@@ -115,8 +115,10 @@ jobs:
           node-version: ${{ matrix.node }}
 
       - name: Install test-only dependencies
+        # Use --ignore-scripts to skip the preinstall/postinstall hooks which
+        # try to recursively npm install all VS Code subdirectories.
         run: |
-          npm install --no-save --no-package-lock --no-audit --no-fund \
+          npm install --no-save --no-package-lock --no-audit --no-fund --ignore-scripts \
             mocha@^10.2.0 \
             ts-node@^10.9.1 \
             typescript@^5.1.0 \
@@ -195,7 +197,7 @@ jobs:
 
       - name: Install test-only dependencies
         run: |
-          npm install --no-save --no-package-lock --no-audit --no-fund \
+          npm install --no-save --no-package-lock --no-audit --no-fund --ignore-scripts \
             mocha@^10.2.0 ts-node@^10.9.1 typescript@^5.1.0 \
             @types/mocha@^9.1.1 @types/node@^20.0.0
 
