@@ -43,43 +43,44 @@ import * as os from 'os';
 import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
+void execFileAsync;
 
 // ─── JSON-RPC 2.0 Types ─────────────────────────────────────────────────────
 
 interface JsonRpcRequest {
-	jsonrpc: '2.0';
-	id: number | string | null;
-	method: string;
-	params?: any;
+        jsonrpc: '2.0';
+        id: number | string | null;
+        method: string;
+        params?: any;
 }
 
 interface JsonRpcResponse {
-	jsonrpc: '2.0';
-	id: number | string | null;
-	result?: any;
-	error?: { code: number; message: string; data?: any };
+        jsonrpc: '2.0';
+        id: number | string | null;
+        result?: any;
+        error?: { code: number; message: string; data?: any };
 }
 
 // ─── MCP Types ──────────────────────────────────────────────────────────────
 
 interface McpTool {
-	name: string;
-	description: string;
-	inputSchema: any;
+        name: string;
+        description: string;
+        inputSchema: any;
 }
 
 interface McpInitializeResult {
-	protocolVersion: string;
-	capabilities: any;
-	serverInfo: { name: string; version: string };
+        protocolVersion: string;
+        capabilities: any;
+        serverInfo: { name: string; version: string };
 }
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 interface AgentReachConfig {
-	proxy?: string;
-	cookies?: Record<string, string>;
-	timeout?: number;
+        proxy?: string;
+        cookies?: Record<string, string>;
+        timeout?: number;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -95,8 +96,8 @@ const LONG_TIMEOUT = 120000;    // 120s for slow operations (Exa, Xiaohongshu)
  * Simple stderr logger to avoid polluting stdout (which is used for JSON-RPC).
  */
 function log(level: 'info' | 'warn' | 'error', message: string): void {
-	const timestamp = new Date().toISOString();
-	console.error(`[${timestamp}] [${level.toUpperCase()}] ${message}`);
+        const timestamp = new Date().toISOString();
+        console.error(`[${timestamp}] [${level.toUpperCase()}] ${message}`);
 }
 
 // ─── Helper: Read Agent Reach config ────────────────────────────────────────
@@ -106,47 +107,47 @@ function log(level: 'info' | 'warn' | 'error', message: string): void {
  * Returns proxy settings, cookies, and custom timeouts.
  */
 function loadAgentReachConfig(): AgentReachConfig {
-	const configPath = path.join(os.homedir(), '.agent-reach', 'config.yaml');
-	const config: AgentReachConfig = {};
+        const configPath = path.join(os.homedir(), '.agent-reach', 'config.yaml');
+        const config: AgentReachConfig = {};
 
-	try {
-		if (fs.existsSync(configPath)) {
-			const content = fs.readFileSync(configPath, 'utf-8');
+        try {
+                if (fs.existsSync(configPath)) {
+                        const content = fs.readFileSync(configPath, 'utf-8');
 
-			// Simple YAML parsing for key-value pairs
-			const proxyMatch = content.match(/proxy:\s*(.+)/);
-			if (proxyMatch) {
-				config.proxy = proxyMatch[1].trim();
-			}
+                        // Simple YAML parsing for key-value pairs
+                        const proxyMatch = content.match(/proxy:\s*(.+)/);
+                        if (proxyMatch) {
+                                config.proxy = proxyMatch[1].trim();
+                        }
 
-			const timeoutMatch = content.match(/timeout:\s*(\d+)/);
-			if (timeoutMatch) {
-				config.timeout = parseInt(timeoutMatch[1], 10);
-			}
+                        const timeoutMatch = content.match(/timeout:\s*(\d+)/);
+                        if (timeoutMatch) {
+                                config.timeout = parseInt(timeoutMatch[1], 10);
+                        }
 
-			// Parse cookies section
-			const cookies: Record<string, string> = {};
-			const cookiesMatch = content.match(/cookies:\s*([\s\S]*?)(?=\n\w|\n*$)/);
-			if (cookiesMatch) {
-				const cookieLines = cookiesMatch[1].split('\n');
-				for (const line of cookieLines) {
-					const match = line.match(/\s+(\w+):\s*(.+)/);
-					if (match) {
-						cookies[match[1].trim()] = match[2].trim();
-					}
-				}
-			}
-			if (Object.keys(cookies).length > 0) {
-				config.cookies = cookies;
-			}
+                        // Parse cookies section
+                        const cookies: Record<string, string> = {};
+                        const cookiesMatch = content.match(/cookies:\s*([\s\S]*?)(?=\n\w|\n*$)/);
+                        if (cookiesMatch) {
+                                const cookieLines = cookiesMatch[1].split('\n');
+                                for (const line of cookieLines) {
+                                        const match = line.match(/\s+(\w+):\s*(.+)/);
+                                        if (match) {
+                                                cookies[match[1].trim()] = match[2].trim();
+                                        }
+                                }
+                        }
+                        if (Object.keys(cookies).length > 0) {
+                                config.cookies = cookies;
+                        }
 
-			log('info', `Loaded Agent Reach config from ${configPath}`);
-		}
-	} catch (error) {
-		log('warn', `Failed to load Agent Reach config: ${error instanceof Error ? error.message : String(error)}`);
-	}
+                        log('info', `Loaded Agent Reach config from ${configPath}`);
+                }
+        } catch (error) {
+                log('warn', `Failed to load Agent Reach config: ${error instanceof Error ? error.message : String(error)}`);
+        }
 
-	return config;
+        return config;
 }
 
 // ─── Helper: Detect agent-reach venv path ───────────────────────────────────
@@ -156,20 +157,20 @@ function loadAgentReachConfig(): AgentReachConfig {
  * Checks common locations: ~/.agent-reach-venv, ~/.local/share/agent-reach/venv
  */
 function detectVenvPath(): string | null {
-	const candidates = [
-		path.join(os.homedir(), '.agent-reach-venv'),
-		path.join(os.homedir(), '.local', 'share', 'agent-reach', 'venv'),
-		path.join(os.homedir(), 'agent-reach-venv'),
-	];
+        const candidates = [
+                path.join(os.homedir(), '.agent-reach-venv'),
+                path.join(os.homedir(), '.local', 'share', 'agent-reach', 'venv'),
+                path.join(os.homedir(), 'agent-reach-venv'),
+        ];
 
-	for (const venvPath of candidates) {
-		const binDir = path.join(venvPath, 'bin');
-		if (fs.existsSync(binDir)) {
-			return binDir;
-		}
-	}
+        for (const venvPath of candidates) {
+                const binDir = path.join(venvPath, 'bin');
+                if (fs.existsSync(binDir)) {
+                        return binDir;
+                }
+        }
 
-	return null;
+        return null;
 }
 
 /**
@@ -177,23 +178,23 @@ function detectVenvPath(): string | null {
  * Injects proxy settings from config and venv PATH.
  */
 function buildCommandEnv(config: AgentReachConfig): Record<string, string> {
-	const env: Record<string, string> = { ...process.env as Record<string, string> };
+        const env: Record<string, string> = { ...process.env as Record<string, string> };
 
-	// Inject venv bin directory into PATH
-	const venvBin = detectVenvPath();
-	if (venvBin) {
-		env.PATH = `${venvBin}${path.delimiter}${env.PATH || ''}`;
-	}
+        // Inject venv bin directory into PATH
+        const venvBin = detectVenvPath();
+        if (venvBin) {
+                env.PATH = `${venvBin}${path.delimiter}${env.PATH || ''}`;
+        }
 
-	// Apply proxy settings
-	if (config.proxy) {
-		env.HTTP_PROXY = config.proxy;
-		env.HTTPS_PROXY = config.proxy;
-		env.http_proxy = config.proxy;
-		env.https_proxy = config.proxy;
-	}
+        // Apply proxy settings
+        if (config.proxy) {
+                env.HTTP_PROXY = config.proxy;
+                env.HTTPS_PROXY = config.proxy;
+                env.http_proxy = config.proxy;
+                env.https_proxy = config.proxy;
+        }
 
-	return env;
+        return env;
 }
 
 // ─── Helper: Execute shell command with timeout ─────────────────────────────
@@ -204,91 +205,91 @@ function buildCommandEnv(config: AgentReachConfig): Record<string, string> {
  * Kills the process if timeout is exceeded.
  */
 function executeCommand(
-	cmd: string,
-	args: string[],
-	timeout: number,
-	env?: Record<string, string>,
-	input?: string,
+        cmd: string,
+        args: string[],
+        timeout: number,
+        env?: Record<string, string>,
+        input?: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-	return new Promise((resolve) => {
-		const startTime = Date.now();
-		const childEnv = env || { ...process.env as Record<string, string> };
+        return new Promise((resolve) => {
+                const startTime = Date.now();
+                const childEnv = env || { ...process.env as Record<string, string> };
 
-		log('info', `Executing: ${cmd} ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')} (timeout: ${timeout}ms)`);
+                log('info', `Executing: ${cmd} ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')} (timeout: ${timeout}ms)`);
 
-		const child = spawn(cmd, args, {
-			env: childEnv,
-			stdio: ['pipe', 'pipe', 'pipe'],
-			shell: false,
-		});
+                const child = spawn(cmd, args, {
+                        env: childEnv,
+                        stdio: ['pipe', 'pipe', 'pipe'],
+                        shell: false,
+                });
 
-		let stdout = '';
-		let stderr = '';
-		let killed = false;
+                let stdout = '';
+                let stderr = '';
+                let killed = false;
 
-		// Set timeout
-		const timeoutTimer = setTimeout(() => {
-			killed = true;
-			log('warn', `Command timed out after ${timeout}ms: ${cmd}`);
-			try {
-				child.kill('SIGKILL');
-			} catch {
-				// Process may have already exited
-			}
-			resolve({
-				stdout,
-				stderr: `${stderr}\n[ERROR] Command timed out after ${timeout}ms`.trim(),
-				exitCode: 124, // Standard timeout exit code
-			});
-		}, timeout);
+                // Set timeout
+                const timeoutTimer = setTimeout(() => {
+                        killed = true;
+                        log('warn', `Command timed out after ${timeout}ms: ${cmd}`);
+                        try {
+                                child.kill('SIGKILL');
+                        } catch {
+                                // Process may have already exited
+                        }
+                        resolve({
+                                stdout,
+                                stderr: `${stderr}\n[ERROR] Command timed out after ${timeout}ms`.trim(),
+                                exitCode: 124, // Standard timeout exit code
+                        });
+                }, timeout);
 
-		child.stdout?.on('data', (data: Buffer) => {
-			stdout += data.toString('utf-8');
-		});
+                child.stdout?.on('data', (data: Buffer) => {
+                        stdout += data.toString('utf-8');
+                });
 
-		child.stderr?.on('data', (data: Buffer) => {
-			stderr += data.toString('utf-8');
-		});
+                child.stderr?.on('data', (data: Buffer) => {
+                        stderr += data.toString('utf-8');
+                });
 
-		if (input !== undefined) {
-			try {
-				child.stdin?.write(input, 'utf-8');
-				child.stdin?.end();
-			} catch (error) {
-				log('warn', `Failed to write to stdin: ${error instanceof Error ? error.message : String(error)}`);
-			}
-		} else {
-			child.stdin?.end();
-		}
+                if (input !== undefined) {
+                        try {
+                                child.stdin?.write(input, 'utf-8');
+                                child.stdin?.end();
+                        } catch (error) {
+                                log('warn', `Failed to write to stdin: ${error instanceof Error ? error.message : String(error)}`);
+                        }
+                } else {
+                        child.stdin?.end();
+                }
 
-		child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
-			if (killed) return; // Already resolved by timeout
-			clearTimeout(timeoutTimer);
+                child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
+                        if (killed) return; // Already resolved by timeout
+                        clearTimeout(timeoutTimer);
 
-			const duration = Date.now() - startTime;
-			log('info', `Command completed in ${duration}ms with exitCode=${code}, signal=${signal}`);
+                        const duration = Date.now() - startTime;
+                        log('info', `Command completed in ${duration}ms with exitCode=${code}, signal=${signal}`);
 
-			resolve({
-				stdout,
-				stderr,
-				exitCode: code ?? (signal ? -1 : 0),
-			});
-		});
+                        resolve({
+                                stdout,
+                                stderr,
+                                exitCode: code ?? (signal ? -1 : 0),
+                        });
+                });
 
-		child.on('error', (error: Error) => {
-			if (killed) return;
-			clearTimeout(timeoutTimer);
+                child.on('error', (error: Error) => {
+                        if (killed) return;
+                        clearTimeout(timeoutTimer);
 
-			const errorMsg = error instanceof Error ? error.message : String(error);
-			log('error', `Command failed: ${cmd} - ${errorMsg}`);
+                        const errorMsg = error instanceof Error ? error.message : String(error);
+                        log('error', `Command failed: ${cmd} - ${errorMsg}`);
 
-			resolve({
-				stdout,
-				stderr: `${stderr}\n[ERROR] ${errorMsg}`.trim(),
-				exitCode: -1,
-			});
-		});
-	});
+                        resolve({
+                                stdout,
+                                stderr: `${stderr}\n[ERROR] ${errorMsg}`.trim(),
+                                exitCode: -1,
+                        });
+                });
+        });
 }
 
 // ─── Tool Command Map ───────────────────────────────────────────────────────
@@ -299,190 +300,190 @@ function executeCommand(
  */
 const TOOL_COMMANDS: Record<string, (args: any, env: Record<string, string>) => { cmd: string; args: string[]; timeout?: number; env?: Record<string, string>; input?: string } | null> = {
 
-	/**
-	 * read_webpage — Extract article content from any URL via jina.ai reader.
-	 * Uses jina.ai's free summarizer/reader service to fetch clean article text.
-	 */
-	'read_webpage': (args, env) => {
-		const url = args.url as string;
-		if (!url) {
-			throw new Error('Missing required parameter: "url"');
-		}
-		// Validate URL to prevent command injection
-		const validatedUrl = encodeURIComponent(url);
-		return {
-			cmd: 'curl',
-			args: ['-s', '-L', '--max-time', '25', `https://r.jina.ai/${validatedUrl}`],
-			timeout: DEFAULT_TIMEOUT,
-			env,
-		};
-	},
+        /**
+         * read_webpage — Extract article content from any URL via jina.ai reader.
+         * Uses jina.ai's free summarizer/reader service to fetch clean article text.
+         */
+        'read_webpage': (args, env) => {
+                const url = args.url as string;
+                if (!url) {
+                        throw new Error('Missing required parameter: "url"');
+                }
+                // Validate URL to prevent command injection
+                const validatedUrl = encodeURIComponent(url);
+                return {
+                        cmd: 'curl',
+                        args: ['-s', '-L', '--max-time', '25', `https://r.jina.ai/${validatedUrl}`],
+                        timeout: DEFAULT_TIMEOUT,
+                        env,
+                };
+        },
 
-	/**
-	 * search_youtube — Search YouTube videos via yt-dlp.
-	 * Returns JSON metadata for matching videos.
-	 */
-	'search_youtube': (args, env) => {
-		const query = args.query as string;
-		const limit = Math.min(Math.max(parseInt(args.limit as string || '5', 10), 1), 20);
-		if (!query) {
-			throw new Error('Missing required parameter: "query"');
-		}
-		return {
-			cmd: 'yt-dlp',
-			args: ['--dump-json', '--playlist-end', String(limit), `ytsearch${limit}:${query}`],
-			timeout: DEFAULT_TIMEOUT,
-			env,
-		};
-	},
+        /**
+         * search_youtube — Search YouTube videos via yt-dlp.
+         * Returns JSON metadata for matching videos.
+         */
+        'search_youtube': (args, env) => {
+                const query = args.query as string;
+                const limit = Math.min(Math.max(parseInt(args.limit as string || '5', 10), 1), 20);
+                if (!query) {
+                        throw new Error('Missing required parameter: "query"');
+                }
+                return {
+                        cmd: 'yt-dlp',
+                        args: ['--dump-json', '--playlist-end', String(limit), `ytsearch${limit}:${query}`],
+                        timeout: DEFAULT_TIMEOUT,
+                        env,
+                };
+        },
 
-	/**
-	 * get_youtube_transcript — Fetch video transcripts/subtitles via yt-dlp.
-	 * Extracts subtitle text in the requested language.
-	 */
-	'get_youtube_transcript': (args, env) => {
-		const url = args.url as string;
-		const lang = args.lang as string || 'en';
-		if (!url) {
-			throw new Error('Missing required parameter: "url"');
-		}
-		// Validate language code to prevent injection (only alphanumeric and hyphen)
-		const validatedLang = lang.replace(/[^a-zA-Z0-9-]/g, '');
-		return {
-			cmd: 'yt-dlp',
-			args: ['--write-sub', '--skip-download', '--sub-langs', validatedLang, '--sub-format', 'json3', '-o', '-', url],
-			timeout: DEFAULT_TIMEOUT,
-			env,
-		};
-	},
+        /**
+         * get_youtube_transcript — Fetch video transcripts/subtitles via yt-dlp.
+         * Extracts subtitle text in the requested language.
+         */
+        'get_youtube_transcript': (args, env) => {
+                const url = args.url as string;
+                const lang = args.lang as string || 'en';
+                if (!url) {
+                        throw new Error('Missing required parameter: "url"');
+                }
+                // Validate language code to prevent injection (only alphanumeric and hyphen)
+                const validatedLang = lang.replace(/[^a-zA-Z0-9-]/g, '');
+                return {
+                        cmd: 'yt-dlp',
+                        args: ['--write-sub', '--skip-download', '--sub-langs', validatedLang, '--sub-format', 'json3', '-o', '-', url],
+                        timeout: DEFAULT_TIMEOUT,
+                        env,
+                };
+        },
 
-	/**
-	 * search_bilibili — Search Bilibili videos via public API.
-	 */
-	'search_bilibili': (args, env) => {
-		const query = args.query as string;
-		const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 50);
-		if (!query) {
-			throw new Error('Missing required parameter: "query"');
-		}
-		const encodedQuery = encodeURIComponent(query);
-		return {
-			cmd: 'curl',
-			args: ['-s', '-L', '--max-time', '20',
-				`https://api.bilibili.com/x/web-interface/search/type?keyword=${encodedQuery}&search_type=video&page=1&pagesize=${limit}`],
-			timeout: DEFAULT_TIMEOUT,
-			env,
-		};
-	},
+        /**
+         * search_bilibili — Search Bilibili videos via public API.
+         */
+        'search_bilibili': (args, env) => {
+                const query = args.query as string;
+                const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 50);
+                if (!query) {
+                        throw new Error('Missing required parameter: "query"');
+                }
+                const encodedQuery = encodeURIComponent(query);
+                return {
+                        cmd: 'curl',
+                        args: ['-s', '-L', '--max-time', '20',
+                                `https://api.bilibili.com/x/web-interface/search/type?keyword=${encodedQuery}&search_type=video&page=1&pagesize=${limit}`],
+                        timeout: DEFAULT_TIMEOUT,
+                        env,
+                };
+        },
 
-	/**
-	 * search_github — Search GitHub repositories via REST API.
-	 * Uses the public GitHub API (no auth required for low-rate searches).
-	 */
-	'search_github': (args, env) => {
-		const query = args.query as string;
-		const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 100);
-		if (!query) {
-			throw new Error('Missing required parameter: "query"');
-		}
-		const encodedQuery = encodeURIComponent(query);
-		return {
-			cmd: 'curl',
-			args: ['-s', '-L', '--max-time', '20',
-				'-H', 'Accept: application/vnd.github.v3+json',
-				'-H', 'User-Agent: agent-reach-mcp-server/1.0',
-				`https://api.github.com/search/repositories?q=${encodedQuery}&per_page=${limit}&sort=stars&order=desc`],
-			timeout: DEFAULT_TIMEOUT,
-			env,
-		};
-	},
+        /**
+         * search_github — Search GitHub repositories via REST API.
+         * Uses the public GitHub API (no auth required for low-rate searches).
+         */
+        'search_github': (args, env) => {
+                const query = args.query as string;
+                const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 100);
+                if (!query) {
+                        throw new Error('Missing required parameter: "query"');
+                }
+                const encodedQuery = encodeURIComponent(query);
+                return {
+                        cmd: 'curl',
+                        args: ['-s', '-L', '--max-time', '20',
+                                '-H', 'Accept: application/vnd.github.v3+json',
+                                '-H', 'User-Agent: agent-reach-mcp-server/1.0',
+                                `https://api.github.com/search/repositories?q=${encodedQuery}&per_page=${limit}&sort=stars&order=desc`],
+                        timeout: DEFAULT_TIMEOUT,
+                        env,
+                };
+        },
 
-	/**
-	 * search_twitter — Search Twitter/X.
-	 * Requires Nitter instance or cookie-based authentication.
-	 * Returns a helpful error guiding the user to set up cookies.
-	 */
-	'search_twitter': (args, _env) => {
-		const query = args.query as string;
-		if (!query) {
-			throw new Error('Missing required parameter: "query"');
-		}
-		// Twitter/X requires authentication. Return null to signal special handling.
-		return null;
-	},
+        /**
+         * search_twitter — Search Twitter/X.
+         * Requires Nitter instance or cookie-based authentication.
+         * Returns a helpful error guiding the user to set up cookies.
+         */
+        'search_twitter': (args, _env) => {
+                const query = args.query as string;
+                if (!query) {
+                        throw new Error('Missing required parameter: "query"');
+                }
+                // Twitter/X requires authentication. Return null to signal special handling.
+                return null;
+        },
 
-	/**
-	 * search_reddit — Search Reddit posts via public JSON API.
-	 */
-	'search_reddit': (args, env) => {
-		const query = args.query as string;
-		const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 100);
-		if (!query) {
-			throw new Error('Missing required parameter: "query"');
-		}
-		const encodedQuery = encodeURIComponent(query);
-		return {
-			cmd: 'curl',
-			args: ['-s', '-L', '--max-time', '20',
-				'-H', 'User-Agent: agent-reach-mcp-server/1.0',
-				`https://www.reddit.com/search.json?q=${encodedQuery}&limit=${limit}&sort=relevance`],
-			timeout: DEFAULT_TIMEOUT,
-			env,
-		};
-	},
+        /**
+         * search_reddit — Search Reddit posts via public JSON API.
+         */
+        'search_reddit': (args, env) => {
+                const query = args.query as string;
+                const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 100);
+                if (!query) {
+                        throw new Error('Missing required parameter: "query"');
+                }
+                const encodedQuery = encodeURIComponent(query);
+                return {
+                        cmd: 'curl',
+                        args: ['-s', '-L', '--max-time', '20',
+                                '-H', 'User-Agent: agent-reach-mcp-server/1.0',
+                                `https://www.reddit.com/search.json?q=${encodedQuery}&limit=${limit}&sort=relevance`],
+                        timeout: DEFAULT_TIMEOUT,
+                        env,
+                };
+        },
 
-	/**
-	 * search_xiaohongshu — Search Xiaohongshu (Little Red Book).
-	 * Requires manual cookie setup due to anti-bot protection.
-	 */
-	'search_xiaohongshu': (args, _env) => {
-		const query = args.query as string;
-		if (!query) {
-			throw new Error('Missing required parameter: "query"');
-		}
-		// Xiaohongshu requires authentication cookies. Return null for special handling.
-		return null;
-	},
+        /**
+         * search_xiaohongshu — Search Xiaohongshu (Little Red Book).
+         * Requires manual cookie setup due to anti-bot protection.
+         */
+        'search_xiaohongshu': (args, _env) => {
+                const query = args.query as string;
+                if (!query) {
+                        throw new Error('Missing required parameter: "query"');
+                }
+                // Xiaohongshu requires authentication cookies. Return null for special handling.
+                return null;
+        },
 
-	/**
-	 * search_exa — Search via Exa API through mcporter.
-	 * mcporter is a bridge tool that routes to various search APIs.
-	 */
-	'search_exa': (args, env) => {
-		const query = args.query as string;
-		const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 100);
-		if (!query) {
-			throw new Error('Missing required parameter: "query"');
-		}
-		// Escape quotes in query for shell safety
-		const safeQuery = query.replace(/"/g, '\\"');
-		return {
-			cmd: 'mcporter',
-			args: ['call', `exa.web_search_exa(query="${safeQuery}", numResults=${limit})`],
-			timeout: LONG_TIMEOUT,
-			env,
-		};
-	},
+        /**
+         * search_exa — Search via Exa API through mcporter.
+         * mcporter is a bridge tool that routes to various search APIs.
+         */
+        'search_exa': (args, env) => {
+                const query = args.query as string;
+                const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 100);
+                if (!query) {
+                        throw new Error('Missing required parameter: "query"');
+                }
+                // Escape quotes in query for shell safety
+                const safeQuery = query.replace(/"/g, '\\"');
+                return {
+                        cmd: 'mcporter',
+                        args: ['call', `exa.web_search_exa(query="${safeQuery}", numResults=${limit})`],
+                        timeout: LONG_TIMEOUT,
+                        env,
+                };
+        },
 
-	/**
-	 * read_rss — Parse RSS/Atom feeds.
-	 * Uses Python with feedparser library (falls back to manual XML parsing).
-	 */
-	'read_rss': (args, env) => {
-		const url = args.url as string;
-		const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 50);
-		if (!url) {
-			throw new Error('Missing required parameter: "url"');
-		}
-		// Validate URL
-		try {
-			new URL(url);
-		} catch {
-			throw new Error(`Invalid URL: "${url}"`);
-		}
+        /**
+         * read_rss — Parse RSS/Atom feeds.
+         * Uses Python with feedparser library (falls back to manual XML parsing).
+         */
+        'read_rss': (args, env) => {
+                const url = args.url as string;
+                const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 50);
+                if (!url) {
+                        throw new Error('Missing required parameter: "url"');
+                }
+                // Validate URL
+                try {
+                        new URL(url);
+                } catch {
+                        throw new Error(`Invalid URL: "${url}"`);
+                }
 
-		// Use Python with feedparser if available, otherwise fallback to curl + basic parsing
-		const pythonScript = `
+                // Use Python with feedparser if available, otherwise fallback to curl + basic parsing
+                const pythonScript = `
 import sys
 import json
 
@@ -592,25 +593,25 @@ else:
     }
     print(json.dumps(result, ensure_ascii=False))
 `;
-		return {
-			cmd: 'python3',
-			args: ['-c', pythonScript],
-			timeout: DEFAULT_TIMEOUT,
-			env,
-		};
-	},
+                return {
+                        cmd: 'python3',
+                        args: ['-c', pythonScript],
+                        timeout: DEFAULT_TIMEOUT,
+                        env,
+                };
+        },
 
-	/**
-	 * doctor — Run agent-reach diagnostics to check tool availability.
-	 */
-	'doctor': (_args, env) => {
-		return {
-			cmd: 'agent-reach',
-			args: ['doctor', '--json'],
-			timeout: DEFAULT_TIMEOUT,
-			env,
-		};
-	},
+        /**
+         * doctor — Run agent-reach diagnostics to check tool availability.
+         */
+        'doctor': (_args, env) => {
+                return {
+                        cmd: 'agent-reach',
+                        args: ['doctor', '--json'],
+                        timeout: DEFAULT_TIMEOUT,
+                        env,
+                };
+        },
 };
 
 // ─── Tool: List available tools ─────────────────────────────────────────────
@@ -620,204 +621,204 @@ else:
  * KOVIX's LLM uses these descriptions to decide which tool to call.
  */
 function handleListTools(): { tools: McpTool[] } {
-	return {
-		tools: [
-			{
-				name: 'read_webpage',
-				description: 'Extract clean article content from any webpage URL. Uses jina.ai reader to strip ads, navigation, and formatting, returning just the readable article text. Great for reading news articles, blog posts, documentation pages, and any public web content.',
-				inputSchema: {
-					type: 'object',
-					properties: {
-						url: {
-							type: 'string',
-							description: 'The full URL of the webpage to read (e.g., https://example.com/article)',
-						},
-					},
-					required: ['url'],
-				},
-			},
-			{
-				name: 'search_youtube',
-				description: 'Search YouTube for videos matching a query. Returns video metadata including title, description, duration, view count, uploader, and video URL. Use this to find relevant videos, tutorials, talks, or educational content.',
-				inputSchema: {
-					type: 'object',
-					properties: {
-						query: {
-							type: 'string',
-							description: 'Search query string (e.g., "TypeScript tutorial", "Rust programming")',
-						},
-						limit: {
-							type: 'number',
-							description: 'Maximum number of results to return (1-20, default: 5)',
-							default: 5,
-						},
-					},
-					required: ['query'],
-				},
-			},
-			{
-				name: 'get_youtube_transcript',
-				description: 'Fetch the transcript/subtitles of a YouTube video. Returns the full subtitle text in the requested language. Use this to get the spoken content of a video as readable text.',
-				inputSchema: {
-					type: 'object',
-					properties: {
-						url: {
-							type: 'string',
-							description: 'The full YouTube video URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)',
-						},
-						lang: {
-							type: 'string',
-							description: 'Language code for subtitles (e.g., "en", "zh", "ja", "auto"). Default: "en"',
-							default: 'en',
-						},
-					},
-					required: ['url'],
-				},
-			},
-			{
-				name: 'search_bilibili',
-				description: 'Search Bilibili (B站) for videos matching a query. Returns video metadata including title, description, duration, view count, and video link. Use this to find Chinese-language video content, tutorials, anime, and educational videos.',
-				inputSchema: {
-					type: 'object',
-					properties: {
-						query: {
-							type: 'string',
-							description: 'Search query string (e.g., "编程教程", "深度学习")',
-						},
-						limit: {
-							type: 'number',
-							description: 'Maximum number of results to return (1-50, default: 10)',
-							default: 10,
-						},
-					},
-					required: ['query'],
-				},
-			},
-			{
-				name: 'search_github',
-				description: 'Search GitHub repositories matching a query. Returns repo metadata including name, description, stars, language, and URL. Use this to find open-source projects, libraries, tools, code examples, and reference implementations.',
-				inputSchema: {
-					type: 'object',
-					properties: {
-						query: {
-							type: 'string',
-							description: 'Search query string (e.g., "react state management", "machine learning python")',
-						},
-						limit: {
-							type: 'number',
-							description: 'Maximum number of results to return (1-100, default: 10)',
-							default: 10,
-						},
-					},
-					required: ['query'],
-				},
-			},
-			{
-				name: 'search_twitter',
-				description: 'Search Twitter/X posts matching a query. REQUIRES MANUAL SETUP: You must configure Twitter/X cookies in ~/.agent-reach/config.yaml before using this tool. Returns recent tweets matching the search query.',
-				inputSchema: {
-					type: 'object',
-					properties: {
-						query: {
-							type: 'string',
-							description: 'Search query string (e.g., "#rustlang", "from:user keyword")',
-						},
-						limit: {
-							type: 'number',
-							description: 'Maximum number of results to return (1-50, default: 10)',
-							default: 10,
-						},
-					},
-					required: ['query'],
-				},
-			},
-			{
-				name: 'search_reddit',
-				description: 'Search Reddit posts and comments matching a query. Returns post metadata including title, subreddit, score, URL, and a preview of the content. Use this to find discussions, recommendations, and community opinions.',
-				inputSchema: {
-					type: 'object',
-					properties: {
-						query: {
-							type: 'string',
-							description: 'Search query string (e.g., "best mechanical keyboard", "rust learning resources")',
-						},
-						limit: {
-							type: 'number',
-							description: 'Maximum number of results to return (1-100, default: 10)',
-							default: 10,
-						},
-					},
-					required: ['query'],
-				},
-			},
-			{
-				name: 'search_xiaohongshu',
-				description: 'Search Xiaohongshu (Little Red Book / 小红书) posts matching a query. MANUAL SETUP REQUIRED: You must configure Xiaohongshu cookies in ~/.agent-reach/config.yaml and install the required browser automation dependencies. Returns post metadata including title, content preview, likes, and link.',
-				inputSchema: {
-					type: 'object',
-					properties: {
-						query: {
-							type: 'string',
-							description: 'Search query string in Chinese (e.g., "护肤品推荐", "旅行攻略")',
-						},
-						limit: {
-							type: 'number',
-							description: 'Maximum number of results to return (1-20, default: 10)',
-							default: 10,
-						},
-					},
-					required: ['query'],
-				},
-			},
-			{
-				name: 'search_exa',
-				description: 'Search the web using Exa AI search API (via mcporter). Returns high-quality search results with titles, URLs, and content summaries. Exa provides semantic search capabilities that understand the meaning behind queries, making it ideal for research and discovery.',
-				inputSchema: {
-					type: 'object',
-					properties: {
-						query: {
-							type: 'string',
-							description: 'Search query string (e.g., "latest advances in LLM agents 2024")',
-						},
-						limit: {
-							type: 'number',
-							description: 'Maximum number of results to return (1-100, default: 10)',
-							default: 10,
-						},
-					},
-					required: ['query'],
-				},
-			},
-			{
-				name: 'read_rss',
-				description: 'Read and parse an RSS or Atom feed from a given URL. Returns feed metadata (title, description, link) and a list of recent entries with titles, links, publication dates, and summaries. Supports both RSS 2.0 and Atom formats. Uses Python feedparser if available, falls back to built-in XML parsing.',
-				inputSchema: {
-					type: 'object',
-					properties: {
-						url: {
-							type: 'string',
-							description: 'The RSS/Atom feed URL (e.g., https://news.ycombinator.com/rss)',
-						},
-						limit: {
-							type: 'number',
-							description: 'Maximum number of entries to return (1-50, default: 10)',
-							default: 10,
-						},
-					},
-					required: ['url'],
-				},
-			},
-			{
-				name: 'doctor',
-				description: 'Run Agent Reach diagnostics. Checks availability of all dependencies (curl, yt-dlp, python3, feedparser, mcporter, agent-reach) and reports their versions and status. Use this to troubleshoot when other Agent Reach tools are not working.',
-				inputSchema: {
-					type: 'object',
-					properties: {},
-					required: [],
-				},
-			},
-		],
-	};
+        return {
+                tools: [
+                        {
+                                name: 'read_webpage',
+                                description: 'Extract clean article content from any webpage URL. Uses jina.ai reader to strip ads, navigation, and formatting, returning just the readable article text. Great for reading news articles, blog posts, documentation pages, and any public web content.',
+                                inputSchema: {
+                                        type: 'object',
+                                        properties: {
+                                                url: {
+                                                        type: 'string',
+                                                        description: 'The full URL of the webpage to read (e.g., https://example.com/article)',
+                                                },
+                                        },
+                                        required: ['url'],
+                                },
+                        },
+                        {
+                                name: 'search_youtube',
+                                description: 'Search YouTube for videos matching a query. Returns video metadata including title, description, duration, view count, uploader, and video URL. Use this to find relevant videos, tutorials, talks, or educational content.',
+                                inputSchema: {
+                                        type: 'object',
+                                        properties: {
+                                                query: {
+                                                        type: 'string',
+                                                        description: 'Search query string (e.g., "TypeScript tutorial", "Rust programming")',
+                                                },
+                                                limit: {
+                                                        type: 'number',
+                                                        description: 'Maximum number of results to return (1-20, default: 5)',
+                                                        default: 5,
+                                                },
+                                        },
+                                        required: ['query'],
+                                },
+                        },
+                        {
+                                name: 'get_youtube_transcript',
+                                description: 'Fetch the transcript/subtitles of a YouTube video. Returns the full subtitle text in the requested language. Use this to get the spoken content of a video as readable text.',
+                                inputSchema: {
+                                        type: 'object',
+                                        properties: {
+                                                url: {
+                                                        type: 'string',
+                                                        description: 'The full YouTube video URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)',
+                                                },
+                                                lang: {
+                                                        type: 'string',
+                                                        description: 'Language code for subtitles (e.g., "en", "zh", "ja", "auto"). Default: "en"',
+                                                        default: 'en',
+                                                },
+                                        },
+                                        required: ['url'],
+                                },
+                        },
+                        {
+                                name: 'search_bilibili',
+                                description: 'Search Bilibili (B站) for videos matching a query. Returns video metadata including title, description, duration, view count, and video link. Use this to find Chinese-language video content, tutorials, anime, and educational videos.',
+                                inputSchema: {
+                                        type: 'object',
+                                        properties: {
+                                                query: {
+                                                        type: 'string',
+                                                        description: 'Search query string (e.g., "编程教程", "深度学习")',
+                                                },
+                                                limit: {
+                                                        type: 'number',
+                                                        description: 'Maximum number of results to return (1-50, default: 10)',
+                                                        default: 10,
+                                                },
+                                        },
+                                        required: ['query'],
+                                },
+                        },
+                        {
+                                name: 'search_github',
+                                description: 'Search GitHub repositories matching a query. Returns repo metadata including name, description, stars, language, and URL. Use this to find open-source projects, libraries, tools, code examples, and reference implementations.',
+                                inputSchema: {
+                                        type: 'object',
+                                        properties: {
+                                                query: {
+                                                        type: 'string',
+                                                        description: 'Search query string (e.g., "react state management", "machine learning python")',
+                                                },
+                                                limit: {
+                                                        type: 'number',
+                                                        description: 'Maximum number of results to return (1-100, default: 10)',
+                                                        default: 10,
+                                                },
+                                        },
+                                        required: ['query'],
+                                },
+                        },
+                        {
+                                name: 'search_twitter',
+                                description: 'Search Twitter/X posts matching a query. REQUIRES MANUAL SETUP: You must configure Twitter/X cookies in ~/.agent-reach/config.yaml before using this tool. Returns recent tweets matching the search query.',
+                                inputSchema: {
+                                        type: 'object',
+                                        properties: {
+                                                query: {
+                                                        type: 'string',
+                                                        description: 'Search query string (e.g., "#rustlang", "from:user keyword")',
+                                                },
+                                                limit: {
+                                                        type: 'number',
+                                                        description: 'Maximum number of results to return (1-50, default: 10)',
+                                                        default: 10,
+                                                },
+                                        },
+                                        required: ['query'],
+                                },
+                        },
+                        {
+                                name: 'search_reddit',
+                                description: 'Search Reddit posts and comments matching a query. Returns post metadata including title, subreddit, score, URL, and a preview of the content. Use this to find discussions, recommendations, and community opinions.',
+                                inputSchema: {
+                                        type: 'object',
+                                        properties: {
+                                                query: {
+                                                        type: 'string',
+                                                        description: 'Search query string (e.g., "best mechanical keyboard", "rust learning resources")',
+                                                },
+                                                limit: {
+                                                        type: 'number',
+                                                        description: 'Maximum number of results to return (1-100, default: 10)',
+                                                        default: 10,
+                                                },
+                                        },
+                                        required: ['query'],
+                                },
+                        },
+                        {
+                                name: 'search_xiaohongshu',
+                                description: 'Search Xiaohongshu (Little Red Book / 小红书) posts matching a query. MANUAL SETUP REQUIRED: You must configure Xiaohongshu cookies in ~/.agent-reach/config.yaml and install the required browser automation dependencies. Returns post metadata including title, content preview, likes, and link.',
+                                inputSchema: {
+                                        type: 'object',
+                                        properties: {
+                                                query: {
+                                                        type: 'string',
+                                                        description: 'Search query string in Chinese (e.g., "护肤品推荐", "旅行攻略")',
+                                                },
+                                                limit: {
+                                                        type: 'number',
+                                                        description: 'Maximum number of results to return (1-20, default: 10)',
+                                                        default: 10,
+                                                },
+                                        },
+                                        required: ['query'],
+                                },
+                        },
+                        {
+                                name: 'search_exa',
+                                description: 'Search the web using Exa AI search API (via mcporter). Returns high-quality search results with titles, URLs, and content summaries. Exa provides semantic search capabilities that understand the meaning behind queries, making it ideal for research and discovery.',
+                                inputSchema: {
+                                        type: 'object',
+                                        properties: {
+                                                query: {
+                                                        type: 'string',
+                                                        description: 'Search query string (e.g., "latest advances in LLM agents 2024")',
+                                                },
+                                                limit: {
+                                                        type: 'number',
+                                                        description: 'Maximum number of results to return (1-100, default: 10)',
+                                                        default: 10,
+                                                },
+                                        },
+                                        required: ['query'],
+                                },
+                        },
+                        {
+                                name: 'read_rss',
+                                description: 'Read and parse an RSS or Atom feed from a given URL. Returns feed metadata (title, description, link) and a list of recent entries with titles, links, publication dates, and summaries. Supports both RSS 2.0 and Atom formats. Uses Python feedparser if available, falls back to built-in XML parsing.',
+                                inputSchema: {
+                                        type: 'object',
+                                        properties: {
+                                                url: {
+                                                        type: 'string',
+                                                        description: 'The RSS/Atom feed URL (e.g., https://news.ycombinator.com/rss)',
+                                                },
+                                                limit: {
+                                                        type: 'number',
+                                                        description: 'Maximum number of entries to return (1-50, default: 10)',
+                                                        default: 10,
+                                                },
+                                        },
+                                        required: ['url'],
+                                },
+                        },
+                        {
+                                name: 'doctor',
+                                description: 'Run Agent Reach diagnostics. Checks availability of all dependencies (curl, yt-dlp, python3, feedparser, mcporter, agent-reach) and reports their versions and status. Use this to troubleshoot when other Agent Reach tools are not working.',
+                                inputSchema: {
+                                        type: 'object',
+                                        properties: {},
+                                        required: [],
+                                },
+                        },
+                ],
+        };
 }
 
 // ─── Tool: Execute a tool call ──────────────────────────────────────────────
@@ -827,68 +828,68 @@ function handleListTools(): { tools: McpTool[] } {
  * Returns structured MCP content array with text results.
  */
 async function handleToolCall(
-	name: string,
-	args: any,
+        name: string,
+        args: any,
 ): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
-	log('info', `Tool call: ${name} with args: ${JSON.stringify(args)}`);
+        log('info', `Tool call: ${name} with args: ${JSON.stringify(args)}`);
 
-	try {
-		// Validate tool name against allowlist — never execute arbitrary commands
-		if (!TOOL_COMMANDS[name]) {
-			return {
-				content: [{ type: 'text', text: `Unknown tool: "${name}". Available tools: ${Object.keys(TOOL_COMMANDS).join(', ')}` }],
-				isError: true,
-			};
-		}
+        try {
+                // Validate tool name against allowlist — never execute arbitrary commands
+                if (!TOOL_COMMANDS[name]) {
+                        return {
+                                content: [{ type: 'text', text: `Unknown tool: "${name}". Available tools: ${Object.keys(TOOL_COMMANDS).join(', ')}` }],
+                                isError: true,
+                        };
+                }
 
-		const config = loadAgentReachConfig();
-		const env = buildCommandEnv(config);
+                const config = loadAgentReachConfig();
+                const env = buildCommandEnv(config);
 
-		// Special handling for tools that require manual setup
-		if (name === 'search_twitter') {
-			return handleTwitterSearch(args, config);
-		}
+                // Special handling for tools that require manual setup
+                if (name === 'search_twitter') {
+                        return handleTwitterSearch(args, config);
+                }
 
-		if (name === 'search_xiaohongshu') {
-			return handleXiaohongshuSearch(args, config);
-		}
+                if (name === 'search_xiaohongshu') {
+                        return handleXiaohongshuSearch(args, config);
+                }
 
-		// Resolve the command
-		const commandSpec = TOOL_COMMANDS[name](args, env);
-		if (commandSpec === null) {
-			return {
-				content: [{ type: 'text', text: `Tool "${name}" returned null — this should not happen.` }],
-				isError: true,
-			};
-		}
+                // Resolve the command
+                const commandSpec = TOOL_COMMANDS[name](args, env);
+                if (commandSpec === null) {
+                        return {
+                                content: [{ type: 'text', text: `Tool "${name}" returned null — this should not happen.` }],
+                                isError: true,
+                        };
+                }
 
-		const { cmd, args: cmdArgs, timeout = DEFAULT_TIMEOUT, env: cmdEnv, input } = commandSpec;
+                const { cmd, args: cmdArgs, timeout = DEFAULT_TIMEOUT, env: cmdEnv, input } = commandSpec;
 
-		// Execute the command
-		const result = await executeCommand(cmd, cmdArgs, timeout, cmdEnv, input);
+                // Execute the command
+                const result = await executeCommand(cmd, cmdArgs, timeout, cmdEnv, input);
 
-		// Check for errors
-		if (result.exitCode !== 0 && result.exitCode !== 124) {
-			const errorMsg = result.stderr || `Command exited with code ${result.exitCode}`;
-			return {
-				content: [{ type: 'text', text: `[${name}] Error: ${errorMsg}\n\nstdout: ${result.stdout}` }],
-				isError: true,
-			};
-		}
+                // Check for errors
+                if (result.exitCode !== 0 && result.exitCode !== 124) {
+                        const errorMsg = result.stderr || `Command exited with code ${result.exitCode}`;
+                        return {
+                                content: [{ type: 'text', text: `[${name}] Error: ${errorMsg}\n\nstdout: ${result.stdout}` }],
+                                isError: true,
+                        };
+                }
 
-		// Return stdout content
-		return {
-			content: [{ type: 'text', text: result.stdout || result.stderr || '(no output)' }],
-		};
+                // Return stdout content
+                return {
+                        content: [{ type: 'text', text: result.stdout || result.stderr || '(no output)' }],
+                };
 
-	} catch (error) {
-		const errorMsg = error instanceof Error ? error.message : String(error);
-		log('error', `Tool ${name} failed: ${errorMsg}`);
-		return {
-			content: [{ type: 'text', text: `[${name}] Error: ${errorMsg}` }],
-			isError: true,
-		};
-	}
+        } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                log('error', `Tool ${name} failed: ${errorMsg}`);
+                return {
+                        content: [{ type: 'text', text: `[${name}] Error: ${errorMsg}` }],
+                        isError: true,
+                };
+        }
 }
 
 // ─── Special Handlers ───────────────────────────────────────────────────────
@@ -897,37 +898,37 @@ async function handleToolCall(
  * Handle Twitter/X search with cookie-based fallback.
  */
 async function handleTwitterSearch(
-	args: any,
-	config: AgentReachConfig,
+        args: any,
+        config: AgentReachConfig,
 ): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
-	const query = args.query as string;
-	const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 50);
+        const query = args.query as string;
+        const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 50);
 
-	// Check if cookies are configured
-	if (!config.cookies || !config.cookies.twitter_auth_token) {
-		return {
-			content: [{
-				type: 'text',
-				text: `Twitter/X search requires authentication cookies.\n\n` +
-					`To set up Twitter search:\n` +
-					`1. Open Twitter/X in your browser and log in\n` +
-					`2. Open DevTools (F12) → Application → Cookies\n` +
-					`3. Copy the 'auth_token' cookie value\n` +
-					`4. Add to ~/.agent-reach/config.yaml:\n\n` +
-					`cookies:\n` +
-					`  twitter_auth_token: YOUR_AUTH_TOKEN_HERE\n\n` +
-					`5. Restart KOVIX for changes to take effect\n\n` +
-					`Query that would have been searched: "${query}" (limit: ${limit})`,
-			}],
-			isError: true,
-		};
-	}
+        // Check if cookies are configured
+        if (!config.cookies || !config.cookies.twitter_auth_token) {
+                return {
+                        content: [{
+                                type: 'text',
+                                text: `Twitter/X search requires authentication cookies.\n\n` +
+                                        `To set up Twitter search:\n` +
+                                        `1. Open Twitter/X in your browser and log in\n` +
+                                        `2. Open DevTools (F12) → Application → Cookies\n` +
+                                        `3. Copy the 'auth_token' cookie value\n` +
+                                        `4. Add to ~/.agent-reach/config.yaml:\n\n` +
+                                        `cookies:\n` +
+                                        `  twitter_auth_token: YOUR_AUTH_TOKEN_HERE\n\n` +
+                                        `5. Restart KOVIX for changes to take effect\n\n` +
+                                        `Query that would have been searched: "${query}" (limit: ${limit})`,
+                        }],
+                        isError: true,
+                };
+        }
 
-	// Try using twscrape or similar tool with cookies
-	try {
-		const env = buildCommandEnv(config);
-		// Attempt to use Python with the cookies
-		const pythonScript = `
+        // Try using twscrape or similar tool with cookies
+        try {
+                const env = buildCommandEnv(config);
+                // Attempt to use Python with the cookies
+                const pythonScript = `
 import sys
 import json
 import urllib.request
@@ -946,54 +947,54 @@ print(json.dumps({
     "suggestion": "Consider using twscrape or similar tool: pip install twscrape",
 }, indent=2))
 `;
-		const result = await executeCommand('python3', ['-c', pythonScript], DEFAULT_TIMEOUT, env);
-		return {
-			content: [{ type: 'text', text: result.stdout || result.stderr }],
-		};
-	} catch (error) {
-		const errorMsg = error instanceof Error ? error.message : String(error);
-		return {
-			content: [{ type: 'text', text: `[search_twitter] Error: ${errorMsg}` }],
-			isError: true,
-		};
-	}
+                const result = await executeCommand('python3', ['-c', pythonScript], DEFAULT_TIMEOUT, env);
+                return {
+                        content: [{ type: 'text', text: result.stdout || result.stderr }],
+                };
+        } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                return {
+                        content: [{ type: 'text', text: `[search_twitter] Error: ${errorMsg}` }],
+                        isError: true,
+                };
+        }
 }
 
 /**
  * Handle Xiaohongshu search with cookie-based authentication requirement.
  */
 async function handleXiaohongshuSearch(
-	args: any,
-	config: AgentReachConfig,
+        args: any,
+        config: AgentReachConfig,
 ): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
-	const query = args.query as string;
-	const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 20);
+        const query = args.query as string;
+        const limit = Math.min(Math.max(parseInt(args.limit as string || '10', 10), 1), 20);
 
-	// Check if cookies are configured
-	if (!config.cookies || !config.cookies.xhs_cookie) {
-		return {
-			content: [{
-				type: 'text',
-				text: `Xiaohongshu (小红书) search requires authentication cookies due to anti-bot protection.\n\n` +
-					`To set up Xiaohongshu search:\n` +
-					`1. Open xiaohongshu.com in your browser and log in\n` +
-					`2. Open DevTools (F12) → Application → Cookies\n` +
-					`3. Copy your session cookie string\n` +
-					`4. Add to ~/.agent-reach/config.yaml:\n\n` +
-					`cookies:\n` +
-					`  xhs_cookie: YOUR_COOKIE_STRING_HERE\n\n` +
-					`5. Install browser automation: pip install playwright\n` +
-					`6. Restart KOVIX for changes to take effect\n\n` +
-					`Query that would have been searched: "${query}" (limit: ${limit})`,
-			}],
-			isError: true,
-		};
-	}
+        // Check if cookies are configured
+        if (!config.cookies || !config.cookies.xhs_cookie) {
+                return {
+                        content: [{
+                                type: 'text',
+                                text: `Xiaohongshu (小红书) search requires authentication cookies due to anti-bot protection.\n\n` +
+                                        `To set up Xiaohongshu search:\n` +
+                                        `1. Open xiaohongshu.com in your browser and log in\n` +
+                                        `2. Open DevTools (F12) → Application → Cookies\n` +
+                                        `3. Copy your session cookie string\n` +
+                                        `4. Add to ~/.agent-reach/config.yaml:\n\n` +
+                                        `cookies:\n` +
+                                        `  xhs_cookie: YOUR_COOKIE_STRING_HERE\n\n` +
+                                        `5. Install browser automation: pip install playwright\n` +
+                                        `6. Restart KOVIX for changes to take effect\n\n` +
+                                        `Query that would have been searched: "${query}" (limit: ${limit})`,
+                        }],
+                        isError: true,
+                };
+        }
 
-	// Try using Python with the configured cookie
-	try {
-		const env = buildCommandEnv(config);
-		const pythonScript = `
+        // Try using Python with the configured cookie
+        try {
+                const env = buildCommandEnv(config);
+                const pythonScript = `
 import sys
 import json
 import urllib.request
@@ -1023,17 +1024,17 @@ result = {
 }
 print(json.dumps(result, indent=2, ensure_ascii=False))
 `;
-		const result = await executeCommand('python3', ['-c', pythonScript], LONG_TIMEOUT, env);
-		return {
-			content: [{ type: 'text', text: result.stdout || result.stderr }],
-		};
-	} catch (error) {
-		const errorMsg = error instanceof Error ? error.message : String(error);
-		return {
-			content: [{ type: 'text', text: `[search_xiaohongshu] Error: ${errorMsg}` }],
-			isError: true,
-		};
-	}
+                const result = await executeCommand('python3', ['-c', pythonScript], LONG_TIMEOUT, env);
+                return {
+                        content: [{ type: 'text', text: result.stdout || result.stderr }],
+                };
+        } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                return {
+                        content: [{ type: 'text', text: `[search_xiaohongshu] Error: ${errorMsg}` }],
+                        isError: true,
+                };
+        }
 }
 
 // ─── JSON-RPC Handlers ──────────────────────────────────────────────────────
@@ -1043,66 +1044,66 @@ print(json.dumps(result, indent=2, ensure_ascii=False))
  * Supports MCP protocol methods: initialize, tools/list, tools/call.
  */
 async function handleRequest(req: JsonRpcRequest): Promise<JsonRpcResponse> {
-	const { id, method, params } = req;
+        const { id, method, params } = req;
 
-	log('info', `JSON-RPC method: ${method}`);
+        log('info', `JSON-RPC method: ${method}`);
 
-	switch (method) {
-		// ─── MCP Initialize ──────────────────────────────────────────────
-		case 'initialize': {
-			const result: McpInitializeResult = {
-				protocolVersion: '2024-11-05',
-				capabilities: {
-					tools: {},
-					resources: {},
-				},
-				serverInfo: {
-					name: SERVER_NAME,
-					version: SERVER_VERSION,
-				},
-			};
+        switch (method) {
+                // ─── MCP Initialize ──────────────────────────────────────────────
+                case 'initialize': {
+                        const result: McpInitializeResult = {
+                                protocolVersion: '2024-11-05',
+                                capabilities: {
+                                        tools: {},
+                                        resources: {},
+                                },
+                                serverInfo: {
+                                        name: SERVER_NAME,
+                                        version: SERVER_VERSION,
+                                },
+                        };
 
-			return { jsonrpc: '2.0', id, result };
-		}
+                        return { jsonrpc: '2.0', id, result };
+                }
 
-		// ─── MCP Initialized Notification ────────────────────────────────
-		case 'notifications/initialized': {
-			// This is a notification, no response needed
-			return { jsonrpc: '2.0', id: null, result: null };
-		}
+                // ─── MCP Initialized Notification ────────────────────────────────
+                case 'notifications/initialized': {
+                        // This is a notification, no response needed
+                        return { jsonrpc: '2.0', id: null, result: null };
+                }
 
-		// ─── MCP Tools/List ──────────────────────────────────────────────
-		case 'tools/list': {
-			const result = handleListTools();
-			return { jsonrpc: '2.0', id, result };
-		}
+                // ─── MCP Tools/List ──────────────────────────────────────────────
+                case 'tools/list': {
+                        const result = handleListTools();
+                        return { jsonrpc: '2.0', id, result };
+                }
 
-		// ─── MCP Tools/Call ──────────────────────────────────────────────
-		case 'tools/call': {
-			const toolName = params?.name as string;
-			const toolArgs = params?.arguments as Record<string, any> || {};
+                // ─── MCP Tools/Call ──────────────────────────────────────────────
+                case 'tools/call': {
+                        const toolName = params?.name as string;
+                        const toolArgs = params?.arguments as Record<string, any> || {};
 
-			if (!toolName) {
-				return {
-					jsonrpc: '2.0',
-					id,
-					error: { code: -32602, message: 'Missing tool name in params' },
-				};
-			}
+                        if (!toolName) {
+                                return {
+                                        jsonrpc: '2.0',
+                                        id,
+                                        error: { code: -32602, message: 'Missing tool name in params' },
+                                };
+                        }
 
-			const result = await handleToolCall(toolName, toolArgs);
-			return { jsonrpc: '2.0', id, result };
-		}
+                        const result = await handleToolCall(toolName, toolArgs);
+                        return { jsonrpc: '2.0', id, result };
+                }
 
-		// ─── Unknown Method ──────────────────────────────────────────────
-		default: {
-			return {
-				jsonrpc: '2.0',
-				id,
-				error: { code: -32601, message: `Method not found: "${method}"` },
-			};
-		}
-	}
+                // ─── Unknown Method ──────────────────────────────────────────────
+                default: {
+                        return {
+                                jsonrpc: '2.0',
+                                id,
+                                error: { code: -32601, message: `Method not found: "${method}"` },
+                        };
+                }
+        }
 }
 
 // ─── Main: stdio server loop ────────────────────────────────────────────────
@@ -1113,100 +1114,100 @@ async function handleRequest(req: JsonRpcRequest): Promise<JsonRpcResponse> {
  * and writes JSON responses to stdout.
  */
 function main(): void {
-	log('info', `${SERVER_NAME} v${SERVER_VERSION} starting...`);
+        log('info', `${SERVER_NAME} v${SERVER_VERSION} starting...`);
 
-	const config = loadAgentReachConfig();
-	if (config.proxy) {
-		log('info', `Using proxy: ${config.proxy}`);
-	}
+        const config = loadAgentReachConfig();
+        if (config.proxy) {
+                log('info', `Using proxy: ${config.proxy}`);
+        }
 
-	const venvPath = detectVenvPath();
-	if (venvPath) {
-		log('info', `Detected venv: ${venvPath}`);
-	}
+        const venvPath = detectVenvPath();
+        if (venvPath) {
+                log('info', `Detected venv: ${venvPath}`);
+        }
 
-	// Create readline interface for line-delimited JSON
-	const rl = readline.createInterface({
-		input: process.stdin,
-		output: process.stdout,
-		terminal: false,
-	});
+        // Create readline interface for line-delimited JSON
+        const rl = readline.createInterface({
+                input: process.stdin,
+                output: process.stdout,
+                terminal: false,
+        });
 
-	log('info', 'Server ready — listening for JSON-RPC messages on stdin');
+        log('info', 'Server ready — listening for JSON-RPC messages on stdin');
 
-	rl.on('line', async (line: string) => {
-		const trimmed = line.trim();
-		if (!trimmed) {
-			return;
-		}
+        rl.on('line', async (line: string) => {
+                const trimmed = line.trim();
+                if (!trimmed) {
+                        return;
+                }
 
-		let request: JsonRpcRequest;
-		try {
-			request = JSON.parse(trimmed) as JsonRpcRequest;
-		} catch {
-			// Invalid JSON — send parse error
-			const response: JsonRpcResponse = {
-				jsonrpc: '2.0',
-				id: null,
-				error: { code: -32700, message: 'Parse error: Invalid JSON' },
-			};
-			console.log(JSON.stringify(response));
-			return;
-		}
+                let request: JsonRpcRequest;
+                try {
+                        request = JSON.parse(trimmed) as JsonRpcRequest;
+                } catch {
+                        // Invalid JSON — send parse error
+                        const response: JsonRpcResponse = {
+                                jsonrpc: '2.0',
+                                id: null,
+                                error: { code: -32700, message: 'Parse error: Invalid JSON' },
+                        };
+                        console.log(JSON.stringify(response));
+                        return;
+                }
 
-		// Validate JSON-RPC version
-		if (request.jsonrpc !== '2.0') {
-			const response: JsonRpcResponse = {
-				jsonrpc: '2.0',
-				id: request.id ?? null,
-				error: { code: -32600, message: 'Invalid Request: jsonrpc must be "2.0"' },
-			};
-			console.log(JSON.stringify(response));
-			return;
-		}
+                // Validate JSON-RPC version
+                if (request.jsonrpc !== '2.0') {
+                        const response: JsonRpcResponse = {
+                                jsonrpc: '2.0',
+                                id: request.id ?? null,
+                                error: { code: -32600, message: 'Invalid Request: jsonrpc must be "2.0"' },
+                        };
+                        console.log(JSON.stringify(response));
+                        return;
+                }
 
-		try {
-			const response = await handleRequest(request);
-			// Only send response if id is not null (not a notification)
-			if (request.id !== null) {
-				console.log(JSON.stringify(response));
-			}
-		} catch (error) {
-			const errorMsg = error instanceof Error ? error.message : String(error);
-			log('error', `Handler error: ${errorMsg}`);
-			const response: JsonRpcResponse = {
-				jsonrpc: '2.0',
-				id: request.id ?? null,
-				error: { code: -32603, message: `Internal error: ${errorMsg}` },
-			};
-			console.log(JSON.stringify(response));
-		}
-	});
+                try {
+                        const response = await handleRequest(request);
+                        // Only send response if id is not null (not a notification)
+                        if (request.id !== null) {
+                                console.log(JSON.stringify(response));
+                        }
+                } catch (error) {
+                        const errorMsg = error instanceof Error ? error.message : String(error);
+                        log('error', `Handler error: ${errorMsg}`);
+                        const response: JsonRpcResponse = {
+                                jsonrpc: '2.0',
+                                id: request.id ?? null,
+                                error: { code: -32603, message: `Internal error: ${errorMsg}` },
+                        };
+                        console.log(JSON.stringify(response));
+                }
+        });
 
-	rl.on('close', () => {
-		log('info', 'Stdin closed — shutting down');
-		process.exit(0);
-	});
+        rl.on('close', () => {
+                log('info', 'Stdin closed — shutting down');
+                process.exit(0);
+        });
 
-	// Handle signals gracefully
-	process.on('SIGINT', () => {
-		log('info', 'Received SIGINT — shutting down gracefully');
-		process.exit(0);
-	});
+        // Handle signals gracefully
+        process.on('SIGINT', () => {
+                log('info', 'Received SIGINT — shutting down gracefully');
+                process.exit(0);
+        });
 
-	process.on('SIGTERM', () => {
-		log('info', 'Received SIGTERM — shutting down gracefully');
-		process.exit(0);
-	});
+        process.on('SIGTERM', () => {
+                log('info', 'Received SIGTERM — shutting down gracefully');
+                process.exit(0);
+        });
 
-	// Handle uncaught errors to prevent crash
-	process.on('uncaughtException', (error) => {
-		log('error', `Uncaught exception: ${error.message}`);
-	});
+        // Handle uncaught errors to prevent crash
+        process.on('uncaughtException', (error) => {
+                log('error', `Uncaught exception: ${error.message}`);
+        });
 
-	process.on('unhandledRejection', (reason) => {
-		log('error', `Unhandled rejection: ${reason}`);
-	});
+        process.on('unhandledRejection', (reason) => {
+                log('error', `Unhandled rejection: ${reason}`);
+        });
 }
 
 // Start the server

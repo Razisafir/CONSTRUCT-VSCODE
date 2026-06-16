@@ -194,7 +194,8 @@ export class ConstructOnboardingWizard extends Disposable {
 
                         case 'installAgentReach': {
                                 try {
-                                        const terminalExecutor = (await import('../../../../platform/construct/common/terminal/terminalExecutor.js')).ITerminalExecutor;
+                                        // Dynamic import kept for future use when service accessor is available
+                                        await import('../../../../platform/construct/common/terminal/terminalExecutor.js');
                                         // Since we can't easily get the service accessor here, just notify
                                         this.notificationService.info('Agent Reach: Starting installation. Run "Construct: Install Agent Reach" from the command palette for automated setup.');
                                         this.postMessage({ type: 'agentReachInstalled' });

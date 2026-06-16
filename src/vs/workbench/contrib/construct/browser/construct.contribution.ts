@@ -1221,12 +1221,12 @@ registerAction2(class ReadWebpageAction extends Action2 {
                 const url = await quickInput.input({
                         prompt: 'Enter webpage URL to read',
                         placeHolder: 'https://example.com',
-                        validateInput: (value) => {
+                        validateInput: async (value: string) => {
                                 if (!value) { return 'URL cannot be empty'; }
                                 if (!value.startsWith('http://') && !value.startsWith('https://')) {
                                         return 'URL must start with http:// or https://';
                                 }
-                                return undefined as unknown as string;
+                                return undefined;
                         },
                 });
 
@@ -1497,23 +1497,24 @@ registerAction2(class UiuxStackGuidelinesAction extends Action2 {
 
 // --- Patch A: Register KovixInlineCompletionProvider (Tab autocomplete) ----
 // Tier 1, item 1.1 — wires IConstructAIService.complete() to VS Code's
-// InlineCompletionItemProvider API. See audit doc §4.1 and §7.1.
+// InlineCompletionsProvider API. See audit doc §4.1 and §7.1.
 import { KovixInlineCompletionProvider } from './services/editor/kovixInlineCompletionProvider.js';
-import { registerInlineCompletionsProvider } from '../../../../editor/contrib/inlineCompletions/browser/inlineCompletions.contribution.js';
+import { ILanguageFeaturesService } from '../../../../editor/common/services/languageFeatures.js';
 
 class ConstructInlineCompletionContribution extends Disposable implements IWorkbenchContribution {
         static readonly ID = 'workbench.contrib.constructInlineCompletion';
 
         constructor(
                 @IInstantiationService instantiationService: IInstantiationService,
+                @ILanguageFeaturesService languageFeaturesService: ILanguageFeaturesService,
         ) {
                 super();
-                // Register the provider for all document types ('**').
-                // The provider itself respects the construct.autocomplete.enabled setting.
-                registerInlineCompletionsProvider(
+                // Register the provider for all document types. The provider itself
+                // respects the construct.autocomplete.enabled setting.
+                this._register(languageFeaturesService.inlineCompletionProvider.register(
                         { pattern: '**' },
                         instantiationService.createInstance(KovixInlineCompletionProvider)
-                );
+                ));
         }
 }
 

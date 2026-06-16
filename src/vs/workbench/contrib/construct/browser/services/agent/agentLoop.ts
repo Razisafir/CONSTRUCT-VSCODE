@@ -39,9 +39,9 @@ import { IUniversalMemoryService } from '../../../../../../platform/construct/co
 
 // Tier 1, item 1.5 (audit doc §4.x) — raised from 15 to 50.
 // 15 was too low for complex multi-file refactors (Cursor commonly does 30-50
-// rounds). At round 50, the agent pauses and asks the user whether to continue.
+// rounds). 50 is the sweet spot: high enough to finish real work, low enough
+// to prevent runaway token consumption.
 const MAX_ROUNDS = 50;
-const MAX_ROUNDS_PROMPT_CONTINUE_AT = 50;
 
 /**
  * Cached result of a tool execution, used to avoid double-execution

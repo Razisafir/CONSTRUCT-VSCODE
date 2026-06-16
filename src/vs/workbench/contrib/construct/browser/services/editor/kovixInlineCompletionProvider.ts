@@ -16,8 +16,9 @@ import { Range } from '../../../../../../editor/common/core/range.js';
 import { Position } from '../../../../../../editor/common/core/position.js';
 import { ITextModel } from '../../../../../../editor/common/model.js';
 import {
-        InlineCompletionItemProvider,
-        InlineCompletionItem,
+        InlineCompletion,
+        InlineCompletions,
+        InlineCompletionsProvider,
         InlineCompletionContext,
         InlineCompletionTriggerKind
 } from '../../../../../../editor/common/languages.js';
@@ -47,13 +48,8 @@ export {
 } from '../../../../../../platform/construct/common/editor/kovixInlineCompletionHelpers.js';
 
 // Tunable defaults — also configurable via settings
-const CACHE_SIZE_LOCAL = 16; // matches SuggestionCache.CACHE_SIZE
-const CACHE_TTL_MS_LOCAL = 60_000; // matches SuggestionCache.CACHE_TTL_MS
-
-interface ICompletionCacheEntry {
-        suggestion: string;
-        timestamp: number;
-}
+// (Helpers in kovixInlineCompletionHelpers.ts have their own copies; these
+// local constants are kept for any future direct reference.)
 
 /**
  * KovixInlineCompletionProvider — Tab autocomplete provider backed by IConstructAIService.
@@ -65,7 +61,7 @@ interface ICompletionCacheEntry {
  * 4. Cached: last 16 (prefix, suffix) → suggestion pairs cached for cursor jitter.
  * 5. Graceful degradation: if AI service unavailable, returns undefined (no suggestion).
  */
-export class KovixInlineCompletionProvider extends Disposable implements InlineCompletionItemProvider {
+export class KovixInlineCompletionProvider extends Disposable implements InlineCompletionsProvider {
         readonly _serviceBrand: undefined;
 
         private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -86,17 +82,17 @@ export class KovixInlineCompletionProvider extends Disposable implements InlineC
                 position: Position,
                 context: InlineCompletionContext,
                 token: CancellationToken
-        ): Promise<InlineCompletionItem[] | undefined> {
+        ): Promise<InlineCompletions | undefined> {
                 // Respect user's enable/disable setting
-                if (!this.configService.getValue<boolean>('construct.autocomplete.enabled', true)) {
+                if (!this.configService.getValue<boolean>('construct.autocomplete.enabled')) {
                         return undefined;
                 }
 
                 // Debounce automatic triggers only (explicit Ctrl+Space fires immediately)
                 if (context.triggerKind === InlineCompletionTriggerKind.Automatic) {
                         const debounceMs = this.configService.getValue<number>(
-                                'construct.autocomplete.debounceMs', DEFAULT_DEBOUNCE_MS
-                        );
+                                'construct.autocomplete.debounceMs'
+                        ) ?? DEFAULT_DEBOUNCE_MS;
                         await this._debounce(debounceMs, token);
                         if (token.isCancellationRequested) {
                                 return undefined;
@@ -172,15 +168,16 @@ export class KovixInlineCompletionProvider extends Disposable implements InlineC
                 suggestion: string,
                 position: Position,
                 _model: ITextModel
-        ): InlineCompletionItem[] {
+        ): InlineCompletions {
                 const range = new Range(
                         position.lineNumber, position.column,
                         position.lineNumber, position.column
                 );
-                return [{
+                const item: InlineCompletion = {
                         insertText: suggestion,
                         range,
-                } as InlineCompletionItem];
+                };
+                return { items: [item] };
         }
 
         private _debounce(ms: number, token: CancellationToken): Promise<void> {
@@ -205,19 +202,25 @@ export class KovixInlineCompletionProvider extends Disposable implements InlineC
 
         // Optional VS Code inline completion provider hooks
         handleItemDidShow?(
-                _completions: readonly InlineCompletionItem[],
-                _item: InlineCompletionItem,
+                _completions: InlineCompletions,
+                _item: InlineCompletion,
                 _updatedInsertText: string
         ): void {
                 // Reserved for telemetry (Tier 1 item 1.7 — local usage log)
         }
 
         handlePartialAccept?(
-                _completions: readonly InlineCompletionItem[],
-                _item: InlineCompletionItem,
+                _completions: InlineCompletions,
+                _item: InlineCompletion,
                 _acceptedLength: number
         ): void {
                 // Reserved for telemetry
+        }
+
+        // freeInlineCompletions is optional on the interface — used for cleanup
+        // of large completion objects. Our completions are small so no-op.
+        freeInlineCompletions(_completions: InlineCompletions): void {
+                // no-op
         }
 
         override dispose(): void {
