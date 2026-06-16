@@ -42,7 +42,7 @@ import { IConstructSessionService } from '../../../../platform/construct/common/
 // process and exposed over IPC, but had ZERO callers in the renderer. The DB
 // file (.construct/chat-history.db) was never created. This wire-up makes the
 // service actually persist user messages and agent responses across restarts.
-import { IConstructChatHistory } from '../../../../platform/construct/common/memory/vectorStore.js';
+import { IConstructChatHistory, IChatSession, IChatHistoryMessage } from '../../../../platform/construct/common/memory/vectorStore.js';
 import { ISelectablePlanStep, IApprovedPlan, IMilestone } from '../../../../platform/construct/common/agent/milestoneStateMachine.js';
 import { showStopModePicker } from './constructStopModePicker.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
@@ -1737,27 +1737,111 @@ export class ConstructAgentViewPane extends ViewPane {
         // --- Session History ---
 
         private async showSessionHistory(): Promise<void> {
-                const sessions = this.sessionService.sessions;
-                if (sessions.length === 0) {
+                // F-005 fix: prefer persisted SQLite sessions over the in-memory
+                // sessionService, which loses everything on restart. Fall back to
+                // sessionService only if chatHistory is unavailable or empty.
+                let persistedSessions: IChatSession[] = [];
+                try {
+                        const workspaceRoot = this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath;
+                        if (workspaceRoot) {
+                                const ok = await this.chatHistory.initialize(workspaceRoot);
+                                if (ok) {
+                                        persistedSessions = await this.chatHistory.listSessions();
+                                }
+                        }
+                } catch (err) {
+                        this.logService.warn('[ConstructSession] Failed to load persisted sessions:', err instanceof Error ? err.message : String(err));
+                }
+
+                const inMemorySessions = this.sessionService.sessions;
+
+                if (persistedSessions.length === 0 && inMemorySessions.length === 0) {
                         this.notificationService.info('No previous sessions found.');
                         return;
                 }
 
-                const picks = sessions.map(s => ({
-                        label: s.title,
-                        description: `${s.messageCount} messages`,
-                        detail: `Last active: ${new Date(s.lastActiveAt).toLocaleString()}`,
-                        sessionId: s.id,
-                }));
+                // Build picks: persisted first (most recent), then in-memory (deduped by id).
+                const seenIds = new Set<string>();
+                const picks: Array<{ label: string; description: string; detail: string; sessionId: string; source: 'persisted' | 'memory' }> = [];
+
+                for (const s of persistedSessions) {
+                        if (seenIds.has(s.id)) { continue; }
+                        seenIds.add(s.id);
+                        picks.push({
+                                label: s.title || `Session ${s.id.slice(0, 8)}`,
+                                description: 'persisted',
+                                detail: `Last active: ${new Date(s.updatedAt).toLocaleString()}`,
+                                sessionId: s.id,
+                                source: 'persisted',
+                        });
+                }
+                for (const s of inMemorySessions) {
+                        if (seenIds.has(s.id)) { continue; }
+                        seenIds.add(s.id);
+                        picks.push({
+                                label: s.title,
+                                description: `${s.messageCount} messages (in-memory)`,
+                                detail: `Last active: ${new Date(s.lastActiveAt).toLocaleString()}`,
+                                sessionId: s.id,
+                                source: 'memory',
+                        });
+                }
 
                 const pick = await this.quickInputService.pick(picks, {
                         placeHolder: 'Select a session to restore...',
                         title: 'Session History',
                 });
 
-                if (pick) {
-                        await this.sessionService.switchToSession((pick as any).sessionId);
-                        this.notificationService.info(`Session restored: ${pick.label}`);
+                if (!pick) { return; }
+
+                const picked = pick as { sessionId: string; source: 'persisted' | 'memory'; label: string };
+                await this.restoreSession(picked.sessionId, picked.source, picked.label);
+        }
+
+        /**
+         * F-005 fix: Restore a session by id. Clears the current messages container,
+         * fetches the persisted messages (if any), re-renders user/agent bubbles,
+         * and sets _chatSessionId so subsequent messages append to the same session.
+         */
+        private async restoreSession(sessionId: string, source: 'persisted' | 'memory', label: string): Promise<void> {
+                try {
+                        // Clear current UI + agent loop state (also resets _chatSessionId via clearMessages()).
+                        this.clearMessages();
+
+                        // Switch the in-memory service (harmless if the session was persisted-only).
+                        try {
+                                await this.sessionService.switchToSession(sessionId);
+                        } catch { /* ignore — session may not exist in memory */ }
+
+                        let messages: IChatHistoryMessage[] = [];
+                        if (source === 'persisted') {
+                                try {
+                                        messages = await this.chatHistory.getMessages(sessionId);
+                                } catch (err) {
+                                        this.logService.warn('[ConstructSession] Failed to load messages for session', sessionId, err instanceof Error ? err.message : String(err));
+                                }
+                        }
+
+                        if (messages.length === 0) {
+                                this.addAgentMessage(`Restored session "${label}" — no persisted messages found. Send a new message to continue.`, 'info');
+                        } else {
+                                for (const m of messages) {
+                                        if (m.role === 'user') {
+                                                this.addUserMessage(m.content);
+                                        } else if (m.role === 'assistant') {
+                                                this.addAgentMessage(m.content, 'info');
+                                        }
+                                        // system / tool messages are skipped — they're internal state, not chat bubbles.
+                                }
+                        }
+
+                        // Subsequent new messages append to this session (ensureChatSession() will short-circuit).
+                        this._chatSessionId = sessionId;
+
+                        this.notificationService.info(`Session restored: ${label}`);
+                } catch (err) {
+                        this.notificationService.error('Failed to restore session: ' + (err instanceof Error ? err.message : String(err)));
+                        this.logService.error('[ConstructSession] restoreSession failed:', err);
                 }
         }
 
