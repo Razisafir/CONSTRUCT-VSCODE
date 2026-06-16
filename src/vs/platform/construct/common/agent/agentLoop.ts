@@ -10,6 +10,8 @@ import { Event } from '../../../../base/common/event.js';
 import { LoadingState, FileChangeEntry } from './loadingState.js';
 import { IRestoreResult } from '../snapshot/snapshotManager.js';
 import { IApprovedPlan, IMilestone, ExecutionState } from './milestoneStateMachine.js';
+// F-003 FIX: IChatMessage needed for getHistory() return type.
+import { IChatMessage } from '../llm/constructAIProvider.js';
 
 export const IAgentLoop = createDecorator<IAgentLoop>('construct.agentLoop');
 
@@ -142,6 +144,15 @@ export interface IAgentLoop {
          * @returns AsyncGenerator of events for real-time streaming.
          */
         runWithApprovedPlan(approvedPlan: IApprovedPlan, signal?: AbortSignal): AsyncGenerator<AgentLoopEvent>;
+
+        /**
+         * F-003 FIX: Get the current conversation history.
+         *
+         * Returns a defensive copy so callers cannot mutate internal state.
+         * Used by the agent view to display prior turns when reopening a
+         * session, and by chat-history persistence (F-004) to flush to disk.
+         */
+        getHistory(): IChatMessage[];
 
         /**
          * Start milestone-aware execution from an approved plan.

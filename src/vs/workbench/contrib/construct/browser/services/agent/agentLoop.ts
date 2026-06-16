@@ -40,6 +40,15 @@ import { IUniversalMemoryService } from '../../../../../../platform/construct/co
 const MAX_ROUNDS = 15;
 
 /**
+ * F-003 FIX: Maximum number of messages to retain in the conversation
+ * history across `run()` calls. Older messages are dropped (FIFO) to
+ * bound context window usage. 50 messages ≈ 25 user/assistant turns,
+ * which is enough for a multi-step coding session without overflowing
+ * the LLM context window on most providers.
+ */
+const MAX_CONVERSATION_HISTORY = 50;
+
+/**
  * Cached result of a tool execution, used to avoid double-execution
  * during the planning phase.
  */
@@ -176,6 +185,18 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         /** Active snapshot ID for the current task (for undo support). */
         private _activeSnapshotId: string | null = null;
 
+        /**
+         * F-003 FIX: Conversation history persisted across `run()` calls.
+         *
+         * Before this field existed, each `run()` call constructed a fresh
+         * `conversationMessages` array containing only the current user task —
+         * the agent had no memory of prior turns within the same chat session.
+         * This field is prepended to the local `conversationMessages` at the
+         * start of `run()`, and the full local conversation is appended back
+         * (FIFO-capped at MAX_CONVERSATION_HISTORY) at the end of `run()`.
+         */
+        private _conversationHistory: IChatMessage[] = [];
+
         /** Milestone execution state. */
         private _executionState: ExecutionState = ExecutionState.Idle;
         private _currentMilestone: IMilestone | null = null;
@@ -216,6 +237,25 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
 
         get currentMilestone(): IMilestone | null {
                 return this._currentMilestone;
+        }
+
+        /**
+         * F-003 FIX: Get a defensive copy of the conversation history.
+         */
+        getHistory(): IChatMessage[] {
+                return this._conversationHistory.map(msg => ({ ...msg }));
+        }
+
+        clearConversationHistory(): void {
+                // F-003 FIX: Also clear the actual conversation history field.
+                // Previously this method only cleared snapshot/milestone state
+                // but left the (non-existent) conversation history untouched —
+                // misleading name. Now that _conversationHistory exists, this
+                // method does what its name promises.
+                this._conversationHistory = [];
+                this._activeSnapshotId = null;
+                this._completedMilestoneIds.clear();
+                this.logService.info('[AgentLoop] Conversation history cleared (incl. snapshot + milestones, F-003)');
         }
 
         async runPlanningPhase(task: string, signal?: AbortSignal): Promise<IPlanResult> {
@@ -403,12 +443,20 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         // Build system prompt with memory context
                         const systemPrompt = await this.buildSystemPrompt(task, false);
 
+                        // F-003 FIX: Prepend persisted conversation history so the
+                        // agent has memory of prior turns within this chat session.
+                        // The current user task is appended as the final message so
+                        // the LLM treats it as the active request.
                         const conversationMessages: IChatMessage[] = [
+                                ...this._conversationHistory,
                                 {
                                         role: 'user',
                                         content: task
                                 }
                         ];
+                        // Snapshot the starting length so we can append only the new
+                        // turns to history at the end (not the prepended history).
+                        const historyLengthBefore = this._conversationHistory.length;
 
                         let roundCount = 0;
                         let finalSummary = '';
@@ -610,6 +658,18 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         if (this.universalMemory && finalSummary) {
                                 this.universalMemory.autoExtractFromTask(task, finalSummary.substring(0, 500)).catch(() => { /* non-critical */ });
                         }
+
+                        // F-003 FIX: Persist this run's conversation into history so the
+                        // next run() call has memory of prior turns. We slice from
+                        // historyLengthBefore to skip the prepended prior-history messages
+                        // (otherwise we'd double-count them). Cap at MAX_CONVERSATION_HISTORY
+                        // using FIFO eviction to bound context window usage.
+                        const newMessages = conversationMessages.slice(historyLengthBefore);
+                        this._conversationHistory.push(...newMessages);
+                        while (this._conversationHistory.length > MAX_CONVERSATION_HISTORY) {
+                                this._conversationHistory.shift();
+                        }
+                        this.logService.info(`[AgentLoop] History persisted: +${newMessages.length} messages, total ${this._conversationHistory.length}/${MAX_CONVERSATION_HISTORY} (F-003)`);
 
                         yield { type: 'complete', summary: finalSummary || 'Task completed.' };
                         this._onDidComplete.fire({ summary: finalSummary });
@@ -1106,12 +1166,6 @@ Guidelines:
                                 // Non-critical -- file explorer will refresh eventually via watchers
                         }
                 }
-        }
-
-        clearConversationHistory(): void {
-                this._activeSnapshotId = null;
-                this._completedMilestoneIds.clear();
-                this.logService.info('[AgentLoop] Conversation history cleared');
         }
 
         override dispose(): void {
