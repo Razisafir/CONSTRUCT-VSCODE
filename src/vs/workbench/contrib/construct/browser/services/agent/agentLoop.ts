@@ -36,6 +36,11 @@ import { redactSecrets } from '../../../../../../platform/construct/common/secur
 // P0-5: In-memory staging for agent-proposed changes
 import { IPendingChangesService } from '../../../../../../platform/construct/common/diff/pendingChanges.js';
 import { IUniversalMemoryService } from '../../../../../../platform/construct/common/memory/universalMemoryService.js';
+// F-002 FIX: Tool registry injection — replaces hardcoded AGENT_TOOLS array
+// so that dynamically-registered tools (security tools, MCP tools, custom tools)
+// become visible to the LLM and executable by the agent loop.
+import { IConstructToolRegistry } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
+import type { IToolDefinition as IRegistryToolDefinition } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
 
 const MAX_ROUNDS = 15;
 
@@ -201,9 +206,10 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 @IPendingChangesService private readonly pendingChanges: IPendingChangesService,
                 @IMCPServerManager private readonly mcpServerManager: IMCPServerManager,
                 @IUniversalMemoryService private readonly universalMemory: IUniversalMemoryService,
+                @IConstructToolRegistry private readonly toolRegistry: IConstructToolRegistry,
         ) {
                 super();
-                this.logService.info('[AgentLoop] Service created with error recovery, snapshots, file watcher, pending changes, and universal memory');
+                this.logService.info('[AgentLoop] Service created with error recovery, snapshots, file watcher, pending changes, universal memory, and tool registry injection (F-002)');
         }
 
         get isRunning(): boolean {
@@ -265,7 +271,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
 
                                 const stream = this.aiService.chat(
                                         conversationMessages,
-                                        PLANNING_TOOLS,
+                                        this.getPlanningTools(),
                                         { signal: timeoutController.signal, systemPrompt }
                                 );
 
@@ -434,7 +440,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
 
                                 const stream = this.aiService.chat(
                                         conversationMessages,
-                                        AGENT_TOOLS,
+                                        this.getAvailableTools(),
                                         { signal: timeoutController.signal, systemPrompt }
                                 );
 
@@ -971,8 +977,31 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                 }
 
                                 default: {
-                                        // BUG 7 FIX: Check if this is an MCP tool call (format: serverName__toolName)
-                                        // Split only on the FIRST __ to handle tool names that contain __
+                                        // F-002 FIX: Try the tool registry first for registered-but-unhandled
+                                        // tools (e.g., nmap, ghidra, nuclei security tools). This makes all
+                                        // tools registered via ConstructToolRegistryService actually executable.
+                                        // Built-in tools (the 8 cases above) take precedence because they have
+                                        // tailored security post-processing (PromptSanitiser + redactSecrets).
+                                        const registryTool = this.toolRegistry.getTool(name);
+                                        if (registryTool) {
+                                                try {
+                                                        if (readOnly && registryTool.modifiesFiles) {
+                                                                return `Error: ${name} not available during planning phase`;
+                                                        }
+                                                        const result = await this.toolRegistry.execute(name, args);
+                                                        let raw = result.output;
+                                                        if (result.truncated) {
+                                                                raw += '\n[output truncated]';
+                                                        }
+                                                        // SEC-6 + SEC-7: sanitise + redact secrets from tool output
+                                                        return PromptSanitiser.sanitise(redactSecrets(raw));
+                                                } catch (err: unknown) {
+                                                        return 'Error: Tool ' + name + ' failed: ' + (err instanceof Error ? err.message : String(err));
+                                                }
+                                        }
+
+                                        // Fall back to MCP tool dispatch (format: serverName__toolName)
+                                        // BUG 7 FIX: Split only on the FIRST __ to handle tool names that contain __
                                         const separatorIndex = name.indexOf('__');
                                         if (separatorIndex !== -1) {
                                                 const serverName = name.slice(0, separatorIndex);
@@ -1049,6 +1078,62 @@ Guidelines:
                 }
 
                 return prompt;
+        }
+
+        /**
+         * F-002 FIX: Build the list of tools available to the LLM.
+         *
+         * Combines the 8 hardcoded AGENT_TOOLS with all dynamically-registered
+         * tools from ConstructToolRegistryService (security tools: nmap/ghidra/nuclei,
+         * MCP tools, custom tools). Deduped by name — built-in tools take
+         * precedence because their executeTool() cases have tailored security
+         * post-processing (PromptSanitiser + redactSecrets applied at the right
+         * granularity for each tool).
+         *
+         * Before this fix, the registry was dead code: tools were registered
+         * but never visible to the LLM, so it could never call them.
+         */
+        private getAvailableTools(): IToolDefinition[] {
+                const builtinNames = new Set(AGENT_TOOLS.map(t => t.name));
+                const registryTools = this.toolRegistry.listTools()
+                        .filter(t => !builtinNames.has(t.name))
+                        .map(t => this.adaptToolDef(t));
+                return [...AGENT_TOOLS, ...registryTools];
+        }
+
+        /**
+         * F-002 FIX: Read-only tools for the planning phase.
+         *
+         * Combines the hardcoded PLANNING_TOOLS with all registry tools
+         * that have modifiesFiles === false. This lets the planner call
+         * read-only security tools (e.g., nuclei scan in passive mode)
+         * during the exploration phase.
+         */
+        private getPlanningTools(): IToolDefinition[] {
+                const builtinNames = new Set(PLANNING_TOOLS.map(t => t.name));
+                const registryReadOnly = this.toolRegistry.listTools()
+                        .filter(t => !t.modifiesFiles && !builtinNames.has(t.name))
+                        .map(t => this.adaptToolDef(t));
+                return [...PLANNING_TOOLS, ...registryReadOnly];
+        }
+
+        /**
+         * F-002 FIX: Adapt a registry IToolDefinition (which has extra
+         * modifiesFiles / requiresNetwork / category fields) to the LLM
+         * provider's IToolDefinition (which only has name / description /
+         * inputSchema). Without this adapter the two interfaces are
+         * structurally incompatible.
+         */
+        private adaptToolDef(t: IRegistryToolDefinition): IToolDefinition {
+                return {
+                        name: t.name,
+                        description: t.description,
+                        inputSchema: {
+                                type: 'object',
+                                properties: t.inputSchema.properties as Record<string, unknown>,
+                                required: t.inputSchema.required,
+                        },
+                };
         }
 
         /**
