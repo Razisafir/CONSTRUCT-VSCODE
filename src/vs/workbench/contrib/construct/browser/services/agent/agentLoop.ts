@@ -509,6 +509,24 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
 
                                                         yield { type: 'tool_result', toolId: event.toolId, toolName: event.toolName, result: toolResult, success };
 
+                                                        // F-006 fix: pause at milestone if execution config requires it.
+                                                        // This makes the generator-based runWithApprovedPlan path milestone-aware,
+                                                        // so the UI's existing 'milestone_paused' event handler (constructAgentView.ts:854)
+                                                        // actually receives events and can render Resume/Skip/Stop controls.
+                                                        if (success && this._executionConfig && this._approvedPlan) {
+                                                                const shouldPause = this.shouldPauseAtMilestone(event);
+                                                                if (shouldPause && this._currentMilestone) {
+                                                                        this._executionState = ExecutionState.PausedAtMilestone;
+                                                                        this._onDidMilestonePause.fire(this._currentMilestone);
+                                                                        yield { type: 'milestone_paused', milestone: this._currentMilestone };
+                                                                        await this._waitForResume();
+                                                                        yield { type: 'milestone_resumed', milestone: this._currentMilestone };
+                                                                        this._completedMilestoneIds.add(this._currentMilestone.id);
+                                                                        this._currentMilestone = null;
+                                                                        this._executionState = ExecutionState.Executing;
+                                                                }
+                                                        }
+
                                                         // Track file writes for snapshot + file watcher
                                                         let filePath: string | undefined;
                                                         if ((event.toolName === 'write_file' || event.toolName === 'edit_file') && success) {
@@ -621,6 +639,11 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 } finally {
                         this._isRunning = false;
                         this._activeSnapshotId = null;
+                        // F-006 fix: clear milestone state so it doesn't leak between runs.
+                        this._approvedPlan = null;
+                        this._executionConfig = null;
+                        this._currentMilestone = null;
+                        this._completedMilestoneIds = new Set();
                 }
         }
 
@@ -643,6 +666,19 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         yield { type: 'error', text: 'No steps selected for execution.', recoverable: false };
                         return;
                 }
+
+                // F-006 fix: seed milestone state so run() can pause at milestones.
+                // Without this, shouldPauseAtMilestone() returns false (no config)
+                // and the UI's milestone_paused handler is dead code.
+                this._approvedPlan = approvedPlan;
+                this._executionConfig = {
+                        mode: approvedPlan.executionMode as ExecutionMode,
+                        // selectedMilestoneIds is set by F-009 fix when present;
+                        // fall back to undefined for plans without selective mode.
+                        selectedMilestoneIds: (approvedPlan as IApprovedPlan & { selectedMilestoneIds?: string[] }).selectedMilestoneIds,
+                };
+                this._completedMilestoneIds = new Set();
+                this._executionState = ExecutionState.Executing;
 
                 const taskDescription = selectedSteps.map(s => `${s.action}: ${s.target}`).join('\n');
                 const enhancedTask = `${approvedPlan.task}\n\nExecute these specific steps:\n${taskDescription}`;

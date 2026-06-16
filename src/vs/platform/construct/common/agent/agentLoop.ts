@@ -116,6 +116,13 @@ export interface IAgentLoop {
         readonly onFileChange: Event<FileChangeEntry>;
 
         /**
+         * Event fired when the agent pauses at a milestone.
+         * F-006 fix: surfaces the pause to the UI so it can render Resume/Skip/Stop buttons.
+         * The agent loop blocks on _waitForResume() until one of those buttons is clicked.
+         */
+        readonly onDidMilestonePause: Event<IMilestone>;
+
+        /**
          * Undo the last agent task by restoring the most recent snapshot.
          * Reverts all file changes made during the last task.
          *
