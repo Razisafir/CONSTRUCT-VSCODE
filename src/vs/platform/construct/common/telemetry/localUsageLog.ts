@@ -18,7 +18,7 @@
  *  unit testing without touching the filesystem.
  *--------------------------------------------------------------------------------------------*/
 
-import * as path from '../../../base/common/path.js';
+import * as path from '../../../../base/common/path.js';
 // Note: localize is intentionally NOT imported here to keep this file
 // dependency-free for unit testing. UI strings live in the service
 // implementation that uses these types.
