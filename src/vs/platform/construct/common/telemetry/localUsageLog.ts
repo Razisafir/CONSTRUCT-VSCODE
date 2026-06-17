@@ -19,7 +19,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as path from '../../../base/common/path.js';
-import { localize } from '../../../nls.js';
+// Note: localize is intentionally NOT imported here to keep this file
+// dependency-free for unit testing. UI strings live in the service
+// implementation that uses these types.
 
 /**
  * Default log file location relative to the user home directory.
