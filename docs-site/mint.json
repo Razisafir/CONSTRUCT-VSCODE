@@ -1,0 +1,47 @@
+{
+  "name": "Kovix Documentation",
+  "logo": "/logo.png",
+  "favicon": "/favicon.png",
+  "colors": {
+    "primary": "#2b6887",
+    "light": "#4990b3",
+    "dark": "#1a4a6a"
+  },
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": ["introduction", "installation", "quickstart", "configuration"]
+    },
+    {
+      "group": "AI Providers",
+      "pages": ["providers/ollama", "providers/anthropic", "providers/openai", "providers/xenova", "providers/troubleshooting"]
+    },
+    {
+      "group": "Agent",
+      "pages": ["agent/overview", "agent/plan-act-loop", "agent/tools", "agent/milestones", "agent/snapshots"]
+    },
+    {
+      "group": "Memory",
+      "pages": ["memory/overview", "memory/semantic", "memory/episodic", "memory/procedural", "memory/indexing"]
+    },
+    {
+      "group": "MCP",
+      "pages": ["mcp/overview", "mcp/configuration", "mcp/marketplace", "mcp/agent-reach", "mcp/ui-ux-pro-max", "mcp/ponytail"]
+    },
+    {
+      "group": "Security Tools",
+      "pages": ["security/overview", "security/nmap", "security/ghidra", "security/nuclei", "security/safety-gates"]
+    },
+    {
+      "group": "Privacy & Telemetry",
+      "pages": ["privacy/overview", "privacy/local-usage-log", "privacy/data-export"]
+    },
+    {
+      "group": "Reference",
+      "pages": ["reference/commands", "reference/settings", "reference/keyboard-shortcuts", "reference/api"]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/Razisafir/KOVIX"
+  }
+}
