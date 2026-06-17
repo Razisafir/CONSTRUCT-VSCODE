@@ -144,17 +144,37 @@ jobs:
         run: |
           mkdir -p /tmp/kovix-test-isolated/src /tmp/kovix-test-isolated/test
 
-          # Copy zero-dep helper sources
+          # Copy zero-dep helper sources (Tier 1.7, 2.1, 2.2, 2.3, 2.4, 2.5, 2.7, 3.5, 3.6, 3.7)
           cp src/vs/platform/construct/common/editor/kovixInlineCompletionHelpers.ts /tmp/kovix-test-isolated/src/
           cp src/vs/platform/construct/common/agent/promptSanitizer.ts /tmp/kovix-test-isolated/src/
+          cp src/vs/platform/construct/common/telemetry/localUsageLogHelpers.ts /tmp/kovix-test-isolated/src/
+          cp src/vs/platform/construct/common/llm/modelRouting.ts /tmp/kovix-test-isolated/src/
+          cp src/vs/platform/construct/common/onboarding/providerTestHelpers.ts /tmp/kovix-test-isolated/src/
+          cp src/vs/platform/construct/common/backgroundAgents/backgroundAgentScheduler.ts /tmp/kovix-test-isolated/src/
+          cp src/vs/platform/construct/common/composer/composerReview.ts /tmp/kovix-test-isolated/src/
+          cp src/vs/platform/construct/common/ponytailReview/ponytailReviewHelpers.ts /tmp/kovix-test-isolated/src/
+          cp src/vs/platform/construct/common/mcpMarketplace/mcpMarketplaceHelpers.ts /tmp/kovix-test-isolated/src/
+          cp src/vs/platform/construct/common/kali/kaliIntegrationPack.ts /tmp/kovix-test-isolated/src/
+          cp src/vs/platform/construct/common/airgap/airgapInstaller.ts /tmp/kovix-test-isolated/src/
+          cp src/vs/platform/construct/common/localRag/localRagHelpers.ts /tmp/kovix-test-isolated/src/
 
           # Copy test files
           cp test/unit/construct/services/*.test.ts /tmp/kovix-test-isolated/test/
           cp test/unit/construct/agent/*.test.ts /tmp/kovix-test-isolated/test/ 2>/dev/null || true
 
-          # Fix imports
+          # Fix imports to point to the local src dir, drop .js extensions
           sed -i 's|../../../../src/vs/platform/construct/common/editor/kovixInlineCompletionHelpers.js|../src/kovixInlineCompletionHelpers|g' /tmp/kovix-test-isolated/test/*.test.ts
           sed -i 's|../../../../src/vs/platform/construct/common/agent/promptSanitizer.js|../src/promptSanitizer|g' /tmp/kovix-test-isolated/test/*.test.ts
+          sed -i 's|../../../../src/vs/platform/construct/common/telemetry/localUsageLogHelpers.js|../src/localUsageLogHelpers|g' /tmp/kovix-test-isolated/test/*.test.ts
+          sed -i 's|../../../../src/vs/platform/construct/common/llm/modelRouting.js|../src/modelRouting|g' /tmp/kovix-test-isolated/test/*.test.ts
+          sed -i 's|../../../../src/vs/platform/construct/common/onboarding/providerTestHelpers.js|../src/providerTestHelpers|g' /tmp/kovix-test-isolated/test/*.test.ts
+          sed -i 's|../../../../src/vs/platform/construct/common/backgroundAgents/backgroundAgentScheduler.js|../src/backgroundAgentScheduler|g' /tmp/kovix-test-isolated/test/*.test.ts
+          sed -i 's|../../../../src/vs/platform/construct/common/composer/composerReview.js|../src/composerReview|g' /tmp/kovix-test-isolated/test/*.test.ts
+          sed -i 's|../../../../src/vs/platform/construct/common/ponytailReview/ponytailReviewHelpers.js|../src/ponytailReviewHelpers|g' /tmp/kovix-test-isolated/test/*.test.ts
+          sed -i 's|../../../../src/vs/platform/construct/common/mcpMarketplace/mcpMarketplaceHelpers.js|../src/mcpMarketplaceHelpers|g' /tmp/kovix-test-isolated/test/*.test.ts
+          sed -i 's|../../../../src/vs/platform/construct/common/kali/kaliIntegrationPack.js|../src/kaliIntegrationPack|g' /tmp/kovix-test-isolated/test/*.test.ts
+          sed -i 's|../../../../src/vs/platform/construct/common/airgap/airgapInstaller.js|../src/airgapInstaller|g' /tmp/kovix-test-isolated/test/*.test.ts
+          sed -i 's|../../../../src/vs/platform/construct/common/localRag/localRagHelpers.js|../src/localRagHelpers|g' /tmp/kovix-test-isolated/test/*.test.ts
 
           # Symlink node_modules
           ln -sf "$(pwd)/node_modules" /tmp/kovix-test-isolated/node_modules
