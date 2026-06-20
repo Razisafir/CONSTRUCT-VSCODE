@@ -111,6 +111,11 @@ class ValidatedIpcMain implements Event.NodeEventEmitter {
 
                 const sender = event.senderFrame;
 
+                // Electron 42: senderFrame can be null in certain edge cases (e.g. detached frame).
+                if (!sender) {
+                        return false;
+                }
+
                 const url = sender.url;
                 // `url` can be `undefined` when running tests from playwright https://github.com/microsoft/vscode/issues/147301
                 // and `url` can be `about:blank` when reloading the window

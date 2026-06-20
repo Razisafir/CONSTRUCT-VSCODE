@@ -288,7 +288,9 @@ export class Menubar extends Disposable {
 			const dockMenu = new Menu();
 			dockMenu.append(new MenuItem({ label: this.mnemonicLabel(nls.localize({ key: 'miNewWindow', comment: ['&& denotes a mnemonic'] }, "New &&Window")), click: () => this.windowsMainService.openEmptyWindow({ context: OpenContext.DOCK }) }));
 
-			app.dock.setMenu(dockMenu);
+			// Electron 42: app.dock is typed as possibly undefined; the isMacintosh
+			// guard above ensures we only reach here on macOS where dock is defined.
+			app.dock?.setMenu(dockMenu);
 		}
 
 		// File
