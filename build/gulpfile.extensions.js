@@ -24,8 +24,8 @@ const ext = require('./lib/extensions');
 
 // To save 250ms for each gulp startup, we are caching the result here
 // const compilations = glob.sync('**/tsconfig.json', {
-// 	cwd: extensionsPath,
-// 	ignore: ['**/out/**', '**/node_modules/**']
+//      cwd: extensionsPath,
+//      ignore: ['**/out/**', '**/node_modules/**']
 // });
 const compilations = [
 	'extensions/configuration-editing/tsconfig.json',
@@ -47,7 +47,6 @@ const compilations = [
 	'extensions/jake/tsconfig.json',
 	'extensions/json-language-features/client/tsconfig.json',
 	'extensions/json-language-features/server/tsconfig.json',
-	'extensions/markdown-language-features/preview-src/tsconfig.json',
 	'extensions/markdown-language-features/tsconfig.json',
 	'extensions/markdown-math/tsconfig.json',
 	'extensions/media-preview/tsconfig.json',
@@ -61,7 +60,6 @@ const compilations = [
 	'extensions/search-result/tsconfig.json',
 	'extensions/simple-browser/tsconfig.json',
 	'extensions/tunnel-forwarding/tsconfig.json',
-	'extensions/typescript-language-features/test-workspace/tsconfig.json',
 	'extensions/typescript-language-features/web/tsconfig.json',
 	'extensions/typescript-language-features/tsconfig.json',
 	'extensions/vscode-api-tests/tsconfig.json',
