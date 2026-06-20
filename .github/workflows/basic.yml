@@ -25,6 +25,12 @@ jobs:
           sudo chmod +x /etc/init.d/xvfb
           sudo update-rc.d xvfb defaults
           sudo service xvfb start
+          # Install libkrb5-dev so the native 'kerberos' npm package can
+          # compile its node-gyp binding (gssapi/gssapi.h). Without this,
+          # 'npm install' fails with 'fatal error: gssapi/gssapi.h: No
+          # such file or directory' on every PR.
+          sudo apt-get update
+          sudo apt-get install -y libkrb5-dev
 
       - uses: actions/setup-node@v4
         with:
