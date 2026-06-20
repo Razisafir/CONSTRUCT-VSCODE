@@ -175,6 +175,9 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         /** Fix for F-003 (#73): clear history when starting a new chat. */
         clearConversationHistory(): void {
                 this._conversationHistory = [];
+                this._activeSnapshotId = null;
+                this._completedMilestoneIds.clear();
+                this.logService.info('[AgentLoop] Conversation history cleared');
         }
         private readonly _onDidStart = this._register(new Emitter<string>());
         readonly onDidStart = this._onDidStart.event;
@@ -1118,12 +1121,6 @@ Guidelines:
                                 // Non-critical -- file explorer will refresh eventually via watchers
                         }
                 }
-        }
-
-        clearConversationHistory(): void {
-                this._activeSnapshotId = null;
-                this._completedMilestoneIds.clear();
-                this.logService.info('[AgentLoop] Conversation history cleared');
         }
 
         override dispose(): void {

@@ -106,6 +106,8 @@ export interface IKovixCheckboxOptions {
   indeterminate?: boolean;
   /** Disabled state. */
   disabled?: boolean;
+  /** Optional aria-label for the input element (accessibility). */
+  ariaLabel?: string;
   /** Change handler. */
   onChange?: (checked: boolean) => void;
 }

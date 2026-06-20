@@ -229,7 +229,9 @@ export class CodeApplication extends Disposable {
                 };
 
                 const isSvgRequestFromSafeContext = (details: Electron.OnBeforeRequestListenerDetails | Electron.OnHeadersReceivedListenerDetails): boolean => {
-                        return details.resourceType === 'xhr' || isSafeFrame(details.frame);
+                        // Electron 42: details.frame is typed as `WebFrameMain | null | undefined`;
+                        // isSafeFrame accepts `WebFrameMain | undefined`. Coerce null to undefined.
+                        return details.resourceType === 'xhr' || isSafeFrame(details.frame ?? undefined);
                 };
 
                 const isAllowedVsCodeFileRequest = (details: Electron.OnBeforeRequestListenerDetails) => {
