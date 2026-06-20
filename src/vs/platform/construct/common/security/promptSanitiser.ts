@@ -15,8 +15,13 @@
  * 1. Wraps all injected content in safety delimiters with unique IDs
  * 2. Escapes delimiter-like strings within content to prevent breakout
  * 3. Strips/escapes common injection prefixes
- * 4. Applies to: read_file output, search_codebase results, memory context injections
+ * 4. Redacts known secret patterns via the shared `secretPatterns` module
+ *    (K2-M4 fix — both this path and the `secretRedactor` path now share
+ *    one canonical pattern set, so future additions can never drift)
+ * 5. Applies to: read_file output, search_codebase results, memory context injections
  */
+
+import { redactSecrets } from './secretPatterns';
 
 /**
  * Known injection prefixes that should be filtered from injected content.
@@ -158,6 +163,12 @@ export function sanitise(content: string): string {
                 pattern.lastIndex = 0; // Reset for global regex
                 filtered = filtered.replace(pattern, '[FILTERED]');
         }
+
+        // Step 2.5 (K2-M4): Redact secrets via the shared canonical pattern set.
+        // This closes the drift between the agentLoop path (PromptSanitiser.sanitise)
+        // and the tool-registry / Ponytail path (secretRedactor.redactSecrets) —
+        // both now reference the same `SECRET_PATTERNS` array.
+        filtered = redactSecrets(filtered);
 
         // Step 3: Wrap in safety delimiters with unique IDs
         return `${contentBegin}\n${filtered}\n${contentEnd}`;
