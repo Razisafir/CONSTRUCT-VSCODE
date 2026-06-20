@@ -7,42 +7,53 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.downloadLibcxxHeaders = downloadLibcxxHeaders;
 exports.downloadLibcxxObjects = downloadLibcxxObjects;
 // Can be removed once https://github.com/electron/electron-rebuild/pull/703 is available.
+// @electron/get v3+ is ESM-only. Use dynamic import() so the compiled
+// CommonJS output does not emit `require('@electron/get')` (ERR_REQUIRE_ESM).
+let _downloadArtifact;
+async function getDownloadArtifact() {
+    if (!_downloadArtifact) {
+	const mod = await import('@electron/get');
+	_downloadArtifact = mod.downloadArtifact;
+    }
+    return _downloadArtifact;
+}
 const fs = require("fs");
 const path = require("path");
 const debug = require("debug");
 const extract = require("extract-zip");
-const get_1 = require("@electron/get");
 const root = path.dirname(path.dirname(__dirname));
 const d = debug('libcxx-fetcher');
 async function downloadLibcxxHeaders(outDir, electronVersion, lib_name) {
     if (await fs.existsSync(path.resolve(outDir, 'include'))) {
-        return;
+	return;
     }
     if (!await fs.existsSync(outDir)) {
-        await fs.mkdirSync(outDir, { recursive: true });
+	await fs.mkdirSync(outDir, { recursive: true });
     }
+    const downloadArtifact = await getDownloadArtifact();
     d(`downloading ${lib_name}_headers`);
-    const headers = await (0, get_1.downloadArtifact)({
-        version: electronVersion,
-        isGeneric: true,
-        artifactName: `${lib_name}_headers.zip`,
+    const headers = await downloadArtifact({
+	version: electronVersion,
+	isGeneric: true,
+	artifactName: `${lib_name}_headers.zip`,
     });
     d(`unpacking ${lib_name}_headers from ${headers}`);
     await extract(headers, { dir: outDir });
 }
 async function downloadLibcxxObjects(outDir, electronVersion, targetArch = 'x64') {
     if (await fs.existsSync(path.resolve(outDir, 'libc++.a'))) {
-        return;
+	return;
     }
     if (!await fs.existsSync(outDir)) {
-        await fs.mkdirSync(outDir, { recursive: true });
+	await fs.mkdirSync(outDir, { recursive: true });
     }
+    const downloadArtifact = await getDownloadArtifact();
     d(`downloading libcxx-objects-linux-${targetArch}`);
-    const objects = await (0, get_1.downloadArtifact)({
-        version: electronVersion,
-        platform: 'linux',
-        artifactName: 'libcxx-objects',
-        arch: targetArch,
+    const objects = await downloadArtifact({
+	version: electronVersion,
+	platform: 'linux',
+	artifactName: 'libcxx-objects',
+	arch: targetArch,
     });
     d(`unpacking libcxx-objects from ${objects}`);
     await extract(objects, { dir: outDir });
@@ -55,7 +66,7 @@ async function main() {
     const packageJSON = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     const electronVersion = packageJSON.devDependencies.electron;
     if (!libcxxObjectsDirPath || !libcxxHeadersDownloadDir || !libcxxabiHeadersDownloadDir) {
-        throw new Error('Required build env not set');
+	throw new Error('Required build env not set');
     }
     await downloadLibcxxObjects(libcxxObjectsDirPath, electronVersion, arch);
     await downloadLibcxxHeaders(libcxxHeadersDownloadDir, electronVersion, 'libcxx');
@@ -63,8 +74,8 @@ async function main() {
 }
 if (require.main === module) {
     main().catch(err => {
-        console.error(err);
-        process.exit(1);
+	console.error(err);
+	process.exit(1);
     });
 }
 //# sourceMappingURL=libcxx-fetcher.js.map

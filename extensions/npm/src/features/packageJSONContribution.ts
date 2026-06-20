@@ -302,7 +302,10 @@ export class PackageJSONContribution implements IJSONContribution {
 			cp.execFile(commandPath, args, options, (error, stdout) => {
 				if (!error) {
 					try {
-						const content = JSON.parse(stdout);
+						// `stdout` is typed as `string | NonSharedBuffer` under Node 22+ types.
+						// Coerce to string before JSON.parse to satisfy TS2345.
+						const stdoutStr = typeof stdout === 'string' ? stdout : stdout.toString('utf8');
+						const content = JSON.parse(stdoutStr);
 						const version = content['dist-tags.latest'] || content['version'];
 						resolve({
 							description: content['description'],
