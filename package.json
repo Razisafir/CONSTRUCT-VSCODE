@@ -150,7 +150,7 @@
                 "@types/yauzl": "^2.10.0",
                 "@types/yazl": "^2.4.2",
                 "@typescript-eslint/utils": "^8.8.0",
-                "@vscode/gulp-electron": "^1.42.0",
+                "@vscode/gulp-electron": "1.36.0",
                 "@vscode/l10n-dev": "0.0.35",
                 "@vscode/telemetry-extractor": "^1.10.2",
                 "@vscode/test-cli": "^0.0.12",
@@ -243,10 +243,7 @@
                 "@parcel/watcher@2.1.0": {
                         "node-addon-api": "7.1.0"
                 },
-                "protobufjs": "7.6.4",
-                "@vscode/gulp-electron": {
-                        "@electron/get": "^2.0.0"
-                }
+                "protobufjs": "7.6.4"
         },
         "repository": {
                 "type": "git",
