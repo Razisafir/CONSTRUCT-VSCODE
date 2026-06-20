@@ -45,7 +45,7 @@ import { ISkillRegistry } from '../../../../platform/construct/common/skills/ski
 // P0-3: Slash command autocomplete dropdown — instantiates one per agent input.
 import { KovixSlashDropdown } from './kovixSlashDropdown.js';
 // v2.0: Shared component library — createButton, createCheckbox, etc.
-import { createButton } from '../../../browser/parts/kovix/ui/kovixUiComponents.js';
+import { createButton, createCheckbox, createErrorState } from '../../../browser/parts/kovix/ui/kovixUiComponents.js';
 import './media/kovixAgent.css';
 // v2.0 teal-identity additions: persistent status bar, plan-approval redesign,
 // stop-mode segmented control, message-category distinctions, memory scope
@@ -185,7 +185,7 @@ export class ConstructAgentViewPane extends ViewPane {
                         console.error('[Kovix] ConstructAgentViewPane.renderBody failed:', err);
                         // Render a visible error placeholder so silent failures are obvious.
                         const errDiv = document.createElement('div');
-                        errDiv.style.cssText = 'padding: 16px; color: #ff6b6b; background: #2a1414; border: 1px solid #ff6b6b; border-radius: 6px; margin: 12px; font-family: var(--kovix-font-mono, monospace); font-size: 12px; white-space: pre-wrap;';
+                        errDiv.style.cssText = 'padding: 16px; color: var(--kovix-error); background: var(--kovix-error-bg); border: 1px solid var(--kovix-error); border-radius: 6px; margin: 12px; font-family: var(--kovix-font-mono, monospace); font-size: 12px; white-space: pre-wrap;';
                         errDiv.textContent = `[Kovix Agent] Failed to render panel:\n${err instanceof Error ? err.stack || err.message : String(err)}\n\nCheck Developer Tools console for details. The agent backend services may have failed to initialize.`;
                         container.appendChild(errDiv);
                 }
@@ -907,128 +907,128 @@ export class ConstructAgentViewPane extends ViewPane {
         private selectableSteps: ISelectablePlanStep[] = [];
 
         private renderPlan(plan: IPlanResult, task: string): void {
-		// Remove any existing plan container
-		this.planContainer?.remove();
+                // Remove any existing plan container
+                this.planContainer?.remove();
 
-		// Create selectable steps from the plan
-		this.selectableSteps = plan.steps.map((step, idx) => ({
-			index: idx,
-			action: step.action,
-			target: step.target,
-			description: step.description,
-			selected: true,
-		}));
+                // Create selectable steps from the plan
+                this.selectableSteps = plan.steps.map((step, idx) => ({
+                        index: idx,
+                        action: step.action,
+                        target: step.target,
+                        description: step.description,
+                        selected: true,
+                }));
 
-		// v2.0: use .kovix-plan-card class from kovixAgentV2.css
-		this.planContainer = dom.$('.kovix-plan-card');
+                // v2.0: use .kovix-plan-card class from kovixAgentV2.css
+                this.planContainer = dom.$('.kovix-plan-card');
 
-		// Plan header
-		const header = dom.$('.kovix-plan-card__header');
-		const title = dom.$('.kovix-plan-card__title');
-		title.textContent = `\uD83D\uDCA1 Plan ready`;
-		const meta = dom.$('.kovix-plan-card__meta');
-		meta.textContent = `${plan.steps.length} steps`;
-		header.appendChild(title);
-		header.appendChild(meta);
-		this.planContainer.appendChild(header);
+                // Plan header
+                const header = dom.$('.kovix-plan-card__header');
+                const title = dom.$('.kovix-plan-card__title');
+                title.textContent = `\uD83D\uDCA1 Plan ready`;
+                const meta = dom.$('.kovix-plan-card__meta');
+                meta.textContent = `${plan.steps.length} steps`;
+                header.appendChild(title);
+                header.appendChild(meta);
+                this.planContainer.appendChild(header);
 
-		// Steps container
-		const stepsContainer = dom.$('.kovix-plan-card__steps');
+                // Steps container
+                const stepsContainer = dom.$('.kovix-plan-card__steps');
 
-		// Select All / Deselect All controls
-		if (this.selectableSteps.length > 0) {
-			const controls = dom.$('.kovix-plan-card__controls');
-			const selectAllBtn = dom.$('button.kovix-plan-card__select-all') as HTMLButtonElement;
-			selectAllBtn.textContent = 'Select All';
-			selectAllBtn.onclick = () => {
-				this.selectableSteps.forEach(s => s.selected = true);
-				this.planContainer?.querySelectorAll<HTMLInputElement>('.kovix-plan-card__steps .kovix-checkbox__input').forEach(cb => { cb.checked = true; });
-				this.planContainer?.querySelectorAll('.kovix-plan-step').forEach(el => { el.classList.remove('is-failed'); });
-			};
-			const deselectAllBtn = dom.$('button.kovix-plan-card__select-all') as HTMLButtonElement;
-			deselectAllBtn.textContent = 'Deselect All';
-			deselectAllBtn.onclick = () => {
-				this.selectableSteps.forEach(s => s.selected = false);
-				this.planContainer?.querySelectorAll<HTMLInputElement>('.kovix-plan-card__steps .kovix-checkbox__input').forEach(cb => { cb.checked = false; });
-			};
-			controls.appendChild(selectAllBtn);
-			controls.appendChild(deselectAllBtn);
-			this.planContainer.appendChild(controls);
-		}
+                // Select All / Deselect All controls
+                if (this.selectableSteps.length > 0) {
+                        const controls = dom.$('.kovix-plan-card__controls');
+                        const selectAllBtn = dom.$('button.kovix-plan-card__select-all') as HTMLButtonElement;
+                        selectAllBtn.textContent = 'Select All';
+                        selectAllBtn.onclick = () => {
+                                this.selectableSteps.forEach(s => s.selected = true);
+                                this.planContainer?.querySelectorAll<HTMLInputElement>('.kovix-plan-card__steps .kovix-checkbox__input').forEach(cb => { cb.checked = true; });
+                                this.planContainer?.querySelectorAll('.kovix-plan-step').forEach(el => { el.classList.remove('is-failed'); });
+                        };
+                        const deselectAllBtn = dom.$('button.kovix-plan-card__select-all') as HTMLButtonElement;
+                        deselectAllBtn.textContent = 'Deselect All';
+                        deselectAllBtn.onclick = () => {
+                                this.selectableSteps.forEach(s => s.selected = false);
+                                this.planContainer?.querySelectorAll<HTMLInputElement>('.kovix-plan-card__steps .kovix-checkbox__input').forEach(cb => { cb.checked = false; });
+                        };
+                        controls.appendChild(selectAllBtn);
+                        controls.appendChild(deselectAllBtn);
+                        this.planContainer.appendChild(controls);
+                }
 
-		// Plan steps with checkboxes (using shared createCheckbox)
-		if (this.selectableSteps.length > 0) {
-			for (const step of this.selectableSteps) {
-				const stepRow = dom.$('.kovix-plan-step');
-				const icon = this.getActionIcon(step.action);
-				const { container: checkboxContainer } = createCheckbox({
-					label: `${icon} ${step.action}: ${step.target}`,
-					checked: step.selected,
-					onChange: (checked) => {
-						step.selected = checked;
-						stepRow.classList.toggle('is-complete', !checked);
-					},
-				});
-				stepRow.appendChild(checkboxContainer);
-				stepsContainer.appendChild(stepRow);
-			}
-			this.planContainer.appendChild(stepsContainer);
-		} else {
-			// No structured steps — show the raw summary
-			const summaryEl = dom.$('.kovix-plan-card__summary');
-			summaryEl.textContent = plan.summary.substring(0, 500);
-			this.planContainer.appendChild(summaryEl);
-		}
+                // Plan steps with checkboxes (using shared createCheckbox)
+                if (this.selectableSteps.length > 0) {
+                        for (const step of this.selectableSteps) {
+                                const stepRow = dom.$('.kovix-plan-step');
+                                const icon = this.getActionIcon(step.action);
+                                const { container: checkboxContainer } = createCheckbox({
+                                        label: `${icon} ${step.action}: ${step.target}`,
+                                        checked: step.selected,
+                                        onChange: (checked) => {
+                                                step.selected = checked;
+                                                stepRow.classList.toggle('is-complete', !checked);
+                                        },
+                                });
+                                stepRow.appendChild(checkboxContainer);
+                                stepsContainer.appendChild(stepRow);
+                        }
+                        this.planContainer.appendChild(stepsContainer);
+                } else {
+                        // No structured steps — show the raw summary
+                        const summaryEl = dom.$('.kovix-plan-card__summary');
+                        summaryEl.textContent = plan.summary.substring(0, 500);
+                        this.planContainer.appendChild(summaryEl);
+                }
 
-		// Buttons (using shared createButton)
-		const btnContainer = dom.$('.kovix-plan-card__actions');
+                // Buttons (using shared createButton)
+                const btnContainer = dom.$('.kovix-plan-card__actions');
 
-		const approveBtn = createButton({
-			label: '\u2705 Approve',
-			variant: 'primary',
-			ariaLabel: 'Approve plan and start execution',
-			onClick: async () => {
-				// Show stop mode picker
-				const milestones = this.agentLoop.extractMilestonesFromPlan(plan.steps);
-				const pickResult = await showStopModePicker(this.quickInputService, milestones);
-				if (!pickResult) { return; } // cancelled
+                const approveBtn = createButton({
+                        label: '\u2705 Approve',
+                        variant: 'primary',
+                        ariaLabel: 'Approve plan and start execution',
+                        onClick: async () => {
+                                // Show stop mode picker
+                                const milestones = this.agentLoop.extractMilestonesFromPlan(plan.steps);
+                                const pickResult = await showStopModePicker(this.quickInputService, milestones);
+                                if (!pickResult) { return; } // cancelled
 
-				const approvedPlan: IApprovedPlan = {
-					task,
-					steps: this.selectableSteps,
-					executionMode: pickResult.mode,
-					selectedMilestoneIds: pickResult.selectedMilestoneIds,
-					milestones,
-					approved: true,
-					approvedAt: Date.now(),
-				};
+                                const approvedPlan: IApprovedPlan = {
+                                        task,
+                                        steps: this.selectableSteps,
+                                        executionMode: pickResult.mode,
+                                        selectedMilestoneIds: pickResult.selectedMilestoneIds,
+                                        milestones,
+                                        approved: true,
+                                        approvedAt: Date.now(),
+                                };
 
-				this.planContainer?.remove();
-				this.planContainer = null;
-				this.runExecution(task, approvedPlan);
-			},
-		});
+                                this.planContainer?.remove();
+                                this.planContainer = null;
+                                this.runExecution(task, approvedPlan);
+                        },
+                });
 
-		const cancelBtn = createButton({
-			label: '\u274C Cancel',
-			variant: 'ghost',
-			ariaLabel: 'Cancel plan',
-			onClick: () => {
-				this.planContainer?.remove();
-				this.planContainer = null;
-				this.addAgentMessage('[CANCEL] Task cancelled', 'info');
-				this.setExecutionState('idle');
-				this.progressPanel?.clear();
-			},
-		});
+                const cancelBtn = createButton({
+                        label: '\u274C Cancel',
+                        variant: 'ghost',
+                        ariaLabel: 'Cancel plan',
+                        onClick: () => {
+                                this.planContainer?.remove();
+                                this.planContainer = null;
+                                this.addAgentMessage('[CANCEL] Task cancelled', 'info');
+                                this.setExecutionState('idle');
+                                this.progressPanel?.clear();
+                        },
+                });
 
-		btnContainer.appendChild(approveBtn);
-		btnContainer.appendChild(cancelBtn);
-		this.planContainer.appendChild(btnContainer);
+                btnContainer.appendChild(approveBtn);
+                btnContainer.appendChild(cancelBtn);
+                this.planContainer.appendChild(btnContainer);
 
-		this.messageContainer.appendChild(this.planContainer);
-		this.scrollToBottom();
-	}
+                this.messageContainer.appendChild(this.planContainer);
+                this.scrollToBottom();
+        }
 
         /**
          * Run the execution phase with full tool access.
@@ -1609,28 +1609,24 @@ export class ConstructAgentViewPane extends ViewPane {
                         contentArea.textContent = '(Unable to read file content)';
                 });
 
-                // Buttons
+                // v2.0: use shared createButton for diff accept/reject
                 const btnRow = dom.$('.construct-diff-buttons');
-                btnRow.style.cssText = `
-                        display: flex; gap: 6px; padding: 6px 10px;
-                        border-top: 1px solid var(--kovix-border); background: var(--kovix-bg-ink);
-                `;
 
-                const acceptBtn = dom.$('button') as HTMLButtonElement;
-                acceptBtn.textContent = '\u2705 Accept';
-                acceptBtn.style.cssText = `
-                        background: var(--kovix-gradient); color: #FFFFFF; border: none;
-                        border-radius: var(--kovix-radius-sm); padding: 4px 12px; cursor: pointer;
-                        font-size: 11px; font-weight: 500;
-                `;
+                const acceptBtn = createButton({
+                        label: '\u2705 Accept',
+                        variant: 'primary',
+                        ariaLabel: 'Accept this diff',
+                });
+                acceptBtn.style.fontSize = '11px';
+                acceptBtn.style.padding = '4px 12px';
 
-                const rejectBtn = dom.$('button') as HTMLButtonElement;
-                rejectBtn.textContent = '\u274C Reject';
-                rejectBtn.style.cssText = `
-                        background: transparent; color: var(--kovix-text-secondary); border: 1px solid var(--kovix-border);
-                        border-radius: var(--kovix-radius-sm); padding: 4px 12px; cursor: pointer;
-                        font-size: 11px; font-weight: 500;
-                `;
+                const rejectBtn = createButton({
+                        label: '\u274C Reject',
+                        variant: 'ghost',
+                        ariaLabel: 'Reject this diff',
+                });
+                rejectBtn.style.fontSize = '11px';
+                rejectBtn.style.padding = '4px 12px';
 
                 acceptBtn.onclick = () => {
                         const entry = this.pendingDiffs.find(d => d.id === diffId);

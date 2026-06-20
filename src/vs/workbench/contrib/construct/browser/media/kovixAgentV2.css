@@ -652,3 +652,14 @@
   line-height: var(--kovix-leading-normal);
   word-break: break-word;
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   13. DIFF BUTTONS CONTAINER (replaces inline style)
+   ═════════════════════════════════════════════════════════════════════════ */
+.construct-diff-buttons {
+  display: flex;
+  gap: var(--kovix-space-2);
+  padding: var(--kovix-space-2) var(--kovix-space-3);
+  border-top: 1px solid var(--kovix-border);
+  background: var(--kovix-bg-base);
+}

@@ -9,71 +9,95 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as debug from 'debug';
 import * as extract from 'extract-zip';
-import { downloadArtifact } from '@electron/get';
+
+// @electron/get v3+ is ESM-only. Use dynamic import() so the compiled
+// CommonJS output (build/package.json has "type": "commonjs") does not
+// emit `require('@electron/get')` which would throw ERR_REQUIRE_ESM.
+type DownloadArtifact = (opts: {
+	version: string;
+	platform?: string;
+	arch?: string;
+	artifactName: string;
+	isGeneric?: boolean;
+	cacheRoot?: string;
+	unsafelyDisableChecksums?: boolean;
+	mirrorOptions?: { mirror?: string; customDir?: string; customFilename?: string };
+}) => Promise<string>;
+
+let _downloadArtifact: DownloadArtifact | undefined;
+async function getDownloadArtifact(): Promise<DownloadArtifact> {
+	if (!_downloadArtifact) {
+		const mod = await import('@electron/get');
+		_downloadArtifact = (mod as any).downloadArtifact;
+	}
+	return _downloadArtifact;
+}
 
 const root = path.dirname(path.dirname(__dirname));
 
 const d = debug('libcxx-fetcher');
 
 export async function downloadLibcxxHeaders(outDir: string, electronVersion: string, lib_name: string): Promise<void> {
-        if (await fs.existsSync(path.resolve(outDir, 'include'))) {
-                return;
-        }
-        if (!await fs.existsSync(outDir)) {
-                await fs.mkdirSync(outDir, { recursive: true });
-        }
+	if (await fs.existsSync(path.resolve(outDir, 'include'))) {
+		return;
+	}
+	if (!await fs.existsSync(outDir)) {
+		await fs.mkdirSync(outDir, { recursive: true });
+	}
 
-        d(`downloading ${lib_name}_headers`);
-        const headers = await downloadArtifact({
-                version: electronVersion,
-                isGeneric: true,
-                artifactName: `${lib_name}_headers.zip`,
-        });
+	const downloadArtifact = await getDownloadArtifact();
+	d(`downloading ${lib_name}_headers`);
+	const headers = await downloadArtifact({
+		version: electronVersion,
+		isGeneric: true,
+		artifactName: `${lib_name}_headers.zip`,
+	});
 
-        d(`unpacking ${lib_name}_headers from ${headers}`);
-        await extract(headers, { dir: outDir });
+	d(`unpacking ${lib_name}_headers from ${headers}`);
+	await extract(headers, { dir: outDir });
 }
 
 export async function downloadLibcxxObjects(outDir: string, electronVersion: string, targetArch: string = 'x64'): Promise<void> {
-        if (await fs.existsSync(path.resolve(outDir, 'libc++.a'))) {
-                return;
-        }
-        if (!await fs.existsSync(outDir)) {
-                await fs.mkdirSync(outDir, { recursive: true });
-        }
+	if (await fs.existsSync(path.resolve(outDir, 'libc++.a'))) {
+		return;
+	}
+	if (!await fs.existsSync(outDir)) {
+		await fs.mkdirSync(outDir, { recursive: true });
+	}
 
-        d(`downloading libcxx-objects-linux-${targetArch}`);
-        const objects = await downloadArtifact({
-                version: electronVersion,
-                platform: 'linux',
-                artifactName: 'libcxx-objects',
-                arch: targetArch,
-        });
+	const downloadArtifact = await getDownloadArtifact();
+	d(`downloading libcxx-objects-linux-${targetArch}`);
+	const objects = await downloadArtifact({
+		version: electronVersion,
+		platform: 'linux',
+		artifactName: 'libcxx-objects',
+		arch: targetArch,
+	});
 
-        d(`unpacking libcxx-objects from ${objects}`);
-        await extract(objects, { dir: outDir });
+	d(`unpacking libcxx-objects from ${objects}`);
+	await extract(objects, { dir: outDir });
 }
 
 async function main(): Promise<void> {
-        const libcxxObjectsDirPath = process.env['VSCODE_LIBCXX_OBJECTS_DIR'];
-        const libcxxHeadersDownloadDir = process.env['VSCODE_LIBCXX_HEADERS_DIR'];
-        const libcxxabiHeadersDownloadDir = process.env['VSCODE_LIBCXXABI_HEADERS_DIR'];
-        const arch = process.env['KOVIX_ARCH'];
-        const packageJSON = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-        const electronVersion = packageJSON.devDependencies.electron;
+	const libcxxObjectsDirPath = process.env['VSCODE_LIBCXX_OBJECTS_DIR'];
+	const libcxxHeadersDownloadDir = process.env['VSCODE_LIBCXX_HEADERS_DIR'];
+	const libcxxabiHeadersDownloadDir = process.env['VSCODE_LIBCXXABI_HEADERS_DIR'];
+	const arch = process.env['KOVIX_ARCH'];
+	const packageJSON = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+	const electronVersion = packageJSON.devDependencies.electron;
 
-        if (!libcxxObjectsDirPath || !libcxxHeadersDownloadDir || !libcxxabiHeadersDownloadDir) {
-                throw new Error('Required build env not set');
-        }
+	if (!libcxxObjectsDirPath || !libcxxHeadersDownloadDir || !libcxxabiHeadersDownloadDir) {
+		throw new Error('Required build env not set');
+	}
 
-        await downloadLibcxxObjects(libcxxObjectsDirPath, electronVersion, arch);
-        await downloadLibcxxHeaders(libcxxHeadersDownloadDir, electronVersion, 'libcxx');
-        await downloadLibcxxHeaders(libcxxabiHeadersDownloadDir, electronVersion, 'libcxxabi');
+	await downloadLibcxxObjects(libcxxObjectsDirPath, electronVersion, arch);
+	await downloadLibcxxHeaders(libcxxHeadersDownloadDir, electronVersion, 'libcxx');
+	await downloadLibcxxHeaders(libcxxabiHeadersDownloadDir, electronVersion, 'libcxxabi');
 }
 
 if (require.main === module) {
-        main().catch(err => {
-                console.error(err);
-                process.exit(1);
-        });
+	main().catch(err => {
+		console.error(err);
+		process.exit(1);
+	});
 }

@@ -5,33 +5,43 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.downloadExplorerAppx = downloadExplorerAppx;
+// @electron/get v3+ is ESM-only. Use dynamic import() so the compiled
+// CommonJS output does not emit `require('@electron/get')` (ERR_REQUIRE_ESM).
+let _downloadArtifact;
+async function getDownloadArtifact() {
+    if (!_downloadArtifact) {
+	const mod = await import('@electron/get');
+	_downloadArtifact = mod.downloadArtifact;
+    }
+    return _downloadArtifact;
+}
 const fs = require("fs");
 const debug = require("debug");
 const extract = require("extract-zip");
 const path = require("path");
-const get_1 = require("@electron/get");
 const root = path.dirname(path.dirname(__dirname));
 const d = debug('explorer-appx-fetcher');
 async function downloadExplorerAppx(outDir, quality = 'stable', targetArch = 'x64') {
     const fileNamePrefix = quality === 'insider' ? 'code_insiders' : 'code';
     const fileName = `${fileNamePrefix}_explorer_${targetArch}.zip`;
     if (await fs.existsSync(path.resolve(outDir, 'resources.pri'))) {
-        return;
+	return;
     }
     if (!await fs.existsSync(outDir)) {
-        await fs.mkdirSync(outDir, { recursive: true });
+	await fs.mkdirSync(outDir, { recursive: true });
     }
+    const downloadArtifact = await getDownloadArtifact();
     d(`downloading ${fileName}`);
-    const artifact = await (0, get_1.downloadArtifact)({
-        isGeneric: true,
-        version: '3.0.4',
-        artifactName: fileName,
-        unsafelyDisableChecksums: true,
-        mirrorOptions: {
-            mirror: 'https://github.com/microsoft/vscode-explorer-command/releases/download/',
-            customDir: '3.0.4',
-            customFilename: fileName
-        }
+    const artifact = await downloadArtifact({
+	isGeneric: true,
+	version: '3.0.4',
+	artifactName: fileName,
+	unsafelyDisableChecksums: true,
+	mirrorOptions: {
+	    mirror: 'https://github.com/microsoft/vscode-explorer-command/releases/download/',
+	    customDir: '3.0.4',
+	    customFilename: fileName
+	}
     });
     d(`unpacking from ${fileName}`);
     await extract(artifact, { dir: fs.realpathSync(outDir) });
@@ -39,15 +49,15 @@ async function downloadExplorerAppx(outDir, quality = 'stable', targetArch = 'x6
 async function main(outputDir) {
     const arch = process.env['KOVIX_ARCH'];
     if (!outputDir) {
-        throw new Error('Required build env not set');
+	throw new Error('Required build env not set');
     }
     const product = JSON.parse(fs.readFileSync(path.join(root, 'product.json'), 'utf8'));
     await downloadExplorerAppx(outputDir, product.quality, arch);
 }
 if (require.main === module) {
     main(process.argv[2]).catch(err => {
-        console.error(err);
-        process.exit(1);
+	console.error(err);
+	process.exit(1);
     });
 }
 //# sourceMappingURL=explorer-appx-fetcher.js.map
