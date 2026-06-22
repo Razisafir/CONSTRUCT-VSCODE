@@ -73,7 +73,7 @@
 		"lint": "node build/eslint"
 	},
 	"dependencies": {
-		"@microsoft/1ds-core-js": "^3.2.13",
+		"@microsoft/1ds-core-js": "^4.4.2",
 		"@microsoft/1ds-post-js": "^3.2.13",
 		"@modelcontextprotocol/sdk": "^1.29.0",
 		"@parcel/watcher": "2.1.0",
