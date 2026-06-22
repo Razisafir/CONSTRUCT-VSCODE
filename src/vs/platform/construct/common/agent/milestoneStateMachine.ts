@@ -13,8 +13,24 @@ export enum ExecutionState {
         Planning = 'planning',
         AwaitingApproval = 'awaiting_approval',
         Executing = 'executing',
+        /**
+         * Verifying — the agent has declared the milestone complete, but the
+         * harness is now running a real check (test script / build / typecheck)
+         * to confirm. The loop MUST pass through this state before reaching
+         * PausedAtMilestone or Complete. See agentLoop.ts runVerification().
+         *
+         * Unlike Executing, this state is harness-controlled, not LLM-controlled:
+         * the agent cannot self-report its way out of it.
+         */
+        Verifying = 'verifying',
         PausedAtMilestone = 'paused_at_milestone',
         Complete = 'complete',
+        /**
+         * VerificationFailed — the harness's real check returned a non-zero
+         * exit code. Routes into AgentErrorRecoveryService as a first-class
+         * error type ('verification_failed'), not silently swallowed.
+         */
+        VerificationFailed = 'verification_failed',
         Error = 'error',
 }
 
