@@ -57,6 +57,35 @@
   animation: kovix-status-pulse 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
+/* Phase 3.1 — State: verifying (Ignite-orange pulse, slower)
+   Distinct from executing so the user can see "the harness is checking the
+   agent's work" vs "the agent is running". Slower pulse (1.8s vs 1.2s)
+   signals "wait, real check in progress" without being alarming. */
+.kovix-agent-statusbar.is-verifying .kovix-agent-statusbar__dot {
+  background: var(--kovix-ignite-500, #FF6B35);
+  animation: kovix-status-pulse 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Phase 3.1 — State: verification failed (solid Ignite-red, no pulse)
+   Solid (not pulsing) because the failure has already happened — the user
+   needs to see it and decide what to do. Slightly more saturated than
+   plain error to signal "this is a trust signal, not just a crash". */
+.kovix-agent-statusbar.is-verification-failed .kovix-agent-statusbar__dot {
+  background: var(--kovix-ignite-600, #E55A2B);
+}
+
+/* Phase 3.1 — Workbench statusbar modifier for verifying state.
+   When the harness is running its check, the bottom status bar shifts to
+   an Ignite-orange tint so the user can see at a glance that verification
+   (not the agent) is in control. Mirrors the existing kovix-status-running
+   modifier but with a warmer hue. */
+.monaco-workbench .part.statusbar.kovix-status-verifying {
+  background: linear-gradient(90deg,
+    var(--kovix-ignite-500, #FF6B35) 0%,
+    var(--kovix-ignite-600, #E55A2B) 100%) !important;
+  color: white !important;
+}
+
 /* State: refining (info pulse) */
 .kovix-agent-statusbar.is-refining .kovix-agent-statusbar__dot {
   background: var(--kovix-info);
