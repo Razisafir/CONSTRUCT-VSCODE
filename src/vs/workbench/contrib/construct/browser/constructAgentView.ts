@@ -52,7 +52,7 @@ import './media/kovixAgent.css';
 // badges, error states, milestone pause redesign, onboarding step treatment.
 import './media/kovixAgentV2.css';
 
-type ExecutionState = 'idle' | 'planning' | 'refining' | 'awaiting_approval' | 'executing' | 'paused_at_milestone' | 'complete' | 'error' | 'stopped';
+type ExecutionState = 'idle' | 'planning' | 'refining' | 'awaiting_approval' | 'executing' | 'verifying' | 'verification_failed' | 'paused_at_milestone' | 'complete' | 'error' | 'stopped';
 
 type ContextScope = 'currentFile' | 'workspace' | 'selectedText';
 
@@ -1152,6 +1152,36 @@ export class ConstructAgentViewPane extends ViewPane {
                                                 fullText += `\n\n\u2705 Milestone completed: ${event.milestone.name}`;
                                                 break;
 
+                                        // ──────────────────────────────────────────────────────────────────────
+                                        // Phase 3.1 — Verification status surface.
+                                        // The agent has declared "done"; the harness is now running a real
+                                        // check (test/build/typecheck) before the milestone is allowed to
+                                        // advance. The chip + status bar reflect this in real time.
+                                        // ──────────────────────────────────────────────────────────────────────
+                                        case 'verification_start':
+                                                this.setExecutionState('verifying');
+                                                fullText += `\n\n\uD83D\uDD0D Verifying: ${event.command}`;
+                                                break;
+
+                                        case 'verification_result': {
+                                                if (event.unverified) {
+                                                        // No test/build/typecheck available — mark unverified, not failed.
+                                                        // Ignite-orange chip in the UI (rendered by updateStatusIndicator),
+                                                        // warning-toned but not alarming.
+                                                        fullText += `\n\n\u26A0\uFE0F Unverified: ${event.output}`;
+                                                } else if (event.passed) {
+                                                        fullText += `\n\n\u2705 Verification passed`;
+                                                } else {
+                                                        // Verification failed — the agent loop's runVerification() already
+                                                        // fired an 'error' event with the failure detail. We just mark
+                                                        // the state here; the error event handler above adds the
+                                                        // user-visible failure text.
+                                                        this.setExecutionState('verification_failed');
+                                                        fullText += `\n\n\u274C Verification failed`;
+                                                }
+                                                break;
+                                        }
+
                                         case 'complete':
                                                 fullText += `\n\n[OK] Task complete`;
                                                 break;
@@ -1281,7 +1311,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 this.executionState = state;
                 this.updateStatusIndicator();
 
-                const isRunning = state === 'planning' || state === 'executing';
+                const isRunning = state === 'planning' || state === 'executing' || state === 'verifying';
                 this.sendBtn.style.display = isRunning ? 'none' : 'inline-block';
                 this.stopBtn.style.display = isRunning ? 'inline-block' : 'none';
                 this.inputBox.disabled = isRunning;
@@ -1290,10 +1320,14 @@ export class ConstructAgentViewPane extends ViewPane {
                 // actively running. This is the highest-frequency brand touchpoint a user
                 // sees — it should feel alive, not decorative. The CSS class is defined
                 // in kovix-tokens.css and toggled here for the duration of the run only.
-                const isAgentRunning = state === 'planning' || state === 'refining' || state === 'executing';
+                const isAgentRunning = state === 'planning' || state === 'refining' || state === 'executing' || state === 'verifying';
                 const statusbar = document.querySelector('.monaco-workbench .part.statusbar');
                 if (statusbar) {
                         statusbar.classList.toggle('kovix-status-running', isAgentRunning);
+                        // Phase 3.1 — Verifying state gets a distinct class so the status
+                        // bar can shift to a slightly different shade (Ignite-orange tint)
+                        // to signal "harness is checking the agent's work" vs "agent is running".
+                        statusbar.classList.toggle('kovix-status-verifying', state === 'verifying');
                 }
 
                 if (state === 'idle') {
@@ -1307,6 +1341,10 @@ export class ConstructAgentViewPane extends ViewPane {
                         this.inputBox.placeholder = 'Planning...';
                 } else if (state === 'executing') {
                         this.inputBox.placeholder = 'Executing...';
+                } else if (state === 'verifying') {
+                        // Phase 3.1 — distinct placeholder so the user knows the harness
+                        // (not the agent) is in control.
+                        this.inputBox.placeholder = 'Verifying — running real check...';
                 } else if (state === 'awaiting_approval') {
                         this.inputBox.placeholder = 'Awaiting approval...';
                 }
@@ -1319,6 +1357,14 @@ export class ConstructAgentViewPane extends ViewPane {
                         refining: { text: 'REFINING', cls: 'kovix-msg__status--thinking', barCls: 'is-refining' },
                         awaiting_approval: { text: 'AWAITING APPROVAL', cls: 'kovix-msg__status--awaiting', barCls: 'is-awaiting' },
                         executing: { text: 'EXECUTING', cls: 'kovix-msg__status--working', barCls: 'is-executing' },
+                        // Phase 3.1 — Verifying chip. Distinct from executing so the user can
+                        // see "the harness is checking the agent's work" vs "the agent is running".
+                        // Uses the same working animation but a different label.
+                        verifying: { text: 'VERIFYING', cls: 'kovix-msg__status--working', barCls: 'is-verifying' },
+                        // Phase 3.1 — VerificationFailed. Distinct from generic error so the
+                        // user can see "the agent said done but the test disagreed" — this is
+                        // a trust signal, not just a crash.
+                        verification_failed: { text: 'VERIFICATION FAILED', cls: 'kovix-msg__status--error', barCls: 'is-verification-failed' },
                         paused_at_milestone: { text: 'PAUSED AT MILESTONE', cls: 'kovix-msg__status--awaiting', barCls: 'is-paused' },
                         complete: { text: 'COMPLETE', cls: 'kovix-msg__status--done', barCls: 'is-complete' },
                         error: { text: 'ERROR', cls: 'kovix-msg__status--error', barCls: 'is-error' },
@@ -1331,7 +1377,7 @@ export class ConstructAgentViewPane extends ViewPane {
                 // v2.0: Drive the persistent status bar with the same state.
                 if (this.statusBarEl) {
                         // Clear all is-* classes, then add the current one
-                        this.statusBarEl.classList.remove('is-idle', 'is-planning', 'is-executing', 'is-refining', 'is-paused', 'is-awaiting', 'is-complete', 'is-error');
+                        this.statusBarEl.classList.remove('is-idle', 'is-planning', 'is-executing', 'is-refining', 'is-paused', 'is-awaiting', 'is-complete', 'is-error', 'is-verifying', 'is-verification-failed');
                         this.statusBarEl.classList.add(config.barCls);
                         if (this.statusBarLabelEl) { this.statusBarLabelEl.textContent = config.text; }
                         if (this.statusBarTaskEl) {
