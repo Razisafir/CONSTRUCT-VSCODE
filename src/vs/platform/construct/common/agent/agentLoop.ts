@@ -28,7 +28,28 @@ export type AgentLoopEvent =
         | { type: 'milestone_reached'; milestone: IMilestone }
         | { type: 'milestone_paused'; milestone: IMilestone }
         | { type: 'milestone_resumed'; milestone: IMilestone }
-        | { type: 'milestone_completed'; milestone: IMilestone };
+        | { type: 'milestone_completed'; milestone: IMilestone }
+        /**
+         * Emitted when the harness enters the Verifying state — i.e. the agent
+         * has declared the milestone complete and the harness is now running a
+         * real check (test / build / typecheck). The UI shows a "Verifying…"
+         * chip while this is in flight.
+         */
+        | { type: 'verification_start'; command: string }
+        /**
+         * Emitted when the harness's verification check finishes.
+         *
+         * - passed=true  → milestone advances normally (PausedAtMilestone or Complete)
+         * - passed=false → ExecutionState transitions to VerificationFailed and
+         *   the failure routes through AgentErrorRecoveryService as a
+         *   'verification_failed' error type (budget 3, then escalate).
+         *
+         * If no test/build/typecheck command exists for the workspace, the
+         * milestone is marked "unverified" (passed=true but output contains
+         * the literal marker "unverified:no-command") and the UI surfaces a
+         * distinct warning-toned badge rather than reporting it as done.
+         */
+        | { type: 'verification_result'; passed: boolean; output: string; unverified?: boolean };
 
 /**
  * Plan step returned from the planning phase.

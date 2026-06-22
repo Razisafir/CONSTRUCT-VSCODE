@@ -652,6 +652,42 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                 }
                         }
 
+                        // ──────────────────────────────────────────────────────────────────────
+                        // Phase 1.2 — Real verification before "complete" is allowed.
+                        // The agent has declared the task done (end_turn / no tool calls).
+                        // The harness now runs a REAL check (test > build > typecheck)
+                        // and only lets the milestone advance if exit code is 0.
+                        // This converts "confidently wrong" from a silent pass into a
+                        // classified 'verification_failed' error routed through
+                        // AgentErrorRecoveryService.
+                        // ──────────────────────────────────────────────────────────────────────
+                        for await (const vEvent of this.runVerification(signal)) {
+                                yield vEvent;
+                                if (vEvent.type === 'verification_result' && !vEvent.passed) {
+                                        // Verification failed — classify + route to error recovery
+                                        this._executionState = ExecutionState.VerificationFailed;
+                                        const stepError = this.errorRecovery.classifyError(
+                                                'verification_harness',
+                                                { command: 'auto-detected' },
+                                                vEvent.output,
+                                                1,
+                                                vEvent.output
+                                        );
+                                        // Force the error type to verification_failed regardless of pattern match
+                                        (stepError as { errorType: string }).errorType = 'verification_failed';
+                                        this.logService.warn(`[AgentLoop] Verification failed, routing to error recovery: ${vEvent.output.substring(0, 200)}`);
+                                        const recovery = await this.errorRecovery.attemptRecovery(stepError);
+                                        const recoverable = recovery.strategy === 'retry';
+                                        this._executionState = ExecutionState.Error;
+                                        const errText = `[Verification Failed] The agent declared the task complete, but the harness's real check returned non-zero.\n${vEvent.output.substring(0, 800)}`;
+                                        this._onError.fire({ text: errText, recoverable });
+                                        yield { type: 'error', text: errText, recoverable };
+                                        return; // do NOT yield 'complete'
+                                }
+                        }
+                        // Verification passed (or marked unverified) — proceed normally.
+                        this._executionState = ExecutionState.Complete;
+
                         // Store task summary in memory
                         if (this.constructMemory.isInitialized && this.constructMemory.config.autoLearn) {
                                 this.constructMemory.addMemory(
@@ -983,6 +1019,108 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         }
 
         /**
+         * Phase 1.2 — Real verification harness.
+         *
+         * Runs a harness-controlled check (NOT an LLM-controlled one) to confirm
+         * the agent's "done" claim. Detection order:
+         *   1. package.json scripts.test  →  `npm test`
+         *   2. package.json scripts.build  →  `npm run build`
+         *   3. package.json scripts.typecheck  →  `npm run typecheck`
+         *   4. tsconfig.json present  →  `npx tsc --noEmit`
+         *   5. nothing found  →  yield verification_result with unverified=true
+         *
+         * The loop MUST pass through this before reaching PausedAtMilestone or
+         * Complete. Verifying is harness-controlled — the agent cannot
+         * self-report its way out of it.
+         */
+        private async *runVerification(signal?: AbortSignal): AsyncGenerator<AgentLoopEvent> {
+                this._executionState = ExecutionState.Verifying;
+                this.logService.info('[AgentLoop] Entering Verifying state — running harness check');
+
+                const detection = await this.detectVerificationCommand();
+
+                if (!detection.command) {
+                        // No test/build/typecheck available — mark unverified, do not fail.
+                        // The UI surfaces a distinct warning-toned badge so the user knows
+                        // the agent's "done" claim was NOT backed by a real check.
+                        this.logService.info(`[AgentLoop] No verification command available (${detection.reason}); marking milestone unverified`);
+                        yield {
+                                type: 'verification_result',
+                                passed: true,
+                                output: `unverified:no-command — ${detection.reason}`,
+                                unverified: true,
+                        };
+                        return;
+                }
+
+                yield { type: 'verification_start', command: detection.command };
+
+                const cwd = this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath;
+                try {
+                        const execResult = await this.terminalExecutor.execute(
+                                detection.command,
+                                cwd,
+                                120_000, // 2-minute timeout — tests shouldn't run forever
+                                signal
+                        );
+                        const passed = execResult.exitCode === 0;
+                        const output = `--- verification command: ${detection.command} (${detection.reason}) ---\n--- stdout (last 4KB) ---\n${execResult.stdout.slice(-4096)}\n--- stderr (last 4KB) ---\n${execResult.stderr.slice(-4096)}\n--- exit code: ${execResult.exitCode} ---`;
+
+                        this.logService.info(`[AgentLoop] Verification ${passed ? 'PASSED' : 'FAILED'} (exit ${execResult.exitCode})`);
+                        yield { type: 'verification_result', passed, output };
+                } catch (err) {
+                        const errMsg = err instanceof Error ? err.message : String(err);
+                        this.logService.warn(`[AgentLoop] Verification command crashed: ${errMsg}`);
+                        yield {
+                                type: 'verification_result',
+                                passed: false,
+                                output: `verification command crashed: ${errMsg}`,
+                        };
+                }
+        }
+
+        /**
+         * Phase 1.2 helper — detect which verification command to run for the
+         * current workspace. Returns { command, reason } or { command: null, reason }
+         * if no test/build/typecheck command exists.
+         */
+        private async detectVerificationCommand(): Promise<{ command: string | null; reason: string }> {
+                const folder = this.workspaceContextService.getWorkspace().folders[0];
+                if (!folder) {
+                        return { command: null, reason: 'no workspace folder open' };
+                }
+
+                // Try package.json scripts.{test,build,typecheck}
+                try {
+                        const pkgUri = URI.joinPath(folder.uri, 'package.json');
+                        const stat = await this.fileService.readFile(pkgUri);
+                        const pkg = JSON.parse(stat.value.toString()) as { scripts?: Record<string, string> };
+                        if (pkg.scripts?.test && !pkg.scripts.test.includes('No tests specified' as string)) {
+                                return { command: 'npm test', reason: 'package.json scripts.test' };
+                        }
+                        if (pkg.scripts?.build) {
+                                return { command: 'npm run build', reason: 'package.json scripts.build' };
+                        }
+                        if (pkg.scripts?.typecheck) {
+                                return { command: 'npm run typecheck', reason: 'package.json scripts.typecheck' };
+                        }
+                } catch {
+                        // No package.json or invalid JSON — fall through to tsconfig check
+                }
+
+                // Fallback: tsc --noEmit if tsconfig.json exists
+                try {
+                        const tsconfigUri = URI.joinPath(folder.uri, 'tsconfig.json');
+                        await this.fileService.readFile(tsconfigUri);
+                        return { command: 'npx tsc --noEmit', reason: 'tsconfig.json present (no package.json scripts)' };
+                } catch {
+                        // No tsconfig either
+                }
+
+                return { command: null, reason: 'no package.json scripts and no tsconfig.json — workspace has no automated check' };
+        }
+
+        /**
          * Build the system prompt with memory context injected.
          * Calls memoryOrchestrator.injectContextIntoPrompt() to include
          * Supermemory persistent context and local four-layer memory.
@@ -1004,10 +1142,47 @@ Guidelines:
 - Always read relevant existing files before making changes
 - Write complete, working code -- never truncate with "// ... rest of file"
 - Prefer running commands over asking the user to run them
-- After writing files, verify by reading them back
+- After writing files or making changes, verify by RUNNING the relevant command
+  (tests, build, type-check, or the actual feature) and reading its real output.
+  Reading a file back to confirm its contents were written is NOT verification —
+  it only proves the write syscall succeeded, not that the code works.
+- Never claim a task is complete, fixed, or passing without having run the
+  verification command in this same turn and seen its exit code / output.
+  The Iron Law: NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE.
+  If you haven't run the verification command in this turn, you cannot claim
+  it passes — "should work", "probably fixed", "I'm confident" are rationalizations,
+  not evidence. See the Common Failures table below.
+- If no test or build command exists for what you changed, say so explicitly and
+  mark the result as "unverified" rather than implying it was checked.
 - Keep the user informed with brief status messages
 - If task requires installing dependencies, do it
-- Always think about what could go wrong and handle it`;
+- Always think about what could go wrong and handle it
+
+Common Failures table (do not reproduce these patterns):
+  | Claim                  | Requires                                  | Not Sufficient                  |
+  |------------------------|-------------------------------------------|---------------------------------|
+  | Tests pass             | Test command output: 0 failures           | Previous run, "should pass"     |
+  | Build succeeds         | Build command: exit 0                     | Linter passing, logs look good  |
+  | Bug fixed              | Test original symptom: passes             | Code changed, assumed fixed     |
+  | Agent completed        | VCS diff shows changes                    | Agent reports "success"         |
+  | Requirements met       | Line-by-line checklist                    | Tests passing                   |
+
+Engineering discipline (Karpathy four principles):
+  1. Think Before Coding — state assumptions explicitly. If multiple interpretations
+     exist, present them; don't pick silently. If a simpler approach exists, say so.
+  2. Simplicity First — minimum code that solves the problem. No speculative
+     abstractions, no "flexibility" that wasn't requested, no error handling for
+     impossible scenarios. If 200 lines could be 50, rewrite.
+  3. Surgical Changes — touch only what you must. Don't "improve" adjacent code.
+     Match existing style. Every changed line should trace directly to the request.
+  4. Goal-Driven Execution — define a verifiable success criterion before starting.
+     "Fix the bug" → "write a test that reproduces it, then make it pass".
+
+Ponytail discipline (DEFAULT: full):
+  YAGNI ladder applies — stdlib before deps, native before custom, one line before
+  fifty. Don't introduce unrequested abstractions. If the user didn't ask for a
+  framework, plugin system, or config layer, don't add one. Escalate to bigger
+  architecture only when the task explicitly requires it.`;
 
                 // Inject memory context from MemoryOrchestrator (Supermemory + local layers)
                 // SEC-6: Sanitise memory context before injection to prevent prompt injection

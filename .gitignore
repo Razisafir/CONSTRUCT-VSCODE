@@ -29,3 +29,4 @@ id_rsa*
 # Session artifacts
 tool-results/
 download/
+vendor-skills/
