@@ -1,0 +1,7 @@
+# Kovix — gitleaks allowlist
+# See SECURITY_AUDIT.md SEC-2 for rationale on each entry.
+
+# Test fixtures that intentionally contain fake API keys for testing the
+# secret redactor. Values are clearly fake (sk-1234567890abcdef, etc.)
+# and would not authenticate against any real provider.
+tests/python/test_security.py
