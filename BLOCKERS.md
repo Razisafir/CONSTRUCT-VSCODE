@@ -46,29 +46,60 @@ confirmed without a desktop.
 `npx tsc --noEmit` to both show 0 errors, with output pasted into the commit
 message. The Phase 5 hard gate additionally requires `npm test`.
 
-A fresh clone of KOVIX (a VS Code fork) requires `npm install` first, which
-pulls ~1GB of dependencies and takes 10-15 minutes. The subsequent
-`npm run compile` takes another 5-10 minutes for a VS Code fork. The full
-`npm test` suite takes 30+ minutes.
+`npm install` was attempted in the build environment and FAILED with:
+```
+npm error Package 'xkbfile', required by 'virtual:world', not found.
+npm error gyp ERR! cwd /home/z/my-project/kovix-work/node_modules/native-keymap
+npm error gyp ERR! command "/usr/bin/node" ".../node-gyp/bin/node-gyp.js" "rebuild"
+npm error gyp ERR! not ok
+```
+`native-keymap` (a VS Code dependency) requires the system library `libxkbfile-dev`
+(+ `libx11-dev`, `libxkbcommon-dev`) which is not installable in this sandbox
+without root apt access. Without `node_modules/` fully populated, neither
+`npm run compile` nor `npx tsc --noEmit` can run.
 
-**Impact:** The compile gate has not been run for Phase 1's code changes. The
-changes are surgical (additive enum members, type union extension, new
-generator method) and TypeScript-compatible by construction, but unverified by
-command output. This violates the Iron Law the phase itself is enforcing.
+**Mitigation applied:** Installed standalone TypeScript 5.6.2 in
+`/home/z/my-project/tsc-bin/` (outside the project tree, with `--ignore-scripts`
+to skip native module rebuilds). Ran parse-only syntax checks
+(`--noResolve --skipLibCheck`) against all 6 modified files. Result:
+
+```
+✓ src/vs/platform/construct/common/agent/milestoneStateMachine.ts — clean
+✓ src/vs/platform/construct/common/agent/agentLoop.ts — clean
+✓ src/vs/platform/construct/common/recovery/agentErrorRecovery.ts — clean
+✓ src/vs/workbench/contrib/construct/browser/services/recovery/agentErrorRecovery.ts — clean
+✓ src/vs/workbench/contrib/construct/browser/kovixAutonomousConfig.ts — clean
+✓ src/vs/workbench/contrib/construct/browser/services/agent/agentLoop.ts — edited regions clean
+  (pre-existing _register/decorator errors at lines 182-221 are --noResolve
+   artifacts from missing Disposable base class, NOT from my changes — they
+   appear in unedited code)
+```
+
+**Impact:** Phase 1's code changes parse cleanly with TypeScript 5.6.2. They
+are additive (new enum members, type union extension, new async generator
+method, one new helper, one new config setting) and TypeScript-compatible by
+construction. The full project compile gate is NOT yet run — must be done
+locally before merge.
 
 **Resolution required from user:**
-1. Run `npm install` locally (10-15 min).
-2. Run `npm run compile 2>&1 | tail -30` and confirm 0 errors.
-3. Run `npx tsc --noEmit 2>&1 | tail -30` and confirm 0 errors.
-4. If errors appear, paste them back and the fixes will be applied to
-   `feature/grand-redesign` before merge.
+1. On a Linux desktop with `apt install -y libxkbfile-dev libx11-dev libxkbcommon-dev`:
+   ```bash
+   cd /path/to/kovix-work
+   git checkout feature/grand-redesign
+   npm install                           # 10-15 min
+   npm run compile 2>&1 | tail -30       # 5-10 min, must show 0 errors
+   npx tsc --noEmit 2>&1 | tail -30      # 5-10 min, must show 0 errors
+   ```
+2. On Windows/macOS, the equivalent system libs are bundled with VS Code's
+   build toolchain — see `BUILD.md` for platform-specific prerequisites.
+3. If errors appear in the edited regions (lines 649-690 or 1021-1121 of
+   `src/vs/workbench/contrib/construct/browser/services/agent/agentLoop.ts`,
+   or any line of the other 5 files), paste them back and the fixes will be
+   applied before merge.
 
-**Mitigation:** The Phase 1 changes are deliberately minimal and additive —
-new enum members (`Verifying`, `VerificationFailed`), new type union member
-(`'verification_failed'`), new event variants in a discriminated union, one
-new async generator method, one new helper. They do not modify existing
-control flow except for the insertion point right before `yield { type:
-'complete' }` in `run()`. Risk of breaking the compile is low but not zero.
+**Iron Law acknowledgement:** This block entry itself follows the rule — the
+gate is reported as 'parse-clean but full-compile not yet run' rather than
+'passing' because the verification command has not been executed in this turn.
 
 ---
 
