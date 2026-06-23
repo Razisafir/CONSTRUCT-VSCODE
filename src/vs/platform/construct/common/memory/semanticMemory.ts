@@ -10,7 +10,7 @@ import { Event } from '../../../../base/common/event.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 import { ISemanticMemoryEntry, IMemorySearchResult } from './memoryTypes.js';
 
-export const ISemanticMemoryService = createDecorator<ISemanticMemoryService>('construct.semanticMemory');
+export const ISemanticMemoryService = createDecorator<ISemanticMemoryService>('kovix.semanticMemory');
 
 export interface ISemanticMemoryService extends IDisposable {
 	readonly _serviceBrand: undefined;

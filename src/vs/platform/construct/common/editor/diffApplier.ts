@@ -7,7 +7,7 @@
 
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 
-export const IDiffApplier = createDecorator<IDiffApplier>('construct.diffApplier');
+export const IDiffApplier = createDecorator<IDiffApplier>('kovix.diffApplier');
 
 /**
  * Result of applying a diff.

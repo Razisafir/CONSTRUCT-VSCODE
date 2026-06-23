@@ -8,7 +8,7 @@
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 import { Event } from '../../../../base/common/event.js';
 
-export const ISecureKeyManager = createDecorator<ISecureKeyManager>('construct.secureKeyManager');
+export const ISecureKeyManager = createDecorator<ISecureKeyManager>('kovix.secureKeyManager');
 
 /**
  * Supported LLM providers for API key management.

@@ -10,7 +10,7 @@ import { Event } from '../../../../base/common/event.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 import { IWorkingMemoryEntry } from './memoryTypes.js';
 
-export const IWorkingMemoryService = createDecorator<IWorkingMemoryService>('construct.workingMemory');
+export const IWorkingMemoryService = createDecorator<IWorkingMemoryService>('kovix.workingMemory');
 
 export interface IWorkingMemoryService extends IDisposable {
 	readonly _serviceBrand: undefined;

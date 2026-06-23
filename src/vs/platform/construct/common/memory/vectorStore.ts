@@ -7,7 +7,7 @@
 
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 
-export const IConstructVectorStore = createDecorator<IConstructVectorStore>('construct.vectorStore');
+export const IConstructVectorStore = createDecorator<IConstructVectorStore>('kovix.vectorStore');
 
 /**
  * A document chunk stored in the vector store.

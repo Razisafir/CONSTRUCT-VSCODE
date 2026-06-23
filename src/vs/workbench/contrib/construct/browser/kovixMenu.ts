@@ -20,58 +20,58 @@
  *
  *    Kovix
  *    ├── Welcome Screen...                          → kovix.welcome.open
- *    ├── New Project...                             → construct.openProjectWizard
- *    ├── Open Project...                            → construct.loadProject
+ *    ├── New Project...                             → kovix.openProjectWizard
+ *    ├── Open Project...                            → kovix.loadProject
  *    ├── ─────────────
  *    ├── Agent
- *    │   ├── Open Agent Panel          (Ctrl+Shift+K)  → construct.focusPanel
- *    │   ├── New Chat                                → construct.newChat
- *    │   ├── Show Inline Agent          (Ctrl+Shift+I) → construct.showInlineAgent
- *    │   ├── Switch Agent Mode...                    → construct.switchAgentMode
- *    │   ├── Spawn Sub-Agent...                      → construct.spawnSubAgent
- *    │   ├── Undo Last Task                          → construct.undoTask
- *    │   ├── Accept All Pending Diffs   (Ctrl+Shift+Enter) → construct.acceptAllDiffs
- *    │   └── Reject All Pending Diffs   (Ctrl+Shift+Escape) → construct.rejectAllDiffs
+ *    │   ├── Open Agent Panel          (Ctrl+Shift+K)  → kovix.focusPanel
+ *    │   ├── New Chat                                → kovix.newChat
+ *    │   ├── Show Inline Agent          (Ctrl+Shift+I) → kovix.showInlineAgent
+ *    │   ├── Switch Agent Mode...                    → kovix.switchAgentMode
+ *    │   ├── Spawn Sub-Agent...                      → kovix.spawnSubAgent
+ *    │   ├── Undo Last Task                          → kovix.undoTask
+ *    │   ├── Accept All Pending Diffs   (Ctrl+Shift+Enter) → kovix.acceptAllDiffs
+ *    │   └── Reject All Pending Diffs   (Ctrl+Shift+Escape) → kovix.rejectAllDiffs
  *    ├── Memory
- *    │   ├── Search Memories...                      → construct.searchMemories
- *    │   ├── Add Memory...                           → construct.addMemory
- *    │   ├── Open Memory Panel                       → construct.openMemoryPanel
- *    │   ├── Open Memory Graph                       → construct.openMemoryGraph
- *    │   ├── Index Workspace                         → construct.indexWorkspace
- *    │   ├── Memory Settings...                      → construct.openMemorySettings
- *    │   └── Forget Everything...                    → construct.forgetAllMemories
+ *    │   ├── Search Memories...                      → kovix.searchMemories
+ *    │   ├── Add Memory...                           → kovix.addMemory
+ *    │   ├── Open Memory Panel                       → kovix.openMemoryPanel
+ *    │   ├── Open Memory Graph                       → kovix.openMemoryGraph
+ *    │   ├── Index Workspace                         → kovix.indexWorkspace
+ *    │   ├── Memory Settings...                      → kovix.openMemorySettings
+ *    │   └── Forget Everything...                    → kovix.forgetAllMemories
  *    ├── Skills
- *    │   ├── View Installed Skills                   → construct.viewSkill
- *    │   ├── Create Skill from Document...           → construct.createSkillFromDocument
- *    │   ├── Import Skill from URL...                → construct.importSkillFromUrl
- *    │   └── Open Skills Folder                      → construct.openSkillsFolder
+ *    │   ├── View Installed Skills                   → kovix.viewSkill
+ *    │   ├── Create Skill from Document...           → kovix.createSkillFromDocument
+ *    │   ├── Import Skill from URL...                → kovix.importSkillFromUrl
+ *    │   └── Open Skills Folder                      → kovix.openSkillsFolder
  *    ├── Swarm
- *    │   ├── Open Swarm Dashboard                    → construct.openSwarm
- *    │   └── Create Custom Agent Mode...             → construct.createAgentMode
+ *    │   ├── Open Swarm Dashboard                    → kovix.openSwarm
+ *    │   └── Create Custom Agent Mode...             → kovix.createAgentMode
  *    ├── Autonomous
- *    │   └── Start Autonomous Build...               → construct.autonomousBuild
+ *    │   └── Start Autonomous Build...               → kovix.autonomousBuild
  *    ├── MCP
- *    │   ├── Open MCP Marketplace                    → construct.mcp.openMarketplace
- *    │   ├── Start MCP Server...                     → construct.mcp.startServer
- *    │   └── Stop MCP Server...                      → construct.mcp.stopServer
+ *    │   ├── Open MCP Marketplace                    → kovix.mcp.openMarketplace
+ *    │   ├── Start MCP Server...                     → kovix.mcp.startServer
+ *    │   └── Stop MCP Server...                      → kovix.mcp.stopServer
  *    ├── Tools
- *    │   ├── Ponytail: Set Mode...                   → construct.ponytailSetMode
- *    │   ├── Ponytail: Review Diff                   → construct.ponytailReview
- *    │   ├── Ponytail: Help                          → construct.ponytailHelp
- *    │   ├── UI/UX: Search Styles...                 → construct.uiuxSearchStyle
- *    │   ├── UI/UX: Search Colors...                 → construct.uiuxSearchColor
- *    │   ├── UI/UX: Generate Design System           → construct.uiuxGenerateDesignSystem
- *    │   ├── UI/UX: Stack Guidelines...              → construct.uiuxStackGuidelines
- *    │   ├── Agent Reach: Check Status               → construct.checkAgentReach
- *    │   ├── Agent Reach: Install                    → construct.installAgentReach
- *    │   ├── Agent Reach: Configure...               → construct.configureAgentReach
- *    │   ├── Web Research: Exa Search...             → construct.searchWebExa
- *    │   ├── Web Research: Read Webpage...           → construct.readWebpage
- *    │   ├── File to URL                             → construct.fileToUrl
- *    │   └── Goclaw Dashboard                        → construct.goclawDashboard
+ *    │   ├── Ponytail: Set Mode...                   → kovix.ponytailSetMode
+ *    │   ├── Ponytail: Review Diff                   → kovix.ponytailReview
+ *    │   ├── Ponytail: Help                          → kovix.ponytailHelp
+ *    │   ├── UI/UX: Search Styles...                 → kovix.uiuxSearchStyle
+ *    │   ├── UI/UX: Search Colors...                 → kovix.uiuxSearchColor
+ *    │   ├── UI/UX: Generate Design System           → kovix.uiuxGenerateDesignSystem
+ *    │   ├── UI/UX: Stack Guidelines...              → kovix.uiuxStackGuidelines
+ *    │   ├── Agent Reach: Check Status               → kovix.checkAgentReach
+ *    │   ├── Agent Reach: Install                    → kovix.installAgentReach
+ *    │   ├── Agent Reach: Configure...               → kovix.configureAgentReach
+ *    │   ├── Web Research: Exa Search...             → kovix.searchWebExa
+ *    │   ├── Web Research: Read Webpage...           → kovix.readWebpage
+ *    │   ├── File to URL                             → kovix.fileToUrl
+ *    │   └── Goclaw Dashboard                        → kovix.goclawDashboard
  *    ├── ─────────────
- *    ├── Settings...                                 → construct.openAgentSettings
- *    ├── Onboarding Wizard...                        → construct.openOnboarding
+ *    ├── Settings...                                 → kovix.openAgentSettings
+ *    ├── Onboarding Wizard...                        → kovix.openOnboarding
  *    └── About Kovix
  *--------------------------------------------------------------------------------------------*/
 
@@ -126,7 +126,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 	command: {
-		id: 'construct.openProjectWizard',
+		id: 'kovix.openProjectWizard',
 		title: localize('kovixMenuNewProject', "New Project..."),
 	},
 	order: 2,
@@ -134,7 +134,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 	command: {
-		id: 'construct.loadProject',
+		id: 'kovix.loadProject',
 		title: localize('kovixMenuOpenProject', "Open Project..."),
 	},
 	order: 3,
@@ -159,7 +159,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 	command: {
-		id: 'construct.focusPanel',
+		id: 'kovix.focusPanel',
 		title: localize('kovixMenuAgentOpen', "Open Agent Panel"),
 	},
 	order: 1,
@@ -167,7 +167,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 	command: {
-		id: 'construct.newChat',
+		id: 'kovix.newChat',
 		title: localize('kovixMenuAgentNewChat', "New Chat"),
 	},
 	order: 2,
@@ -175,7 +175,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 	command: {
-		id: 'construct.showInlineAgent',
+		id: 'kovix.showInlineAgent',
 		title: localize('kovixMenuAgentInline', "Show Inline Agent"),
 	},
 	order: 3,
@@ -183,7 +183,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 	command: {
-		id: 'construct.switchAgentMode',
+		id: 'kovix.switchAgentMode',
 		title: localize('kovixMenuAgentSwitchMode', "Switch Agent Mode..."),
 	},
 	order: 4,
@@ -191,7 +191,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 	command: {
-		id: 'construct.spawnSubAgent',
+		id: 'kovix.spawnSubAgent',
 		title: localize('kovixMenuAgentSpawn', "Spawn Sub-Agent..."),
 	},
 	order: 5,
@@ -199,7 +199,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 	command: {
-		id: 'construct.undoTask',
+		id: 'kovix.undoTask',
 		title: localize('kovixMenuAgentUndo', "Undo Last Task"),
 	},
 	order: 6,
@@ -216,7 +216,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 	command: {
-		id: 'construct.acceptAllDiffs',
+		id: 'kovix.acceptAllDiffs',
 		title: localize('kovixMenuAgentAcceptDiffs', "Accept All Pending Diffs"),
 	},
 	order: 8,
@@ -224,7 +224,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixAgentMenu, {
 	command: {
-		id: 'construct.rejectAllDiffs',
+		id: 'kovix.rejectAllDiffs',
 		title: localize('kovixMenuAgentRejectDiffs', "Reject All Pending Diffs"),
 	},
 	order: 9,
@@ -240,7 +240,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 	command: {
-		id: 'construct.searchMemories',
+		id: 'kovix.searchMemories',
 		title: localize('kovixMenuMemorySearch', "Search Memories..."),
 	},
 	order: 1,
@@ -248,7 +248,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 	command: {
-		id: 'construct.addMemory',
+		id: 'kovix.addMemory',
 		title: localize('kovixMenuMemoryAdd', "Add Memory..."),
 	},
 	order: 2,
@@ -256,7 +256,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 	command: {
-		id: 'construct.openMemoryPanel',
+		id: 'kovix.openMemoryPanel',
 		title: localize('kovixMenuMemoryPanel', "Open Memory Panel"),
 	},
 	order: 3,
@@ -264,7 +264,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 	command: {
-		id: 'construct.openMemoryGraph',
+		id: 'kovix.openMemoryGraph',
 		title: localize('kovixMenuMemoryGraph', "Open Memory Graph"),
 	},
 	order: 4,
@@ -272,7 +272,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 	command: {
-		id: 'construct.indexWorkspace',
+		id: 'kovix.indexWorkspace',
 		title: localize('kovixMenuMemoryIndex', "Index Workspace"),
 	},
 	order: 5,
@@ -280,7 +280,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 	command: {
-		id: 'construct.openMemorySettings',
+		id: 'kovix.openMemorySettings',
 		title: localize('kovixMenuMemorySettings', "Memory Settings..."),
 	},
 	order: 6,
@@ -297,7 +297,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMemoryMenu, {
 	command: {
-		id: 'construct.forgetAllMemories',
+		id: 'kovix.forgetAllMemories',
 		title: localize('kovixMenuMemoryForget', "Forget Everything..."),
 	},
 	order: 8,
@@ -313,7 +313,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixSkillsMenu, {
 	command: {
-		id: 'construct.viewSkill',
+		id: 'kovix.viewSkill',
 		title: localize('kovixMenuSkillsView', "View Installed Skills"),
 	},
 	order: 1,
@@ -321,7 +321,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixSkillsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixSkillsMenu, {
 	command: {
-		id: 'construct.createSkillFromDocument',
+		id: 'kovix.createSkillFromDocument',
 		title: localize('kovixMenuSkillsCreate', "Create Skill from Document..."),
 	},
 	order: 2,
@@ -329,7 +329,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixSkillsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixSkillsMenu, {
 	command: {
-		id: 'construct.importSkillFromUrl',
+		id: 'kovix.importSkillFromUrl',
 		title: localize('kovixMenuSkillsImport', "Import Skill from URL..."),
 	},
 	order: 3,
@@ -337,7 +337,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixSkillsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixSkillsMenu, {
 	command: {
-		id: 'construct.openSkillsFolder',
+		id: 'kovix.openSkillsFolder',
 		title: localize('kovixMenuSkillsFolder', "Open Skills Folder"),
 	},
 	order: 4,
@@ -353,7 +353,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixSwarmMenu, {
 	command: {
-		id: 'construct.openSwarm',
+		id: 'kovix.openSwarm',
 		title: localize('kovixMenuSwarmOpen', "Open Swarm Dashboard"),
 	},
 	order: 1,
@@ -361,7 +361,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixSwarmMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixSwarmMenu, {
 	command: {
-		id: 'construct.createAgentMode',
+		id: 'kovix.createAgentMode',
 		title: localize('kovixMenuSwarmCreateMode', "Create Custom Agent Mode..."),
 	},
 	order: 2,
@@ -377,7 +377,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixAutonomousMenu, {
 	command: {
-		id: 'construct.autonomousBuild',
+		id: 'kovix.autonomousBuild',
 		title: localize('kovixMenuAutonomousBuild', "Start Autonomous Build..."),
 	},
 	order: 1,
@@ -393,7 +393,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMcpMenu, {
 	command: {
-		id: 'construct.mcp.openMarketplace',
+		id: 'kovix.mcp.openMarketplace',
 		title: localize('kovixMenuMcpMarketplace', "Open MCP Marketplace"),
 	},
 	order: 1,
@@ -401,7 +401,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMcpMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMcpMenu, {
 	command: {
-		id: 'construct.mcp.startServer',
+		id: 'kovix.mcp.startServer',
 		title: localize('kovixMenuMcpStart', "Start MCP Server..."),
 	},
 	order: 2,
@@ -409,7 +409,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMcpMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMcpMenu, {
 	command: {
-		id: 'construct.mcp.stopServer',
+		id: 'kovix.mcp.stopServer',
 		title: localize('kovixMenuMcpStop', "Stop MCP Server..."),
 	},
 	order: 3,
@@ -426,7 +426,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 // Ponytail group
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.ponytailSetMode',
+		id: 'kovix.ponytailSetMode',
 		title: localize('kovixMenuToolsPonytailMode', "Ponytail: Set Mode..."),
 	},
 	order: 1,
@@ -434,7 +434,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.ponytailReview',
+		id: 'kovix.ponytailReview',
 		title: localize('kovixMenuToolsPonytailReview', "Ponytail: Review Diff"),
 	},
 	order: 2,
@@ -442,7 +442,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.ponytailHelp',
+		id: 'kovix.ponytailHelp',
 		title: localize('kovixMenuToolsPonytailHelp', "Ponytail: Help"),
 	},
 	order: 3,
@@ -459,7 +459,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.uiuxSearchStyle',
+		id: 'kovix.uiuxSearchStyle',
 		title: localize('kovixMenuToolsUiuxStyle', "UI/UX: Search Styles..."),
 	},
 	order: 5,
@@ -467,7 +467,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.uiuxSearchColor',
+		id: 'kovix.uiuxSearchColor',
 		title: localize('kovixMenuToolsUiuxColor', "UI/UX: Search Colors..."),
 	},
 	order: 6,
@@ -475,7 +475,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.uiuxGenerateDesignSystem',
+		id: 'kovix.uiuxGenerateDesignSystem',
 		title: localize('kovixMenuToolsUiuxDesignSystem', "UI/UX: Generate Design System"),
 	},
 	order: 7,
@@ -483,7 +483,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.uiuxStackGuidelines',
+		id: 'kovix.uiuxStackGuidelines',
 		title: localize('kovixMenuToolsUiuxStack', "UI/UX: Stack Guidelines..."),
 	},
 	order: 8,
@@ -500,7 +500,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.checkAgentReach',
+		id: 'kovix.checkAgentReach',
 		title: localize('kovixMenuToolsReachCheck', "Agent Reach: Check Status"),
 	},
 	order: 10,
@@ -508,7 +508,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.installAgentReach',
+		id: 'kovix.installAgentReach',
 		title: localize('kovixMenuToolsReachInstall', "Agent Reach: Install"),
 	},
 	order: 11,
@@ -516,7 +516,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.configureAgentReach',
+		id: 'kovix.configureAgentReach',
 		title: localize('kovixMenuToolsReachConfigure', "Agent Reach: Configure..."),
 	},
 	order: 12,
@@ -533,7 +533,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.searchWebExa',
+		id: 'kovix.searchWebExa',
 		title: localize('kovixMenuToolsWebSearch', "Web Research: Exa Search..."),
 	},
 	order: 14,
@@ -541,7 +541,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.readWebpage',
+		id: 'kovix.readWebpage',
 		title: localize('kovixMenuToolsWebRead', "Web Research: Read Webpage..."),
 	},
 	order: 15,
@@ -549,7 +549,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.fileToUrl',
+		id: 'kovix.fileToUrl',
 		title: localize('kovixMenuToolsFileToUrl', "File to URL"),
 	},
 	order: 16,
@@ -557,7 +557,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixToolsMenu, {
 	command: {
-		id: 'construct.goclawDashboard',
+		id: 'kovix.goclawDashboard',
 		title: localize('kovixMenuToolsGoclaw', "Goclaw Dashboard"),
 	},
 	order: 17,
@@ -575,7 +575,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 	command: {
-		id: 'construct.openAgentSettings',
+		id: 'kovix.openAgentSettings',
 		title: localize('kovixMenuSettings', "Settings..."),
 	},
 	order: 91,
@@ -583,7 +583,7 @@ MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 
 MenuRegistry.appendMenuItem(MenuIdKovixMainMenu, {
 	command: {
-		id: 'construct.openOnboarding',
+		id: 'kovix.openOnboarding',
 		title: localize('kovixMenuOnboarding', "Onboarding Wizard..."),
 	},
 	order: 92,

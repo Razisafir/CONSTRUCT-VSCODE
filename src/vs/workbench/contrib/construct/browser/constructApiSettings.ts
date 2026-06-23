@@ -15,7 +15,7 @@ import { ISecureKeyManager, LLMProvider, IProviderConfig } from '../../../../pla
 import { IProgressService, ProgressLocation } from '../../../../platform/progress/common/progress.js';
 
 // ─── Configuration Registration ──────────────────────────────────────────────────
-// ponytail: 7 dead config keys removed (construct.api.activeProvider, .anthropic.key,
+// ponytail: 7 dead config keys removed (kovix.api.activeProvider, .anthropic.key,
 //   .openai.key, .ollama.endpoint, .litellm.endpoint, .custom.endpoint, .custom.key).
 //   None were ever read — ManageApiKeys uses ISecureKeyManager directly.
 //   Kept: nothing. The block was 100% dead.
@@ -135,7 +135,7 @@ const PROVIDER_META: IProviderMeta[] = [
 registerAction2(class ManageApiKeysAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.manageApiKeys',
+                        id: 'kovix.manageApiKeys',
                         title: localize2('manageApiKeys', "Manage API Keys"),
                         f1: true,
                         category: localize2('constructCategoryApiKeys', "Construct"),
@@ -304,7 +304,7 @@ registerAction2(class ManageApiKeysAction extends Action2 {
 registerAction2(class TestProviderConnectionAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.testProviderConnection',
+                        id: 'kovix.testProviderConnection',
                         title: localize2('testProviderConnection', "Test Provider Connection"),
                         f1: true,
                         category: localize2('constructCategoryTestConn', "Construct"),
@@ -357,7 +357,7 @@ registerAction2(class TestProviderConnectionAction extends Action2 {
 registerAction2(class SwitchKeyProviderAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.switchProvider.quick',
+                        id: 'kovix.switchProvider.quick',
                         title: localize2('switchKeyProvider', "Switch Provider (Quick)"),
                         f1: true,
                         category: localize2('constructCategorySwitch', "Construct"),

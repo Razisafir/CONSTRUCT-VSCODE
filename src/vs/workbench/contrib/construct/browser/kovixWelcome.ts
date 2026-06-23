@@ -110,7 +110,7 @@ export class KovixWelcomeView extends Disposable {
       case 'cta-new-project':
         this.markSeen();
         // Trigger the existing Kovix Project Wizard command (if registered).
-        this.dispatchCommand('construct.openProjectWizard');
+        this.dispatchCommand('kovix.openProjectWizard');
         break;
       case 'cta-open-folder':
         this.markSeen();
@@ -119,7 +119,7 @@ export class KovixWelcomeView extends Disposable {
       case 'cta-tour':
         this.markSeen();
         // Reuse the onboarding wizard as the "60-second tour".
-        this.dispatchCommand('construct.openOnboarding');
+        this.dispatchCommand('kovix.openOnboarding');
         break;
       case 'cta-skip':
         this.markSeen();

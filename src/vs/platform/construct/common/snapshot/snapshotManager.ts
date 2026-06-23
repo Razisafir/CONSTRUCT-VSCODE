@@ -8,7 +8,7 @@
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 import { Event } from '../../../../base/common/event.js';
 
-export const ISnapshotManager = createDecorator<ISnapshotManager>('construct.snapshotManager');
+export const ISnapshotManager = createDecorator<ISnapshotManager>('kovix.snapshotManager');
 
 /**
  * The strategy used for creating the snapshot.

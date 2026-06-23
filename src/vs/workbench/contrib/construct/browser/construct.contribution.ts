@@ -22,6 +22,7 @@ import { KovixWelcomeContribution, KovixWelcomeView } from './kovixWelcome.js';
 import { KovixBrandChromeContribution } from './kovixBrandChrome.js';
 import { KovixSurfaceBrandingContribution } from './kovixSurfaceBranding.js';
 import { KovixSplashContribution } from './kovixSplash.js';
+import { KovixSettingsMigrationContribution } from './kovixSettingsMigration.js';
 import { KovixCommandBridgeContribution } from './kovixCommandBridge.js';
 import { IStatusbarService, StatusbarAlignment, IStatusbarEntryAccessor } from '../../../../workbench/services/statusbar/browser/statusbar.js';
 import { IWorkbenchContribution, Extensions as WorkbenchExtensions, IWorkbenchContributionsRegistry, WorkbenchPhase, registerWorkbenchContribution2 } from '../../../../workbench/common/contributions.js';
@@ -130,7 +131,7 @@ const constructViewContainer = Registry.as<IViewContainersRegistry>(ViewExtensio
                 order: 0,
                 // Open the right-hand panel by default on first launch so the agent is immediately visible.
                 openCommandActionDescriptor: {
-                                id: 'construct.focusPanel',
+                                id: 'kovix.focusPanel',
                                 title: { value: localize('focusConstructPanel', "Open Kovix Agent"), original: 'Open Kovix Agent' },
                                 mnemonicTitle: undefined,
                                 keybindings: {
@@ -142,7 +143,7 @@ const constructViewContainer = Registry.as<IViewContainersRegistry>(ViewExtensio
 
 // Register the agent panel view inside the container
 Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
-                id: 'construct.agentPanel',
+                id: 'kovix.agentPanel',
                 name: localize2('agentPanel', "Agent"),
                 containerIcon: constructViewIcon,
                 ctorDescriptor: new SyncDescriptor(ConstructAgentViewPane),
@@ -150,7 +151,7 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
                 canMoveView: true,
                 order: 1,
 }, {
-                id: 'construct.memoryPanel',
+                id: 'kovix.memoryPanel',
                 name: localize2('memoryPanel', "Memory"),
                 containerIcon: constructMemoryIcon,
                 ctorDescriptor: new SyncDescriptor(ConstructMemoryViewPane),
@@ -158,7 +159,7 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
                 canMoveView: true,
                 order: 2,
 }, {
-                id: 'construct.memoryGraph',
+                id: 'kovix.memoryGraph',
                 name: localize2('memoryGraph', "Memory Graph"),
                 containerIcon: constructGraphIcon,
                 ctorDescriptor: new SyncDescriptor(KovixMemoryGraphPane),
@@ -166,7 +167,7 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
                 canMoveView: true,
                 order: 3,
 }, {
-                id: 'construct.controlCenter',
+                id: 'kovix.controlCenter',
                 name: localize2('controlCenter', "Control Center"),
                 containerIcon: constructControlIcon,
                 ctorDescriptor: new SyncDescriptor(KovixAgentControlCenter),
@@ -174,7 +175,7 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
                 canMoveView: true,
                 order: 4,
 }, {
-                id: 'construct.agentSettings',
+                id: 'kovix.agentSettings',
                 name: localize2('agentSettings', "Agent Settings"),
                 containerIcon: constructSettingsIcon,
                 ctorDescriptor: new SyncDescriptor(KovixAgentSettingsPane),
@@ -203,8 +204,8 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
                                                 text: '$(robot) Ready',
                                                 ariaLabel: localize('constructAgentStatusAria', "Kovix Agent: Ready"),
                                                 tooltip: localize('constructAgentStatusTooltip', "Kovix Agent: Idle -- click to open panel"),
-                                                command: 'construct.focusPanel',
-                                }, 'construct.agentStatus', StatusbarAlignment.LEFT, 50));
+                                                command: 'kovix.focusPanel',
+                                }, 'kovix.agentStatus', StatusbarAlignment.LEFT, 50));
 
                                 // Model info (left side) — dynamically updated from AI service
                                 this.modelEntryAccessor = this._register(this.statusbarService.addEntry({
@@ -212,8 +213,8 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
                                                 text: '$(zap) No Model local',
                                                 ariaLabel: localize('constructModelAria', "Active LLM: No model selected"),
                                                 tooltip: localize('constructModelTooltip', "Click to select a model"),
-                                                command: 'construct.selectModel',
-                                }, 'construct.model', StatusbarAlignment.LEFT, 51));
+                                                command: 'kovix.selectModel',
+                                }, 'kovix.model', StatusbarAlignment.LEFT, 51));
 
                                 // Listen for provider and model changes
                                 this._register(this.aiService.onDidChangeActiveModel(() => {
@@ -232,7 +233,7 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
                                                 ariaLabel: localize('constructChangesAria', "No changes awaiting approval"),
                                                 tooltip: localize('constructChangesTooltip', "Click to review pending Kovix agent diffs"),
                                                 command: 'workbench.view.scm',
-                                }, 'construct.changes', StatusbarAlignment.RIGHT, 50));
+                                }, 'kovix.changes', StatusbarAlignment.RIGHT, 50));
 
                                 // Agent Reach status (left side, priority 49)
                                 this.agentReachEntryAccessor = this._register(this.statusbarService.addEntry({
@@ -240,8 +241,8 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
                                                 text: '$(globe) Agent Reach',
                                                 ariaLabel: localize('constructAgentReachAria', "Agent Reach internet research tools"),
                                                 tooltip: localize('constructAgentReachTooltip', "Click to check Agent Reach status"),
-                                                command: 'construct.checkAgentReach',
-                                }, 'construct.agentReach', StatusbarAlignment.LEFT, 49));
+                                                command: 'kovix.checkAgentReach',
+                                }, 'kovix.agentReach', StatusbarAlignment.LEFT, 49));
 
                                 // Ponytail lazy-dev mode status (left side, priority 48)
                                 this.ponytailEntryAccessor = this._register(this.statusbarService.addEntry({
@@ -249,8 +250,8 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
                                                 text: '$(shield) PONYTAIL',
                                                 ariaLabel: localize('constructPonytailAria', "Ponytail lazy-dev mode: full"),
                                                 tooltip: localize('constructPonytailTooltip', "Ponytail: full mode — click to change mode"),
-                                                command: 'construct.ponytailSetMode',
-                                }, 'construct.ponytail', StatusbarAlignment.LEFT, 48));
+                                                command: 'kovix.ponytailSetMode',
+                                }, 'kovix.ponytail', StatusbarAlignment.LEFT, 48));
                 }
 
                 private updateModelStatus(): void {
@@ -267,7 +268,7 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
                                                 text: `${icon} ${modelName} ${suffix}`,
                                                 ariaLabel: localize('constructModelAria', "Active LLM: {0} ({1})", modelName, suffix),
                                                 tooltip: localize('constructModelTooltip', "Active LLM: {0} ({1}) — click to change", modelName, suffix),
-                                                command: 'construct.selectModel',
+                                                command: 'kovix.selectModel',
                                 });
                 }
 
@@ -280,7 +281,7 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
                                                 text: `${icon} ${message || 'Agent Reach'}`,
                                                 ariaLabel: localize('constructAgentReachAria', "Agent Reach: {0}", message || status),
                                                 tooltip: localize('constructAgentReachTooltip', "Agent Reach status: {0} — click to check", message || status),
-                                                command: 'construct.checkAgentReach',
+                                                command: 'kovix.checkAgentReach',
                                 });
                 }
 
@@ -299,7 +300,7 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
                                                 text: `${icon} PONYTAIL ${label}`,
                                                 ariaLabel: localize('constructPonytailAria', "Ponytail lazy-dev mode: {0}", mode),
                                                 tooltip: localize('constructPonytailTooltip', "Ponytail: {0} mode — click to change", mode),
-                                                command: 'construct.ponytailSetMode',
+                                                command: 'kovix.ponytailSetMode',
                                 });
                 }
 }
@@ -318,8 +319,8 @@ class ConstructAutoOpenContribution extends Disposable implements IWorkbenchCont
                                 // the constructor runs the workbench layout is ready. Just call openView directly.
                                 try {
                                                 // DIAGNOSTIC: log view registration state before opening
-                                                const container = this.viewDescriptorService.getViewContainerByViewId('construct.agentPanel');
-                                                console.log('[Kovix AutoOpen] container for construct.agentPanel:', container?.id, 'location:', container ? this.viewDescriptorService.getViewContainerLocation(container) : 'N/A');
+                                                const container = this.viewDescriptorService.getViewContainerByViewId('kovix.agentPanel');
+                                                console.log('[Kovix AutoOpen] container for kovix.agentPanel:', container?.id, 'location:', container ? this.viewDescriptorService.getViewContainerLocation(container) : 'N/A');
                                                 if (container) {
                                                                 const model = this.viewDescriptorService.getViewContainerModel(container);
                                                                 const all = model.allViewDescriptors;
@@ -327,7 +328,7 @@ class ConstructAutoOpenContribution extends Disposable implements IWorkbenchCont
                                                                 console.log('[Kovix AutoOpen] allViewDescriptors:', all.map(v => v.id));
                                                                 console.log('[Kovix AutoOpen] activeViewDescriptors:', active.map(v => v.id));
                                                 }
-                                                const result = this.viewsService.openView('construct.agentPanel', false);
+                                                const result = this.viewsService.openView('kovix.agentPanel', false);
                                                 console.log('[Kovix AutoOpen] openView returned:', result);
                                                 result.then(v => console.log('[Kovix AutoOpen] openView resolved:', v)).catch(err => console.error('[Kovix AutoOpen] openView rejected:', err));
                                 } catch (err) {
@@ -341,6 +342,10 @@ Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).regi
 Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(KovixWelcomeContribution, LifecyclePhase.Restored);
 Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(KovixBrandChromeContribution, LifecyclePhase.Restored);
 Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(KovixSurfaceBrandingContribution, LifecyclePhase.Restored);
+// Settings migration: convert legacy construct.* keys/commands in user settings.json
+// and keybindings.json to kovix.*. Idempotent — guarded by a global state flag.
+// Runs at Restored so we don't compete with brand-chrome / splash for boot DOM.
+Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(KovixSettingsMigrationContribution, LifecyclePhase.Restored);
 // The command bridge must install BEFORE the splash / brand-chrome contributions
 // run, so they can dispatch commands immediately. BlockStartup is the earliest phase
 // (maps to LifecyclePhase.Starting) — requires registerWorkbenchContribution2
@@ -352,14 +357,14 @@ registerWorkbenchContribution2(
         KovixSplashContribution.ID, KovixSplashContribution, WorkbenchPhase.BlockStartup);
 
 // --- Construct Commands --------------------------------------------------------
-// NOTE: The `construct.focusPanel` command is auto-registered by the container's
-// `openCommandActionDescriptor` (see above). We keep `construct.newChat` and
-// `construct.showInlineAgent` as additional entry points that also focus the panel.
+// NOTE: The `kovix.focusPanel` command is auto-registered by the container's
+// `openCommandActionDescriptor` (see above). We keep `kovix.newChat` and
+// `kovix.showInlineAgent` as additional entry points that also focus the panel.
 
 registerAction2(class NewConstructChatAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.newChat',
+                                                id: 'kovix.newChat',
                                                 title: localize2('newConstructChat', "Kovix: New Chat"),
                                                 f1: true,
                                                 category: localize2('constructCategory2', "Kovix"),
@@ -371,14 +376,14 @@ registerAction2(class NewConstructChatAction extends Action2 {
                                 });
                 }
                 run(accessor: ServicesAccessor): void {
-                                accessor.get(IViewsService).openView('construct.agentPanel', true);
+                                accessor.get(IViewsService).openView('kovix.agentPanel', true);
                 }
 });
 
 registerAction2(class ShowInlineAgentAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.showInlineAgent',
+                                                id: 'kovix.showInlineAgent',
                                                 title: localize2('showInlineAgent', "Kovix: Focus Agent Panel"),
                                                 keybinding: {
                                                                 primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyI,
@@ -389,7 +394,7 @@ registerAction2(class ShowInlineAgentAction extends Action2 {
                                 });
                 }
                 run(accessor: ServicesAccessor): void {
-                                accessor.get(IViewsService).openView('construct.agentPanel', true);
+                                accessor.get(IViewsService).openView('kovix.agentPanel', true);
                 }
 });
 
@@ -398,42 +403,42 @@ registerAction2(class ShowInlineAgentAction extends Action2 {
 registerAction2(class OpenMemoryPanelAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.openMemoryPanel',
+                                                id: 'kovix.openMemoryPanel',
                                                 title: localize2('openMemoryPanel', "Kovix: Open Memory Panel"),
                                                 f1: true,
                                                 category: localize2('constructCategory4', "Kovix"),
                                 });
                 }
                 run(accessor: ServicesAccessor): void {
-                                accessor.get(IViewsService).openView('construct.memoryPanel', true);
+                                accessor.get(IViewsService).openView('kovix.memoryPanel', true);
                 }
 });
 
 registerAction2(class OpenMemoryGraphAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.openMemoryGraph',
+                                                id: 'kovix.openMemoryGraph',
                                                 title: localize2('openMemoryGraph', "Kovix: Open Memory Graph"),
                                                 f1: true,
                                                 category: localize2('constructCategory4', "Kovix"),
                                 });
                 }
                 run(accessor: ServicesAccessor): void {
-                                accessor.get(IViewsService).openView('construct.memoryGraph', true);
+                                accessor.get(IViewsService).openView('kovix.memoryGraph', true);
                 }
 });
 
 registerAction2(class OpenControlCenterAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.openControlCenter',
+                                                id: 'kovix.openControlCenter',
                                                 title: localize2('openControlCenter', "Kovix: Open Agent Control Center"),
                                                 f1: true,
                                                 category: localize2('constructCategory4', "Kovix"),
                                 });
                 }
                 run(accessor: ServicesAccessor): void {
-                                accessor.get(IViewsService).openView('construct.controlCenter', true);
+                                accessor.get(IViewsService).openView('kovix.controlCenter', true);
                 }
 });
 
@@ -460,7 +465,7 @@ registerAction2(class OpenKovixWelcomeAction extends Action2 {
 registerAction2(class SearchMemoriesAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.searchMemories',
+                                                id: 'kovix.searchMemories',
                                                 title: localize2('searchMemories', "Kovix: Search Memories"),
                                                 f1: true,
                                                 category: localize2('constructCategory5', "Kovix"),
@@ -510,7 +515,7 @@ registerAction2(class SearchMemoriesAction extends Action2 {
 registerAction2(class AddMemoryAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.addMemory',
+                                                id: 'kovix.addMemory',
                                                 title: localize2('addMemory', "Kovix: Add Memory"),
                                                 f1: true,
                                                 category: localize2('constructCategory6', "Kovix"),
@@ -549,7 +554,7 @@ registerAction2(class AddMemoryAction extends Action2 {
 registerAction2(class TestLLMConnectionAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.testMemoryConnection',
+                                                id: 'kovix.testMemoryConnection',
                                                 title: localize2('testMemoryConnection', "Kovix: Test Memory Connection"),
                                                 f1: true,
                                                 category: localize2('constructCategory7', "Kovix"),
@@ -578,21 +583,21 @@ registerAction2(class TestLLMConnectionAction extends Action2 {
 registerAction2(class OpenApiSettingsAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.openApiSettings',
+                                                id: 'kovix.openApiSettings',
                                                 title: localize2('openApiSettings', "Kovix: Open API Settings"),
                                                 f1: true,
                                                 category: localize2('constructCategoryApi', "Kovix"),
                                 });
                 }
                 async run(accessor: ServicesAccessor): Promise<void> {
-                                accessor.get(ICommandService).executeCommand('workbench.action.openSettings', 'construct.anthropic');
+                                accessor.get(ICommandService).executeCommand('workbench.action.openSettings', 'kovix.anthropic');
                 }
 });
 
 registerAction2(class SetApiKeyAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.setApiKey',
+                                                id: 'kovix.setApiKey',
                                                 title: localize2('setApiKey', "Set API Key"),
                                                 f1: true,
                                                 category: localize2('constructCategoryApiKey', "Kovix"),
@@ -622,7 +627,7 @@ registerAction2(class SetApiKeyAction extends Action2 {
 registerAction2(class ClearApiKeyAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.clearApiKey',
+                                                id: 'kovix.clearApiKey',
                                                 title: localize2('clearApiKey', "Kovix: Clear API Key"),
                                                 f1: true,
                                                 category: localize2('constructCategoryApiKey2', "Kovix"),
@@ -639,7 +644,7 @@ registerAction2(class ClearApiKeyAction extends Action2 {
 registerAction2(class TestCloudConnectionAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.testCloudConnection',
+                                                id: 'kovix.testCloudConnection',
                                                 title: localize2('testCloudConnection', "Test Cloud AI Connection"),
                                                 f1: true,
                                                 category: localize2('constructCategoryCloud', "Kovix"),
@@ -730,7 +735,7 @@ registerSingleton(IAgentModeService, AgentModeService, InstantiationType.Delayed
 registerAction2(class SwitchAgentModeAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.switchAgentMode',
+                        id: 'kovix.switchAgentMode',
                         title: localize2('switchAgentMode', "Switch Agent Mode"),
                         f1: true,
                         category: localize2('constructCategoryAI', "Kovix"),
@@ -771,7 +776,7 @@ registerAction2(class SwitchAgentModeAction extends Action2 {
 registerAction2(class CreateAgentModeAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.createAgentMode',
+                        id: 'kovix.createAgentMode',
                         title: localize2('createAgentMode', "Create Custom Agent Mode"),
                         f1: true,
                         category: localize2('constructCategoryAI', "Kovix"),
@@ -845,7 +850,7 @@ registerAction2(class CreateAgentModeAction extends Action2 {
 registerAction2(class SpawnSubAgentAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.spawnSubAgent',
+                        id: 'kovix.spawnSubAgent',
                         title: localize2('spawnSubAgent', "Spawn Sub-Agent"),
                         f1: true,
                         category: localize2('constructCategoryAI', "Kovix"),
@@ -887,7 +892,7 @@ registerAction2(class SpawnSubAgentAction extends Action2 {
 registerAction2(class SwitchAIProviderAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.switchProvider',
+                        id: 'kovix.switchProvider',
                         title: localize2('switchAIProvider', "Switch AI Provider"),
                         f1: true,
                         category: localize2('constructCategoryAI', "Kovix"),
@@ -933,7 +938,7 @@ registerAction2(class SwitchAIProviderAction extends Action2 {
 registerAction2(class SelectModelAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.selectModel',
+                        id: 'kovix.selectModel',
                         title: localize2('selectModel', "Kovix: Select Model"),
                         f1: true,
                         category: localize2('constructCategoryModel', "Kovix"),
@@ -976,9 +981,9 @@ registerAction2(class SelectModelAction extends Action2 {
 
                         if (!setupPick) { return; }
                         if (setupPick.action === 'manageKeys') {
-                                commandService.executeCommand('construct.manageApiKeys');
+                                commandService.executeCommand('kovix.manageApiKeys');
                         } else if (setupPick.action === 'switchProvider') {
-                                commandService.executeCommand('construct.switchProvider.quick');
+                                commandService.executeCommand('kovix.switchProvider.quick');
                         } else if (setupPick.action === 'retry') {
                                 models = await aiService.listModels();
                                 if (models.length === 0) {
@@ -1032,7 +1037,7 @@ registerSingleton(IConstructSessionService, ConstructSessionServiceImpl, Instant
 registerAction2(class NewProjectAction extends Action2 {
                 constructor() {
                         super({
-                                id: 'construct.newProject',
+                                id: 'kovix.newProject',
                                 title: localize2('newConstructProject', "Kovix: New Project"),
                                 f1: true,
                                 category: localize2('constructCategoryProject', "Kovix"),
@@ -1047,7 +1052,7 @@ registerAction2(class NewProjectAction extends Action2 {
 registerAction2(class OpenProjectWizardAction extends Action2 {
                 constructor() {
                         super({
-                                id: 'construct.openProjectWizard',
+                                id: 'kovix.openProjectWizard',
                                 title: localize2('openProjectWizard', "Open Project Wizard"),
                                 f1: true,
                                 category: localize2('constructCategoryWizard', "Kovix"),
@@ -1062,7 +1067,7 @@ registerAction2(class OpenProjectWizardAction extends Action2 {
 registerAction2(class LoadProjectAction extends Action2 {
                 constructor() {
                         super({
-                                id: 'construct.loadProject',
+                                id: 'kovix.loadProject',
                                 title: localize2('loadProject', "Kovix: Load Project"),
                                 f1: true,
                                 category: localize2('constructCategoryLoadProject', "Kovix"),
@@ -1098,7 +1103,7 @@ registerAction2(class LoadProjectAction extends Action2 {
 registerAction2(class UndoTaskAction extends Action2 {
                 constructor() {
                                 super({
-                                                id: 'construct.undoTask',
+                                                id: 'kovix.undoTask',
                                                 title: localize2('undoTask', "Kovix: Undo Last Task"),
                                                 f1: true,
                                                 category: localize2('constructCategoryUndo', "Kovix"),
@@ -1142,7 +1147,7 @@ registerAction2(class UndoTaskAction extends Action2 {
 registerAction2(class AcceptAllDiffsAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.acceptAllDiffs',
+                        id: 'kovix.acceptAllDiffs',
                         title: localize2('acceptAllDiffs', "Accept All Pending Diffs"),
                         f1: true,
                         category: localize2('constructCategoryDiff', "Kovix"),
@@ -1155,7 +1160,7 @@ registerAction2(class AcceptAllDiffsAction extends Action2 {
         async run(accessor: ServicesAccessor): Promise<void> {
                 const viewsService = accessor.get(IViewsService);
                 const notificationService = accessor.get(INotificationService);
-                const view = viewsService.getActiveViewWithId('construct.agentPanel') as any;
+                const view = viewsService.getActiveViewWithId('kovix.agentPanel') as any;
                 if (view && typeof view.acceptAllPendingDiffs === 'function') {
                         await view.acceptAllPendingDiffs();
                         notificationService.info('All pending diffs accepted.');
@@ -1168,7 +1173,7 @@ registerAction2(class AcceptAllDiffsAction extends Action2 {
 registerAction2(class RejectAllDiffsAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.rejectAllDiffs',
+                        id: 'kovix.rejectAllDiffs',
                         title: localize2('rejectAllDiffs', "Reject All Pending Diffs"),
                         f1: true,
                         category: localize2('constructCategoryDiff2', "Kovix"),
@@ -1181,7 +1186,7 @@ registerAction2(class RejectAllDiffsAction extends Action2 {
         run(accessor: ServicesAccessor): void {
                 const viewsService = accessor.get(IViewsService);
                 const notificationService = accessor.get(INotificationService);
-                const view = viewsService.getActiveViewWithId('construct.agentPanel') as any;
+                const view = viewsService.getActiveViewWithId('kovix.agentPanel') as any;
                 if (view && typeof view.rejectAllPendingDiffs === 'function') {
                         view.rejectAllPendingDiffs();
                         notificationService.info('All pending diffs rejected.');
@@ -1196,7 +1201,7 @@ registerAction2(class RejectAllDiffsAction extends Action2 {
 registerAction2(class OpenOnboardingWizardAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.openOnboarding',
+                        id: 'kovix.openOnboarding',
                         title: localize2('openOnboarding', "Open Setup Wizard"),
                         f1: true,
                         category: localize2('constructCategoryOnboarding', "Kovix"),
@@ -1214,7 +1219,7 @@ registerAction2(class OpenOnboardingWizardAction extends Action2 {
 registerAction2(class IndexWorkspaceAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.indexWorkspace',
+                        id: 'kovix.indexWorkspace',
                         title: localize2('indexWorkspace', "Kovix: Index Workspace"),
                         f1: true,
                         category: localize2('constructCategoryMemory', "Kovix"),
@@ -1238,7 +1243,7 @@ registerAction2(class IndexWorkspaceAction extends Action2 {
 registerAction2(class StartMCPServerAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.mcp.startServer',
+                        id: 'kovix.mcp.startServer',
                         title: localize2('startMCPServer', "Start MCP Server"),
                         f1: true,
                         category: localize2('constructCategoryMCP', "Kovix"),
@@ -1282,7 +1287,7 @@ registerAction2(class StartMCPServerAction extends Action2 {
 registerAction2(class StopMCPServerAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.mcp.stopServer',
+                        id: 'kovix.mcp.stopServer',
                         title: localize2('stopMCPServer', "Stop MCP Server"),
                         f1: true,
                         category: localize2('constructCategoryMCP2', "Kovix"),
@@ -1328,7 +1333,7 @@ registerAction2(class StopMCPServerAction extends Action2 {
 registerAction2(class ProviderStatusAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.providerStatus',
+                        id: 'kovix.providerStatus',
                         title: localize2('providerStatus', "Show AI Provider Status"),
                         f1: true,
                         category: localize2('constructCategoryProvider', "Kovix"),
@@ -1389,7 +1394,7 @@ registerAction2(class ProviderStatusAction extends Action2 {
 registerAction2(class FileToUrlAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.fileToUrl',
+                        id: 'kovix.fileToUrl',
                         title: localize2('fileToUrl', "Convert File to URL (f2u)"),
                         f1: true,
                         category: localize2('constructCategoryF2U', "Kovix"),
@@ -1419,7 +1424,7 @@ registerAction2(class FileToUrlAction extends Action2 {
 registerAction2(class GoclawDashboardAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.goclawDashboard',
+                        id: 'kovix.goclawDashboard',
                         title: localize2('goclawDashboard', "Open GoClaw Dashboard"),
                         f1: true,
                         category: localize2('constructCategoryGoclaw', "Kovix"),
@@ -1449,7 +1454,7 @@ registerAction2(class GoclawDashboardAction extends Action2 {
 registerAction2(class CheckAgentReachAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.checkAgentReach',
+                        id: 'kovix.checkAgentReach',
                         title: localize2('checkAgentReach', "Check Agent Reach Health"),
                         f1: true,
                         category: localize2('constructCategoryAgentReach', "Kovix"),
@@ -1478,7 +1483,7 @@ registerAction2(class CheckAgentReachAction extends Action2 {
 registerAction2(class InstallAgentReachAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.installAgentReach',
+                        id: 'kovix.installAgentReach',
                         title: localize2('installAgentReach', "Install Agent Reach"),
                         f1: true,
                         category: localize2('constructCategoryAgentReach2', "Kovix"),
@@ -1515,7 +1520,7 @@ registerAction2(class InstallAgentReachAction extends Action2 {
 registerAction2(class ConfigureAgentReachAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.configureAgentReach',
+                        id: 'kovix.configureAgentReach',
                         title: localize2('configureAgentReach', "Configure Agent Reach Channels"),
                         f1: true,
                         category: localize2('constructCategoryAgentReach3', "Kovix"),
@@ -1526,14 +1531,14 @@ registerAction2(class ConfigureAgentReachAction extends Action2 {
                 const commandService = accessor.get(ICommandService);
 
                 notificationService.info('Agent Reach: Channels are configured automatically. Use the status bar icon or run "Check Agent Reach Health" to verify.');
-                commandService.executeCommand('construct.checkAgentReach');
+                commandService.executeCommand('kovix.checkAgentReach');
         }
 });
 
 registerAction2(class SearchWebExaAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.searchWebExa',
+                        id: 'kovix.searchWebExa',
                         title: localize2('searchWebExa', "Search Web (Exa)"),
                         f1: true,
                         category: localize2('constructCategoryAgentReach4', "Kovix"),
@@ -1570,7 +1575,7 @@ registerAction2(class SearchWebExaAction extends Action2 {
 registerAction2(class ReadWebpageAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.readWebpage',
+                        id: 'kovix.readWebpage',
                         title: localize2('readWebpage', "Read Webpage"),
                         f1: true,
                         category: localize2('constructCategoryAgentReach5', "Kovix"),
@@ -1616,7 +1621,7 @@ registerAction2(class ReadWebpageAction extends Action2 {
 registerAction2(class PonytailSetModeAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.ponytailSetMode',
+                        id: 'kovix.ponytailSetMode',
                         title: localize2('ponytailSetMode', "Set Ponytail Mode"),
                         f1: true,
                         category: localize2('constructCategoryPonytail', "Kovix"),
@@ -1656,7 +1661,7 @@ registerAction2(class PonytailSetModeAction extends Action2 {
 registerAction2(class PonytailReviewAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.ponytailReview',
+                        id: 'kovix.ponytailReview',
                         title: localize2('ponytailReview', "Review Current File for Over-Engineering"),
                         f1: true,
                         category: localize2('constructCategoryPonytail2', "Kovix"),
@@ -1680,7 +1685,7 @@ registerAction2(class PonytailReviewAction extends Action2 {
 registerAction2(class PonytailHelpAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.ponytailHelp',
+                        id: 'kovix.ponytailHelp',
                         title: localize2('ponytailHelp', "Show Ponytail Help"),
                         f1: true,
                         category: localize2('constructCategoryPonytail3', "Kovix"),
@@ -1724,7 +1729,7 @@ registerAction2(class PonytailHelpAction extends Action2 {
 registerAction2(class UiuxSearchStyleAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.uiuxSearchStyle',
+                        id: 'kovix.uiuxSearchStyle',
                         title: localize2('uiuxSearchStyle', "Search UI Styles"),
                         f1: true,
                         category: localize2('constructCategoryUiux', "Kovix: Design"),
@@ -1750,7 +1755,7 @@ registerAction2(class UiuxSearchStyleAction extends Action2 {
 registerAction2(class UiuxSearchColorAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.uiuxSearchColor',
+                        id: 'kovix.uiuxSearchColor',
                         title: localize2('uiuxSearchColor', "Search Color Palettes"),
                         f1: true,
                         category: localize2('constructCategoryUiux2', "Kovix: Design"),
@@ -1776,7 +1781,7 @@ registerAction2(class UiuxSearchColorAction extends Action2 {
 registerAction2(class UiuxGenerateDesignSystemAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.uiuxGenerateDesignSystem',
+                        id: 'kovix.uiuxGenerateDesignSystem',
                         title: localize2('uiuxGenerateDesignSystem', "Generate Design System"),
                         f1: true,
                         category: localize2('constructCategoryUiux3', "Kovix: Design"),
@@ -1810,7 +1815,7 @@ registerAction2(class UiuxGenerateDesignSystemAction extends Action2 {
 registerAction2(class UiuxStackGuidelinesAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.uiuxStackGuidelines',
+                        id: 'kovix.uiuxStackGuidelines',
                         title: localize2('uiuxStackGuidelines', "Get Stack Guidelines"),
                         f1: true,
                         category: localize2('constructCategoryUiux4', "Kovix: Design"),
@@ -1864,7 +1869,7 @@ registerAction2(class UiuxStackGuidelinesAction extends Action2 {
 registerAction2(class OpenAgentSettingsAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.openAgentSettings',
+                        id: 'kovix.openAgentSettings',
                         title: localize2('openAgentSettings', "Kovix: Open Agent Settings"),
                         f1: true,
                         category: localize2('constructCategorySettings', "Kovix"),
@@ -1877,21 +1882,21 @@ registerAction2(class OpenAgentSettingsAction extends Action2 {
                 });
         }
         run(accessor: ServicesAccessor): void {
-                accessor.get(IViewsService).openView('construct.agentSettings', true);
+                accessor.get(IViewsService).openView('kovix.agentSettings', true);
         }
 });
 
 registerAction2(class OpenMemorySettingsAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.openMemorySettings',
+                        id: 'kovix.openMemorySettings',
                         title: localize2('openMemorySettings', "Kovix: Open Memory Settings"),
                         f1: true,
                         category: localize2('constructCategorySettings2', "Kovix"),
                 });
         }
         run(accessor: ServicesAccessor): void {
-                accessor.get(IViewsService).openView('construct.agentSettings', true).then(() => {
+                accessor.get(IViewsService).openView('kovix.agentSettings', true).then(() => {
                         // The view auto-selects the skills tab; we expose memory as a
                         // separate command for discoverability — users land on the
                         // settings pane and can click the Memory tab.
@@ -1902,7 +1907,7 @@ registerAction2(class OpenMemorySettingsAction extends Action2 {
 registerAction2(class OpenSwarmAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.openSwarm',
+                        id: 'kovix.openSwarm',
                         title: localize2('openSwarm', "Kovix: Open Swarm"),
                         f1: true,
                         category: localize2('constructCategorySwarm', "Kovix"),
@@ -1917,8 +1922,8 @@ registerAction2(class OpenSwarmAction extends Action2 {
         run(accessor: ServicesAccessor): void {
                 // Open the control center (which shows live sub-agents) and prompt
                 // the user to spawn a sub-agent.
-                accessor.get(IViewsService).openView('construct.controlCenter', true);
-                accessor.get(ICommandService).executeCommand('construct.spawnSubAgent');
+                accessor.get(IViewsService).openView('kovix.controlCenter', true);
+                accessor.get(ICommandService).executeCommand('kovix.spawnSubAgent');
         }
 });
 
@@ -1927,7 +1932,7 @@ registerAction2(class OpenSwarmAction extends Action2 {
 registerAction2(class CreateSkillFromDocumentAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.createSkillFromDocument',
+                        id: 'kovix.createSkillFromDocument',
                         title: localize2('createSkillFromDocument', "Kovix: Create Skill from Document"),
                         f1: true,
                         category: localize2('constructCategorySkills', "Kovix"),
@@ -2001,7 +2006,7 @@ registerAction2(class CreateSkillFromDocumentAction extends Action2 {
                                 scope: scopePick.scope,
                         });
                         notificationService.info(`Skill created: /${skill.slug}`);
-                        accessor.get(IViewsService).openView('construct.agentSettings', true);
+                        accessor.get(IViewsService).openView('kovix.agentSettings', true);
                 } catch (error) {
                         notificationService.error(`Failed to create skill: ${error instanceof Error ? error.message : String(error)}`);
                 }
@@ -2011,7 +2016,7 @@ registerAction2(class CreateSkillFromDocumentAction extends Action2 {
 registerAction2(class ImportSkillFromUrlAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.importSkillFromUrl',
+                        id: 'kovix.importSkillFromUrl',
                         title: localize2('importSkillFromUrl', "Kovix: Import Skill from URL"),
                         f1: true,
                         category: localize2('constructCategorySkills2', "Kovix"),
@@ -2036,7 +2041,7 @@ registerAction2(class ImportSkillFromUrlAction extends Action2 {
                 try {
                         const skill = await skillRegistry.importFromUrl(url, 'user');
                         notificationService.info(`Skill imported: /${skill.slug}`);
-                        accessor.get(IViewsService).openView('construct.agentSettings', true);
+                        accessor.get(IViewsService).openView('kovix.agentSettings', true);
                 } catch (error) {
                         notificationService.error(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
                 }
@@ -2046,7 +2051,7 @@ registerAction2(class ImportSkillFromUrlAction extends Action2 {
 registerAction2(class ViewSkillAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.viewSkill',
+                        id: 'kovix.viewSkill',
                         title: localize2('viewSkill', "Kovix: View Skill"),
                         f1: true,
                         category: localize2('constructCategorySkills3', "Kovix"),
@@ -2087,7 +2092,7 @@ registerAction2(class ViewSkillAction extends Action2 {
 registerAction2(class OpenSkillsFolderAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.openSkillsFolder',
+                        id: 'kovix.openSkillsFolder',
                         title: localize2('openSkillsFolder', "Kovix: Open Skills Folder"),
                         f1: true,
                         category: localize2('constructCategorySkills4', "Kovix"),
@@ -2116,7 +2121,7 @@ registerAction2(class OpenSkillsFolderAction extends Action2 {
 registerAction2(class ForgetAllMemoriesAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.forgetAllMemories',
+                        id: 'kovix.forgetAllMemories',
                         title: localize2('forgetAllMemories', "Kovix: Forget All Memories"),
                         f1: true,
                         category: localize2('constructCategoryMemory2', "Kovix"),
@@ -2157,7 +2162,7 @@ registerAction2(class ForgetAllMemoriesAction extends Action2 {
 registerAction2(class OpenMcpMarketplaceAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.mcp.openMarketplace',
+                        id: 'kovix.mcp.openMarketplace',
                         title: localize2('openMcpMarketplace', "Kovix: Browse MCP Marketplace"),
                         f1: true,
                         category: localize2('constructCategoryMCP3', "Kovix"),
@@ -2218,7 +2223,7 @@ registerAction2(class OpenMcpMarketplaceAction extends Action2 {
 registerAction2(class AutonomousBuildAction extends Action2 {
         constructor() {
                 super({
-                        id: 'construct.autonomousBuild',
+                        id: 'kovix.autonomousBuild',
                         title: localize2('autonomousBuild', "Kovix: Autonomous Idea → App"),
                         f1: true,
                         category: localize2('constructCategoryAutonomous', "Kovix"),
@@ -2233,7 +2238,7 @@ registerAction2(class AutonomousBuildAction extends Action2 {
                 // 1. Make sure an AI provider is configured
                 if (!aiService.activeProvider) {
                         notificationService.warn('No AI provider configured. Add an API key first (NVIDIA NIM, OpenAI, Anthropic, etc.).');
-                        commandService.executeCommand('construct.manageApiKeys');
+                        commandService.executeCommand('kovix.manageApiKeys');
                         return;
                 }
 
@@ -2248,12 +2253,12 @@ registerAction2(class AutonomousBuildAction extends Action2 {
                 if (!idea) { return; }
 
                 // 3. Open the agent panel and inject the idea
-                await commandService.executeCommand('construct.focusPanel');
+                await commandService.executeCommand('kovix.focusPanel');
 
                 // 4. If idea refinement is on, the agent panel's normal flow
                 // will pick up the idea and run refinement → plan → act.
                 // We dispatch the idea as if the user typed it.
-                // The agent panel listens for the `construct.newChat` event,
+                // The agent panel listens for the `kovix.newChat` event,
                 // so we first clear, then dispatch via a custom command.
                 //
                 // The simplest reliable path: tell the user we've armed the
@@ -2265,7 +2270,7 @@ registerAction2(class AutonomousBuildAction extends Action2 {
 
                 // Route to the existing project wizard, which already does
                 // idea refinement → plan → milestone-gated execution.
-                commandService.executeCommand('construct.openProjectWizard', idea);
+                commandService.executeCommand('kovix.openProjectWizard', idea);
         }
 });
 

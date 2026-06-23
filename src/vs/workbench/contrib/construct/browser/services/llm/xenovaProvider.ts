@@ -157,7 +157,7 @@ export class XenovaProvider extends Disposable implements IConstructAIProvider {
                         }
 
                         // Try to auto-select the default model
-                        const configuredModel = this.configurationService.getValue<string>('construct.xenova.model') || XenovaProvider.DEFAULT_MODEL;
+                        const configuredModel = this.configurationService.getValue<string>('kovix.xenova.model') || XenovaProvider.DEFAULT_MODEL;
                         const model = XenovaProvider.KNOWN_MODELS.find(m => m.id === configuredModel) ?? XenovaProvider.KNOWN_MODELS[0];
 
                         this._activeModel = model;

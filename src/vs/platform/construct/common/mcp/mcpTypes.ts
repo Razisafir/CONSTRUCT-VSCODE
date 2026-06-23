@@ -144,11 +144,11 @@ export interface IMCPResourceResult {
 // --- Constants -------------------------------------------------------------
 
 export const MCP_REGISTRY_URL = 'https://raw.githubusercontent.com/modelcontextprotocol/servers/main/registry.json';
-export const MCP_CONFIG_KEY = 'construct.mcp.servers';
+export const MCP_CONFIG_KEY = 'kovix.mcp.servers';
 export const MCP_CREDENTIALS_PREFIX = 'construct.mcp.credentials.';
-export const MCP_MARKETPLACE_CACHE_KEY = 'construct.mcp.marketplace.cache';
-export const MCP_MARKETPLACE_RATINGS_KEY = 'construct.mcp.marketplace.ratings';
-export const MCP_INSTALLED_MARKETPLACE_KEY = 'construct.mcp.marketplace.installed';
+export const MCP_MARKETPLACE_CACHE_KEY = 'kovix.mcp.marketplace.cache';
+export const MCP_MARKETPLACE_RATINGS_KEY = 'kovix.mcp.marketplace.ratings';
+export const MCP_INSTALLED_MARKETPLACE_KEY = 'kovix.mcp.marketplace.installed';
 
 export const MCP_MAX_CONCURRENT_SERVERS = 10;
 export const MCP_DEFAULT_TOOL_TIMEOUT_MS = 30_000;

@@ -155,7 +155,7 @@ export class KovixSurfaceBrandingContribution extends Disposable implements IWor
         <div class="kovix-settings-title">${localize('kovixSettingsTitle', "Kovix Settings")}</div>
         <div class="kovix-settings-tagline">${localize('kovixSettingsTagline', "AI-native development environment")}</div>
       </div>
-      <button class="kovix-settings-cta" type="button" data-command="construct.agentSettings">
+      <button class="kovix-settings-cta" type="button" data-command="kovix.agentSettings">
         ${localize('kovixSettingsCta', "Open Agent Settings →")}
       </button>
     `;
@@ -166,7 +166,7 @@ export class KovixSurfaceBrandingContribution extends Disposable implements IWor
     header.querySelector<HTMLButtonElement>('.kovix-settings-cta')?.addEventListener('click', () => {
       try {
         const bridge = (window as any).kovixCommandBridge;
-        bridge?.executeCommand?.('construct.openAgentSettings');
+        bridge?.executeCommand?.('kovix.openAgentSettings');
       } catch (err) {
         this.logService.error('[Kovix] Settings CTA dispatch failed:', err);
       }

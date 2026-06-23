@@ -8,7 +8,7 @@
 import { Event } from '../../../../base/common/event.js';
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 
-export const ISkillRegistry = createDecorator<ISkillRegistry>('construct.skillRegistry');
+export const ISkillRegistry = createDecorator<ISkillRegistry>('kovix.skillRegistry');
 
 /**
  * A Kovix Skill is a self-contained, markdown-driven playbook that the agent

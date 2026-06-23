@@ -9,7 +9,7 @@ import { createDecorator } from '../../../instantiation/common/instantiation.js'
 import { Event } from '../../../../base/common/event.js';
 import { URI } from '../../../../base/common/uri.js';
 
-export const IFileWatcherService = createDecorator<IFileWatcherService>('construct.fileWatcher');
+export const IFileWatcherService = createDecorator<IFileWatcherService>('kovix.fileWatcher');
 
 /**
  * The type of file system change detected.

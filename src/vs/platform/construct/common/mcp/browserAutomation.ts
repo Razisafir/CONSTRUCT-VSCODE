@@ -9,7 +9,7 @@ import { Event } from '../../../../base/common/event.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 
-export const IBrowserAutomationService = createDecorator<IBrowserAutomationService>('construct.browserAutomation');
+export const IBrowserAutomationService = createDecorator<IBrowserAutomationService>('kovix.browserAutomation');
 
 // --- Session Types ---------------------------------------------------------
 

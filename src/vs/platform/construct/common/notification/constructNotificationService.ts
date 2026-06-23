@@ -8,7 +8,7 @@
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 import { Event } from '../../../../base/common/event.js';
 
-export const IConstructNotificationService = createDecorator<IConstructNotificationService>('construct.notificationService');
+export const IConstructNotificationService = createDecorator<IConstructNotificationService>('kovix.notificationService');
 
 /**
  * Severity levels for notifications.

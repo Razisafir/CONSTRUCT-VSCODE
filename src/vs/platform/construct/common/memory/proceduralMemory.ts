@@ -10,7 +10,7 @@ import { Event } from '../../../../base/common/event.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 import { IProceduralMemoryEntry } from './memoryTypes.js';
 
-export const IProceduralMemoryService = createDecorator<IProceduralMemoryService>('construct.proceduralMemory');
+export const IProceduralMemoryService = createDecorator<IProceduralMemoryService>('kovix.proceduralMemory');
 
 export interface IProceduralMemoryService extends IDisposable {
 	readonly _serviceBrand: undefined;

@@ -917,7 +917,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                         // require explicit user consent before spawning. If the user
                                         // declines, we return an error to the LLM so it can re-plan.
                                         //
-                                        // Restricted mode (construct.terminal.restrictedMode=true,
+                                        // Restricted mode (kovix.terminal.restrictedMode=true,
                                         // the default) already blocks interpreters via the allowlist
                                         // before this code runs. This gate covers the case where the
                                         // user has disabled restricted mode — every interpreter
@@ -968,7 +968,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                         // Delegate to the tool registry which has vector store access
                                         try {
                                                 // Use command service to execute via the registry
-                                                const toolResult = await this.commandService.executeCommand('construct.executeTool', 'search_codebase', { query, topK: args.topK ?? 8 });
+                                                const toolResult = await this.commandService.executeCommand('kovix.executeTool', 'search_codebase', { query, topK: args.topK ?? 8 });
                                                 const raw = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
                                                 // SEC-6: Sanitise search results to prevent injection
                                                 return PromptSanitiser.sanitise(raw);
@@ -982,7 +982,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                         if (!query) { return 'Error: query is required'; }
                                         // Delegate to the tool registry which handles online mode
                                         try {
-                                                const toolResult = await this.commandService.executeCommand('construct.executeTool', 'web_search', { query, num: args.num ?? 10 });
+                                                const toolResult = await this.commandService.executeCommand('kovix.executeTool', 'web_search', { query, num: args.num ?? 10 });
                                                 const raw = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
                                                 // SEC-6: Sanitise web search results to prevent injection
                                                 // SEC-7: Redact secrets from web content

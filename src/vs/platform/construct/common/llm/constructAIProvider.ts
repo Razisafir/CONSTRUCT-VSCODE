@@ -29,7 +29,7 @@ export class ConstructOverloadedError extends Error {
         }
 }
 
-export const IConstructAIProvider = createDecorator<IConstructAIProvider>('construct.aiProvider');
+export const IConstructAIProvider = createDecorator<IConstructAIProvider>('kovix.aiProvider');
 
 /**
  * Represents a model available from a provider.

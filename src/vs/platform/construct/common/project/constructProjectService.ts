@@ -9,7 +9,7 @@ import { createDecorator } from '../../../instantiation/common/instantiation.js'
 import { Event } from '../../../../base/common/event.js';
 import { IKovixProject, IProjectCreationInput, IProjectSummary, ProjectStatus } from './constructProjectTypes.js';
 
-export const IConstructProjectService = createDecorator<IConstructProjectService>('construct.projectService');
+export const IConstructProjectService = createDecorator<IConstructProjectService>('kovix.projectService');
 
 /**
  * Service for managing KOVIX projects in the Construct agent system.

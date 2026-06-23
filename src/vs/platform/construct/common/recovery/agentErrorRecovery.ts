@@ -8,7 +8,7 @@
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 import { Event } from '../../../../base/common/event.js';
 
-export const IAgentErrorRecovery = createDecorator<IAgentErrorRecovery>('construct.agentErrorRecovery');
+export const IAgentErrorRecovery = createDecorator<IAgentErrorRecovery>('kovix.agentErrorRecovery');
 
 /**
  * The type of error that occurred during a step execution.

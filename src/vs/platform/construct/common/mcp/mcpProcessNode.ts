@@ -7,7 +7,7 @@
 
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 
-export const IMCPProcessNodeService = createDecorator<IMCPProcessNodeService>('construct.mcpProcessNode');
+export const IMCPProcessNodeService = createDecorator<IMCPProcessNodeService>('kovix.mcpProcessNode');
 
 /**
  * Node-layer MCP process service interface.

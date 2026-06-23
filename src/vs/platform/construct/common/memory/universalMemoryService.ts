@@ -8,7 +8,7 @@
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 import { IUniversalMemoryEntry, IUniversalMemoryQuery, IUniversalMemoryStats } from './universalMemoryTypes.js';
 
-export const IUniversalMemoryService = createDecorator<IUniversalMemoryService>('construct.universalMemory');
+export const IUniversalMemoryService = createDecorator<IUniversalMemoryService>('kovix.universalMemory');
 
 /**
  * Service for universal, cross-project memory that persists locally.

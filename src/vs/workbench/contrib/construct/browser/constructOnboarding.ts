@@ -19,10 +19,10 @@ import { IWebviewWorkbenchService } from '../../webviewPanel/browser/webviewWork
 import { IOverlayWebview } from '../../webview/browser/webview.js';
 
 /** Storage key for the onboarding completion flag. */
-const ONBOARDING_COMPLETE_KEY = 'construct.onboarding.complete';
+const ONBOARDING_COMPLETE_KEY = 'kovix.onboarding.complete';
 
 /** View type for the onboarding webview panel. */
-const ONBOARDING_VIEW_TYPE = 'construct.onboarding';
+const ONBOARDING_VIEW_TYPE = 'kovix.onboarding';
 
 /**
  * Messages sent from the webview to the extension host.
@@ -288,27 +288,27 @@ export class ConstructOnboardingWizard extends Disposable {
 
                         // Write .construct/settings.json via configuration service
                         await this.configurationService.updateValue(
-                                'construct.provider.default',
+                                'kovix.provider.default',
                                 config.providerType,
                                 ConfigurationTarget.USER,
                         );
                         if (config.modelId) {
                                 await this.configurationService.updateValue(
-                                        'construct.provider.model',
+                                        'kovix.provider.model',
                                         config.modelId,
                                         ConfigurationTarget.USER,
                                 );
                         }
                         if (config.kaliWSLEnabled !== undefined) {
                                 await this.configurationService.updateValue(
-                                        'construct.terminal.kaliWSL',
+                                        'kovix.terminal.kaliWSL',
                                         config.kaliWSLEnabled,
                                         ConfigurationTarget.USER,
                                 );
                         }
                         if (config.agentReachInstalled !== undefined) {
                                 await this.configurationService.updateValue(
-                                        'construct.agentReach.enabled',
+                                        'kovix.agentReach.enabled',
                                         config.agentReachInstalled,
                                         ConfigurationTarget.USER,
                                 );

@@ -23,7 +23,7 @@ import { OllamaProvider } from './ollamaProvider.js';
 import { XenovaProvider } from './xenovaProvider.js';
 import { CloudProvider } from './cloudProvider.js';
 
-const STORAGE_KEY_PREFERRED_PROVIDER = 'construct.preferredProvider';
+const STORAGE_KEY_PREFERRED_PROVIDER = 'kovix.preferredProvider';
 
 /**
  * ConstructAIService — the unified AI service that auto-selects the best provider.
@@ -69,7 +69,7 @@ export class ConstructAIService extends Disposable implements IConstructAIServic
                 @IConfigurationService configurationService: IConfigurationService,
                 @IStorageService private readonly storageService: IStorageService,
                 // BUGFIX (v1.2.0): break the constructor-time DI cycle
-                // construct.aiService ↔ construct.secureKeyManager.
+                // kovix.aiService ↔ construct.secureKeyManager.
                 // Previously @ISecureKeyManager was injected here directly, and
                 // SecureKeyManager injected @IConstructAIService — the
                 // instantiator cannot satisfy a cycle and throws

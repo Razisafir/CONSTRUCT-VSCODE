@@ -9,7 +9,7 @@ import { createDecorator } from '../../../instantiation/common/instantiation.js'
 import { Event } from '../../../../base/common/event.js';
 import { URI } from '../../../../base/common/uri.js';
 
-export const IPendingChangesService = createDecorator<IPendingChangesService>('construct.pendingChanges');
+export const IPendingChangesService = createDecorator<IPendingChangesService>('kovix.pendingChanges');
 
 /**
  * A single pending change entry staged by the agent.

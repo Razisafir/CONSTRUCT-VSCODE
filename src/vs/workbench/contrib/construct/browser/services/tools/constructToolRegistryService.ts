@@ -90,18 +90,18 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 this.registerBuiltinTools();
 
                 // Check online mode
-                this._onlineMode = _configurationService.getValue<boolean>('construct.onlineMode') ?? false;
+                this._onlineMode = _configurationService.getValue<boolean>('kovix.onlineMode') ?? false;
                 this._register(_configurationService.onDidChangeConfiguration(e => {
-                        if (e.affectsConfiguration('construct.onlineMode')) {
-                                this._onlineMode = _configurationService.getValue<boolean>('construct.onlineMode') ?? false;
+                        if (e.affectsConfiguration('kovix.onlineMode')) {
+                                this._onlineMode = _configurationService.getValue<boolean>('kovix.onlineMode') ?? false;
                         }
                 }));
 
                 // Check for Kali WSL2 (async, non-blocking)
                 this.checkKaliWSL();
 
-                // Security tools — gated by construct.enableSecurityTools setting
-                const enableSecurityTools = this._configurationService.getValue<boolean>('construct.enableSecurityTools');
+                // Security tools — gated by kovix.enableSecurityTools setting
+                const enableSecurityTools = this._configurationService.getValue<boolean>('kovix.enableSecurityTools');
                 if (enableSecurityTools !== false) {
                         this.registerSecurityTools();
                 }
@@ -1148,7 +1148,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 if (!this._onlineMode) {
                         return {
                                 success: false,
-                                output: 'Web search requires online mode. Enable "construct.onlineMode" in settings to use this tool.',
+                                output: 'Web search requires online mode. Enable "kovix.onlineMode" in settings to use this tool.',
                                 truncated: false,
                         };
                 }
@@ -1157,8 +1157,8 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         // Use OpenAI-compatible web search (graceful fallback if SDK not available)
                         // The z-ai-web-dev-sdk is available in the desktop app but may not
                         // be in the compilation environment. Web search will work at runtime.
-                        const searchUrl = this._configurationService.getValue<string>('construct.cloud.baseUrl') || 'https://api.openai.com/v1';
-                        const apiKey = this._configurationService.getValue<string>('construct.cloud.apiKey');
+                        const searchUrl = this._configurationService.getValue<string>('kovix.cloud.baseUrl') || 'https://api.openai.com/v1';
+                        const apiKey = this._configurationService.getValue<string>('kovix.cloud.apiKey');
 
                         if (!apiKey) {
                                 return {
@@ -1217,7 +1217,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 }
 
                 // Get MCP server configuration
-                const mcpServers = this._configurationService.getValue<Array<{ name: string; command: string; args: string[]; env: Record<string, string>; enabled?: boolean }>>('construct.mcp.servers') ?? [];
+                const mcpServers = this._configurationService.getValue<Array<{ name: string; command: string; args: string[]; env: Record<string, string>; enabled?: boolean }>>('kovix.mcp.servers') ?? [];
                 const agentReachServer = mcpServers.find(s => s.name === 'agent-reach' && s.enabled !== false);
 
                 // Build the JSON-RPC request payload for the MCP tool
@@ -1282,7 +1282,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                                 'To use Agent Reach internet research tools:',
                                 '1. Install the agent-reach MCP server: npm install -g @agent-reach/mcp-server',
                                 '2. Or configure the MCP server path in Construct: MCP Servers settings',
-                                '3. Ensure online mode is enabled (construct.onlineMode)',
+                                '3. Ensure online mode is enabled (kovix.onlineMode)',
                                 '',
                                 `Tool input received: ${JSON.stringify(input, null, 2)}`,
                         ].join('\n'),
@@ -1424,7 +1424,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
          */
         private async executePonytailTool(toolName: string, input: Record<string, unknown>): Promise<IToolResult> {
                 // Get MCP server configuration
-                const mcpServers = this._configurationService.getValue<Array<{ name: string; command: string; args: string[]; env: Record<string, string>; enabled?: boolean }>>('construct.mcp.servers') ?? [];
+                const mcpServers = this._configurationService.getValue<Array<{ name: string; command: string; args: string[]; env: Record<string, string>; enabled?: boolean }>>('kovix.mcp.servers') ?? [];
                 const ponytailServer = mcpServers.find(s => s.name === 'ponytail' && s.enabled !== false);
 
                 // Build the JSON-RPC request payload for the MCP tool
@@ -1838,7 +1838,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
         private checkExternalTargetAllowed(target: string): string | undefined {
                 if (!this.isExternalTarget(target)) { return undefined; }
                 const allowed = this._configurationService.getValue<boolean>(
-                        'construct.security.allowExternalTargets'
+                        'kovix.security.allowExternalTargets'
                 );
                 if (allowed) { return undefined; }
                 return [
@@ -1850,7 +1850,7 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                         'To allow external scans, enable the setting:',
                         '  Settings -> Kovix — Security Tools -> Allow External Targets',
                         'Or in settings.json:',
-                        '  "construct.security.allowExternalTargets": true',
+                        '  "kovix.security.allowExternalTargets": true',
                 ].join('\n');
         }
 

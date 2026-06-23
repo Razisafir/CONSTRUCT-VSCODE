@@ -9,7 +9,7 @@ import { createDecorator } from '../../../instantiation/common/instantiation.js'
 import { Event } from '../../../../base/common/event.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 
-export const IConstructMemoryService = createDecorator<IConstructMemoryService>('construct.constructMemory');
+export const IConstructMemoryService = createDecorator<IConstructMemoryService>('kovix.constructMemory');
 
 /**
  * Represents a memory item retrieved from Supermemory.

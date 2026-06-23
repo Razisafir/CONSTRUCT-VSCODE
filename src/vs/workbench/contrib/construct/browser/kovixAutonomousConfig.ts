@@ -17,42 +17,42 @@ import { IConfigurationRegistry, Extensions as ConfigurationExtensions, IConfigu
  * tab of the Agent Settings pane.
  */
 const autonomousConfiguration: IConfigurationNode = {
-	id: 'construct.autonomous',
+	id: 'kovix.autonomous',
 	order: 110,
-	title: localize('construct.autonomous', "Kovix — Autonomous Mode"),
+	title: localize('kovix.autonomous', "Kovix — Autonomous Mode"),
 	type: 'object',
 	properties: {
-		'construct.autonomous.autoApprovePlan': {
+		'kovix.autonomous.autoApprovePlan': {
 			type: 'boolean',
 			default: false,
-			description: localize('construct.autonomous.autoApprovePlan', "When ON, the agent skips the 'Approve plan?' gate and starts executing immediately. Faster, less control."),
+			description: localize('kovix.autonomous.autoApprovePlan', "When ON, the agent skips the 'Approve plan?' gate and starts executing immediately. Faster, less control."),
 		},
-		'construct.autonomous.milestoneGates': {
+		'kovix.autonomous.milestoneGates': {
 			type: 'boolean',
 			default: true,
-			description: localize('construct.autonomous.milestoneGates', "When ON, the agent pauses at logical milestones (e.g. 'scaffold done', 'MVP works') for you to review."),
+			description: localize('kovix.autonomous.milestoneGates', "When ON, the agent pauses at logical milestones (e.g. 'scaffold done', 'MVP works') for you to review."),
 		},
-		'construct.autonomous.runTests': {
+		'kovix.autonomous.runTests': {
 			type: 'boolean',
 			default: true,
-			description: localize('construct.autonomous.runTests', "When ON, the agent runs the project's test suite after each milestone and stops if tests fail."),
+			description: localize('kovix.autonomous.runTests', "When ON, the agent runs the project's test suite after each milestone and stops if tests fail."),
 		},
-		'construct.autonomous.gitCommitPerStep': {
+		'kovix.autonomous.gitCommitPerStep': {
 			type: 'boolean',
 			default: true,
-			description: localize('construct.autonomous.gitCommitPerStep', "When ON, the agent commits after each plan step on a dedicated branch. Easy to roll back."),
+			description: localize('kovix.autonomous.gitCommitPerStep', "When ON, the agent commits after each plan step on a dedicated branch. Easy to roll back."),
 		},
-		'construct.autonomous.maxRounds': {
+		'kovix.autonomous.maxRounds': {
 			type: 'number',
 			default: 50,
 			minimum: 1,
 			maximum: 500,
-			description: localize('construct.autonomous.maxRounds', "Hard ceiling on agent-loop iterations per task. Prevents runaway costs. 50 is a sensible default."),
+			description: localize('kovix.autonomous.maxRounds', "Hard ceiling on agent-loop iterations per task. Prevents runaway costs. 50 is a sensible default."),
 		},
-		'construct.autonomous.ponytailEnforce': {
+		'kovix.autonomous.ponytailEnforce': {
 			type: 'boolean',
 			default: true,
-			description: localize('construct.autonomous.ponytailEnforce', "When ON, Ponytail (YAGNI → stdlib → native → deps → one-line → minimum) is enforced during autonomous builds to prevent over-engineering."),
+			description: localize('kovix.autonomous.ponytailEnforce', "When ON, Ponytail (YAGNI → stdlib → native → deps → one-line → minimum) is enforced during autonomous builds to prevent over-engineering."),
 		},
 		'construct.autonomous.ponytailMode': {
 			// Phase 1.5 — ponytail discipline is a STANDING DEFAULT, not opt-in.
@@ -70,17 +70,17 @@ const autonomousConfiguration: IConfigurationNode = {
 			default: 'full',
 			description: localize('construct.autonomous.ponytailMode', "Ponytail discipline level applied to ALL agent code generation, not just autonomous builds. 'full' is the recommended default — stdlib before deps, native before custom, one line before fifty. Switch to 'lite' or 'off' only when a task explicitly requires a bigger architecture."),
 		},
-		'construct.autonomous.parallelSwarm': {
+		'kovix.autonomous.parallelSwarm': {
 			type: 'boolean',
 			default: false,
-			description: localize('construct.autonomous.parallelSwarm', "When ON, the agent spawns parallel sub-agents (architect, coder, reviewer) for each milestone. Faster on multi-core, but uses more tokens."),
+			description: localize('kovix.autonomous.parallelSwarm', "When ON, the agent spawns parallel sub-agents (architect, coder, reviewer) for each milestone. Faster on multi-core, but uses more tokens."),
 		},
-		'construct.autonomous.swarmSize': {
+		'kovix.autonomous.swarmSize': {
 			type: 'number',
 			default: 3,
 			minimum: 1,
 			maximum: 8,
-			description: localize('construct.autonomous.swarmSize', "Number of parallel sub-agents to spawn when parallelSwarm is ON. 3 = architect + coder + reviewer."),
+			description: localize('kovix.autonomous.swarmSize', "Number of parallel sub-agents to spawn when parallelSwarm is ON. 3 = architect + coder + reviewer."),
 		},
 	},
 };

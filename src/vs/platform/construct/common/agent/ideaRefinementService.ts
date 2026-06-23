@@ -9,7 +9,7 @@ import { createDecorator } from '../../../instantiation/common/instantiation.js'
 import { Event } from '../../../../base/common/event.js';
 import { IRefinementQuestion, IRefinementAnswer, IRefinedIdea, RefinementEvent } from './ideaRefinementTypes.js';
 
-export const IIdeaRefinementService = createDecorator<IIdeaRefinementService>('construct.ideaRefinement');
+export const IIdeaRefinementService = createDecorator<IIdeaRefinementService>('kovix.ideaRefinement');
 
 /**
  * Service for the idea refinement phase of the Construct agent workflow.

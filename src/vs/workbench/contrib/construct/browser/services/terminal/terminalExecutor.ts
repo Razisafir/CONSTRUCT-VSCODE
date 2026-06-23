@@ -154,9 +154,9 @@ export class TerminalExecutorService extends Disposable implements ITerminalExec
                 }
 
                 // SEC-3: Restricted mode allowlist check
-                const restrictedMode = this.configurationService.getValue<boolean>('construct.terminal.restrictedMode') ?? true;
+                const restrictedMode = this.configurationService.getValue<boolean>('kovix.terminal.restrictedMode') ?? true;
                 if (restrictedMode && !isCommandInAllowlist(command)) {
-                        throw new Error(`Command rejected in restricted mode: "${command.split(/\s+/)[0]}" is not in the allowed command list. Disable construct.terminal.restrictedMode to allow all commands.`);
+                        throw new Error(`Command rejected in restricted mode: "${command.split(/\s+/)[0]}" is not in the allowed command list. Disable kovix.terminal.restrictedMode to allow all commands.`);
                 }
 
                 // SEC-7 (H4 fix): Audit-log interpreter commands even when

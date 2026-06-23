@@ -10,7 +10,7 @@ import { Event } from '../../../../base/common/event.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 import { IEmbeddingConfig } from './memoryTypes.js';
 
-export const IEmbeddingService = createDecorator<IEmbeddingService>('construct.embedding');
+export const IEmbeddingService = createDecorator<IEmbeddingService>('kovix.embedding');
 
 export interface IEmbeddingService extends IDisposable {
 	readonly _serviceBrand: undefined;

@@ -15,7 +15,7 @@ import { IConstructSessionService, IConstructSession } from '../../../../../../p
 /**
  * Storage key for persisting session data.
  */
-const SESSIONS_STORAGE_KEY = 'construct.sessions';
+const SESSIONS_STORAGE_KEY = 'kovix.sessions';
 
 /**
  * Default title assigned to sessions when no title is provided.

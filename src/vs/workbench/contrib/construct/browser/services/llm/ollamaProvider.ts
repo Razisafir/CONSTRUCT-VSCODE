@@ -54,7 +54,7 @@ export class OllamaProvider extends Disposable implements IConstructAIProvider {
                 @IConfigurationService private readonly _configurationService: IConfigurationService,
         ) {
                 super();
-                this._baseUrl = _configurationService.getValue<string>('construct.ollama.baseUrl') || OLLAMA_BASE_URL;
+                this._baseUrl = _configurationService.getValue<string>('kovix.ollama.baseUrl') || OLLAMA_BASE_URL;
                 this.logService.info('[OllamaProvider] Initialized (baseUrl: ' + this._baseUrl + ')');
         }
 
@@ -88,7 +88,7 @@ export class OllamaProvider extends Disposable implements IConstructAIProvider {
                         if (!this._activeModel) {
                                 const models = await this.listModels();
                                 if (models.length > 0) {
-                                        const configuredModel = this._configurationService.getValue<string>('construct.ollama.model');
+                                        const configuredModel = this._configurationService.getValue<string>('kovix.ollama.model');
                                         if (configuredModel) {
                                                 const found = models.find(m => m.id === configuredModel || m.id.startsWith(configuredModel + ':'));
                                                 if (found) {

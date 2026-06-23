@@ -26,7 +26,7 @@ const DEFAULT_CLOUD_MODEL = 'gpt-4o-mini';
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
 const MAX_RETRIES = 3;
-const STORAGE_KEY_CLOUD_API_KEY = 'construct.cloud.apiKey';
+const STORAGE_KEY_CLOUD_API_KEY = 'kovix.cloud.apiKey';
 
 /**
  * Parsed SSE chunk from the Anthropic streaming API.
@@ -85,7 +85,7 @@ export class CloudProvider extends Disposable implements IConstructAIProvider {
         ) {
                 super();
 
-                this._baseUrl = configurationService.getValue<string>('construct.cloud.baseUrl') || DEFAULT_CLOUD_BASE_URL;
+                this._baseUrl = configurationService.getValue<string>('kovix.cloud.baseUrl') || DEFAULT_CLOUD_BASE_URL;
                 // P0-2 FIX: Resolve key through ISecureKeyManager (OS keychain) first
                 this._resolveApiKey();
 
@@ -152,7 +152,7 @@ export class CloudProvider extends Disposable implements IConstructAIProvider {
 
                 // Secondary fallback: read from IConfigurationService
                 if (!this._apiKey) {
-                        this._apiKey = this.configurationService.getValue<string>('construct.cloud.apiKey') ?? '';
+                        this._apiKey = this.configurationService.getValue<string>('kovix.cloud.apiKey') ?? '';
                 }
         }
 
@@ -240,7 +240,7 @@ export class CloudProvider extends Disposable implements IConstructAIProvider {
                         ];
 
                         if (!this._activeModel) {
-                                const configuredModel = this.configurationService.getValue<string>('construct.anthropic.model') || DEFAULT_ANTHROPIC_MODEL;
+                                const configuredModel = this.configurationService.getValue<string>('kovix.anthropic.model') || DEFAULT_ANTHROPIC_MODEL;
                                 const found = this._customModels.find(m => m.id === configuredModel);
                                 await this.setActiveModel(found ? found.id : this._customModels[0].id);
                         }
@@ -289,7 +289,7 @@ export class CloudProvider extends Disposable implements IConstructAIProvider {
                         }));
 
                         if (!this._activeModel && this._customModels.length > 0) {
-                                const configuredModel = this.configurationService.getValue<string>('construct.cloud.model') || DEFAULT_CLOUD_MODEL;
+                                const configuredModel = this.configurationService.getValue<string>('kovix.cloud.model') || DEFAULT_CLOUD_MODEL;
                                 const found = this._customModels.find(m => m.id === configuredModel);
                                 await this.setActiveModel(found ? found.id : this._customModels[0].id);
                         }

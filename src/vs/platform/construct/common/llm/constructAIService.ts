@@ -13,7 +13,7 @@ import {
 	IToolDefinition, ProviderStatus
 } from './constructAIProvider.js';
 
-export const IConstructAIService = createDecorator<IConstructAIService>('construct.aiService');
+export const IConstructAIService = createDecorator<IConstructAIService>('kovix.aiService');
 
 /**
  * IConstructAIService — the unified AI service that auto-selects the best provider.

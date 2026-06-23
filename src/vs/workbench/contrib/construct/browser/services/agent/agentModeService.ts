@@ -14,7 +14,7 @@ import { ILogService } from '../../../../../../platform/log/common/log.js';
 import { LLMProvider } from '../../../../../../platform/construct/common/security/secureKeyManager.js';
 import { AIProviderType } from '../../../../../../platform/construct/common/llm/constructAIProvider.js';
 
-export const IAgentModeService = createDecorator<IAgentModeService>('construct.agentModeService');
+export const IAgentModeService = createDecorator<IAgentModeService>('kovix.agentModeService');
 
 /**
  * Tool groups available to an agent mode.
@@ -238,8 +238,8 @@ const BUILTIN_MODES: IConstructAgentMode[] = [
 	},
 ];
 
-const STORAGE_KEY_MODES = 'construct.agentModes';
-const STORAGE_KEY_ACTIVE_MODE = 'construct.agentActiveMode';
+const STORAGE_KEY_MODES = 'kovix.agentModes';
+const STORAGE_KEY_ACTIVE_MODE = 'kovix.agentActiveMode';
 
 export class AgentModeService extends Disposable implements IAgentModeService {
 	declare readonly _serviceBrand: undefined;

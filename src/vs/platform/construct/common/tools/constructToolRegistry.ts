@@ -7,7 +7,7 @@
 
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 
-export const IConstructToolRegistry = createDecorator<IConstructToolRegistry>('construct.toolRegistry');
+export const IConstructToolRegistry = createDecorator<IConstructToolRegistry>('kovix.toolRegistry');
 
 // Re-export from the canonical location for backward compatibility
 export { assertWithinWorkspace } from '../security/workspaceGuard.js';

@@ -219,13 +219,13 @@ export class KovixAgentSettingsPane extends ViewPane {
                 // --- Action bar ---
                 const actions = dom.$('.kovix-actionbar');
                 const createBtn = this.makeBtn('spark', 'Create from Document', 'Convert any markdown / text document into a skill');
-                createBtn.onclick = () => this.commandService.executeCommand('construct.createSkillFromDocument');
+                createBtn.onclick = () => this.commandService.executeCommand('kovix.createSkillFromDocument');
                 const importBtn = this.makeBtn('cloud-download', 'Import from URL', 'Fetch a raw SKILL.md from a GitHub raw URL');
-                importBtn.onclick = () => this.commandService.executeCommand('construct.importSkillFromUrl');
+                importBtn.onclick = () => this.commandService.executeCommand('kovix.importSkillFromUrl');
                 const refreshBtn = this.makeBtn('refresh', 'Refresh', 'Reload skills from disk');
                 refreshBtn.onclick = async () => { await this.skillRegistry.refresh(); };
                 const openFolderBtn = this.makeBtn('folder-opened', 'Open Skills Folder', 'Reveal ~/.kovix/skills/ in the file explorer');
-                openFolderBtn.onclick = () => this.commandService.executeCommand('construct.openSkillsFolder');
+                openFolderBtn.onclick = () => this.commandService.executeCommand('kovix.openSkillsFolder');
                 actions.append(createBtn, importBtn, refreshBtn, openFolderBtn);
                 wrap.appendChild(actions);
 
@@ -286,7 +286,7 @@ export class KovixAgentSettingsPane extends ViewPane {
                 toggle.appendChild(dom.$('span.kovix-switch__slider'));
 
                 const viewBtn = this.makeIconBtn('eye', 'View body');
-                viewBtn.onclick = () => this.commandService.executeCommand('construct.viewSkill', skill.slug);
+                viewBtn.onclick = () => this.commandService.executeCommand('kovix.viewSkill', skill.slug);
                 const revealBtn = this.makeIconBtn('folder', 'Reveal in explorer');
                 revealBtn.onclick = async () => {
                         try { await this.skillRegistry.revealSkill(skill.slug); }
@@ -331,49 +331,49 @@ export class KovixAgentSettingsPane extends ViewPane {
 
                 // Toggles
                 wrap.appendChild(this.makeToggle(
-                        'construct.memory.privacy.autoRemember',
+                        'kovix.memory.privacy.autoRemember',
                         'Auto-remember everything',
                         'When ON, the agent automatically stores facts from your conversation (file paths, decisions, errors). When OFF, nothing is stored unless you explicitly ask.',
                         cfg.autoRemember,
                 ));
                 wrap.appendChild(this.makeToggle(
-                        'construct.memory.privacy.requireExplicitConsent',
+                        'kovix.memory.privacy.requireExplicitConsent',
                         'Ask before each memory (audit mode)',
                         'When ON, the agent will ask "OK to remember this?" before storing any new memory. Slower, but maximum control.',
                         cfg.requireExplicitConsent,
                 ));
                 wrap.appendChild(this.makeToggle(
-                        'construct.memory.privacy.piiScrub',
+                        'kovix.memory.privacy.piiScrub',
                         'Scrub PII before storing',
                         'Redacts emails, phone numbers, credit-card-shaped numbers, SSNs, and common API-key shapes before any memory is stored. Strongly recommended.',
                         cfg.piiScrub,
                 ));
                 wrap.appendChild(this.makeToggle(
-                        'construct.memory.privacy.redactFileContents',
+                        'kovix.memory.privacy.redactFileContents',
                         'Never memorise file contents',
                         'Store metadata about files (path, action, timestamp) but never the actual code. Disable only if you want the agent to remember snippets.',
                         cfg.redactFileContents,
                 ));
                 wrap.appendChild(this.makeToggle(
-                        'construct.memory.privacy.crossProjectLearning',
+                        'kovix.memory.privacy.crossProjectLearning',
                         'Cross-project learning',
                         'When ON, procedural memories (e.g. "how I like my tests structured") are shared across projects. When OFF, each project is its own silo.',
                         cfg.crossProjectLearning,
                 ));
                 wrap.appendChild(this.makeToggle(
-                        'construct.memory.privacy.allowNetworkSync',
+                        'kovix.memory.privacy.allowNetworkSync',
                         'Allow network sync (Supermemory cloud)',
                         'When ON, memories are synced to Supermemory cloud (if an API key is set). When OFF, all memory operations are local-only.',
                         cfg.allowNetworkSync,
                 ));
                 wrap.appendChild(this.makeToggle(
-                        'construct.memory.privacy.telemetryOptOut',
+                        'kovix.memory.privacy.telemetryOptOut',
                         'Telemetry opt-out (no memory data leaves machine)',
                         'When ON, no memory-related telemetry is sent anywhere. Kovix never sells or transmits your memories.',
                         cfg.telemetryOptOut,
                 ));
                 wrap.appendChild(this.makeToggle(
-                        'construct.memory.privacy.forgetOnWindowClose',
+                        'kovix.memory.privacy.forgetOnWindowClose',
                         'Forget short-term memory on window close',
                         'When ON, working memory is cleared when you close the Kovix window. Long-term memory is preserved.',
                         cfg.forgetOnWindowClose,
@@ -381,7 +381,7 @@ export class KovixAgentSettingsPane extends ViewPane {
 
                 // Scope selector
                 wrap.appendChild(this.makeSelect(
-                        'construct.memory.privacy.scope',
+                        'kovix.memory.privacy.scope',
                         'Memory scope',
                         'How wide should memory scope be? Tighter = more privacy.',
                         [
@@ -394,7 +394,7 @@ export class KovixAgentSettingsPane extends ViewPane {
 
                 // Retention
                 wrap.appendChild(this.makeNumber(
-                        'construct.memory.privacy.retentionDays',
+                        'kovix.memory.privacy.retentionDays',
                         'Retention (days)',
                         'Memories older than this are automatically forgotten. 1 = ephemeral, 3650 = ~permanent.',
                         cfg.retentionDays, 1, 3650,
@@ -410,7 +410,7 @@ export class KovixAgentSettingsPane extends ViewPane {
                                 { placeHolder: 'Forget ALL stored memories? This cannot be undone.' },
                         );
                         if (confirm?.label.startsWith('Yes')) {
-                                this.commandService.executeCommand('construct.forgetAllMemories');
+                                this.commandService.executeCommand('kovix.forgetAllMemories');
                         }
                 };
                 danger.appendChild(forgetBtn);
@@ -421,7 +421,7 @@ export class KovixAgentSettingsPane extends ViewPane {
                 link.innerHTML = `<span class="codicon codicon-graph"></span> <a href="#">Open Memory Graph</a>`;
                 link.querySelector('a')!.onclick = (e) => {
                         e.preventDefault();
-                        this.commandService.executeCommand('construct.openMemoryGraph');
+                        this.commandService.executeCommand('kovix.openMemoryGraph');
                 };
                 wrap.appendChild(link);
 
@@ -441,11 +441,11 @@ export class KovixAgentSettingsPane extends ViewPane {
                 // Action bar
                 const actions = dom.$('.kovix-actionbar');
                 const startBtn = this.makeBtn('play', 'Start Server', 'Start an installed MCP server');
-                startBtn.onclick = () => this.commandService.executeCommand('construct.mcp.startServer');
+                startBtn.onclick = () => this.commandService.executeCommand('kovix.mcp.startServer');
                 const stopBtn = this.makeBtn('debug-stop', 'Stop Server', 'Stop a running MCP server');
-                stopBtn.onclick = () => this.commandService.executeCommand('construct.mcp.stopServer');
+                stopBtn.onclick = () => this.commandService.executeCommand('kovix.mcp.stopServer');
                 const marketBtn = this.makeBtn('shopping-cart', 'Browse Marketplace', 'Browse the MCP marketplace catalog');
-                marketBtn.onclick = () => this.commandService.executeCommand('construct.mcp.openMarketplace');
+                marketBtn.onclick = () => this.commandService.executeCommand('kovix.mcp.openMarketplace');
                 actions.append(startBtn, stopBtn, marketBtn);
                 wrap.appendChild(actions);
 
@@ -519,14 +519,14 @@ export class KovixAgentSettingsPane extends ViewPane {
 
                                         if (status === 'running') {
                                                 const stop = this.makeIconBtn('debug-stop', 'Stop');
-                                                stop.onclick = () => this.commandService.executeCommand('construct.mcp.stopServer');
+                                                stop.onclick = () => this.commandService.executeCommand('kovix.mcp.stopServer');
                                                 cardActions.appendChild(stop);
                                         } else if (isApproved) {
                                                 // Only show Start if approved; unapproved servers
                                                 // get the Approve button instead (clicking Start
                                                 // would just fail with the consent-gate error).
                                                 const start = this.makeIconBtn('play', 'Start');
-                                                start.onclick = () => this.commandService.executeCommand('construct.mcp.startServer');
+                                                start.onclick = () => this.commandService.executeCommand('kovix.mcp.startServer');
                                                 cardActions.appendChild(start);
                                         }
                                         card.appendChild(cardActions);
@@ -593,13 +593,13 @@ export class KovixAgentSettingsPane extends ViewPane {
 
                 const actions = dom.$('.kovix-actionbar');
                 const manageBtn = this.makeBtn('key', 'Manage API Keys', 'Open the key manager — add, validate, activate, test');
-                manageBtn.onclick = () => this.commandService.executeCommand('construct.manageApiKeys');
+                manageBtn.onclick = () => this.commandService.executeCommand('kovix.manageApiKeys');
                 const switchBtn = this.makeBtn('arrow-swap', 'Switch Provider', 'Switch the active LLM provider');
-                switchBtn.onclick = () => this.commandService.executeCommand('construct.switchProvider.quick');
+                switchBtn.onclick = () => this.commandService.executeCommand('kovix.switchProvider.quick');
                 const selectBtn = this.makeBtn('list-selection', 'Select Model', 'Pick a model from the active provider');
-                selectBtn.onclick = () => this.commandService.executeCommand('construct.selectModel');
+                selectBtn.onclick = () => this.commandService.executeCommand('kovix.selectModel');
                 const testBtn = this.makeBtn('pulse', 'Test Connection', 'Run a minimal API call to verify the active provider');
-                testBtn.onclick = () => this.commandService.executeCommand('construct.testCloudConnection');
+                testBtn.onclick = () => this.commandService.executeCommand('kovix.testCloudConnection');
                 actions.append(manageBtn, switchBtn, selectBtn, testBtn);
                 wrap.appendChild(actions);
 
@@ -652,11 +652,11 @@ export class KovixAgentSettingsPane extends ViewPane {
 
                 const actions = dom.$('.kovix-actionbar');
                 const spawnBtn = this.makeBtn('rocket', 'Spawn Sub-Agent', 'Spawn a single sub-agent with a specific mode and task');
-                spawnBtn.onclick = () => this.commandService.executeCommand('construct.spawnSubAgent');
+                spawnBtn.onclick = () => this.commandService.executeCommand('kovix.spawnSubAgent');
                 const swarmBtn = this.makeBtn('layers', 'Launch Swarm', 'Launch a full multi-agent swarm (opens the swarm wizard)');
-                swarmBtn.onclick = () => this.commandService.executeCommand('construct.openSwarm');
+                swarmBtn.onclick = () => this.commandService.executeCommand('kovix.openSwarm');
                 const ccBtn = this.makeBtn('dashboard', 'Open Control Center', 'Open the live agent control center');
-                ccBtn.onclick = () => this.commandService.executeCommand('construct.openControlCenter');
+                ccBtn.onclick = () => this.commandService.executeCommand('kovix.openControlCenter');
                 actions.append(spawnBtn, swarmBtn, ccBtn);
                 wrap.appendChild(actions);
 
@@ -693,7 +693,7 @@ export class KovixAgentSettingsPane extends ViewPane {
                 }
 
                 const createModeBtn = this.makeBtn('add', 'Create Custom Mode', 'Define your own agent role with custom tools and prompt');
-                createModeBtn.onclick = () => this.commandService.executeCommand('construct.createAgentMode');
+                createModeBtn.onclick = () => this.commandService.executeCommand('kovix.createAgentMode');
                 wrap.appendChild(createModeBtn);
 
                 this.tabContent.appendChild(wrap);
@@ -717,46 +717,46 @@ export class KovixAgentSettingsPane extends ViewPane {
                                 <div class="kovix-cta__title">Idea → App</div>
                                 <div class="kovix-cta__sub">Describe your idea in one line. Kovix will refine it, plan it, build it, and ship it.</div>
                         </div>`;
-                cta.onclick = () => this.commandService.executeCommand('construct.autonomousBuild');
+                cta.onclick = () => this.commandService.executeCommand('kovix.autonomousBuild');
                 wrap.appendChild(cta);
 
                 // Autonomous toggles
                 wrap.appendChild(this.makeToggle(
-                        'construct.ideaRefinement.enabled',
+                        'kovix.ideaRefinement.enabled',
                         'Idea refinement (ask clarifying questions before planning)',
                         'When ON, the agent asks 1-3 clarifying questions before planning. When OFF, it plans immediately from your raw idea.',
-                        this.configurationService.getValue<boolean>('construct.ideaRefinement.enabled') !== false,
+                        this.configurationService.getValue<boolean>('kovix.ideaRefinement.enabled') !== false,
                 ));
                 wrap.appendChild(this.makeToggle(
-                        'construct.autonomous.autoApprovePlan',
+                        'kovix.autonomous.autoApprovePlan',
                         'Auto-approve plan (no manual approval gate)',
                         'When ON, the agent skips the "Approve plan?" gate and starts executing immediately. Faster, less control.',
-                        !!this.configurationService.getValue<boolean>('construct.autonomous.autoApprovePlan'),
+                        !!this.configurationService.getValue<boolean>('kovix.autonomous.autoApprovePlan'),
                 ));
                 wrap.appendChild(this.makeToggle(
-                        'construct.autonomous.milestoneGates',
+                        'kovix.autonomous.milestoneGates',
                         'Milestone gates (pause at sensible boundaries)',
                         'When ON, the agent pauses at logical milestones (e.g. "scaffold done", "MVP works") for you to review.',
-                        this.configurationService.getValue<boolean>('construct.autonomous.milestoneGates') !== false,
+                        this.configurationService.getValue<boolean>('kovix.autonomous.milestoneGates') !== false,
                 ));
                 wrap.appendChild(this.makeToggle(
-                        'construct.autonomous.runTests',
+                        'kovix.autonomous.runTests',
                         'Run tests after each milestone',
                         'When ON, the agent runs the project\'s test suite after each milestone and stops if tests fail.',
-                        this.configurationService.getValue<boolean>('construct.autonomous.runTests') !== false,
+                        this.configurationService.getValue<boolean>('kovix.autonomous.runTests') !== false,
                 ));
                 wrap.appendChild(this.makeToggle(
-                        'construct.autonomous.gitCommitPerStep',
+                        'kovix.autonomous.gitCommitPerStep',
                         'Git commit per step',
                         'When ON, the agent commits after each plan step on a dedicated branch. Easy to roll back.',
-                        !!this.configurationService.getValue<boolean>('construct.autonomous.gitCommitPerStep'),
+                        !!this.configurationService.getValue<boolean>('kovix.autonomous.gitCommitPerStep'),
                 ));
 
                 wrap.appendChild(this.makeNumber(
-                        'construct.autonomous.maxRounds',
+                        'kovix.autonomous.maxRounds',
                         'Max rounds per task',
                         'Hard ceiling on agent-loop iterations. Prevents runaway costs. 50 is a sensible default.',
-                        this.configurationService.getValue<number>('construct.autonomous.maxRounds') || 50, 1, 500,
+                        this.configurationService.getValue<number>('kovix.autonomous.maxRounds') || 50, 1, 500,
                 ));
 
                 // Ponytail enforcement
@@ -769,7 +769,7 @@ export class KovixAgentSettingsPane extends ViewPane {
                         </div>
                         <div class="kovix-card__actions"></div>`;
                 const ponyBtn = this.makeBtn('settings-gear', 'Configure Ponytail', 'lite / full / ultra / off');
-                ponyBtn.onclick = () => this.commandService.executeCommand('construct.ponytailSetMode');
+                ponyBtn.onclick = () => this.commandService.executeCommand('kovix.ponytailSetMode');
                 pony.querySelector('.kovix-card__actions')!.appendChild(ponyBtn);
                 wrap.appendChild(pony);
 
@@ -786,16 +786,16 @@ export class KovixAgentSettingsPane extends ViewPane {
                         return (v === undefined || v === null) ? def : v;
                 };
                 return {
-                        autoRemember: g('construct.memory.privacy.autoRemember', DEFAULT_PRIVACY_CONFIG.autoRemember),
-                        requireExplicitConsent: g('construct.memory.privacy.requireExplicitConsent', DEFAULT_PRIVACY_CONFIG.requireExplicitConsent),
-                        piiScrub: g('construct.memory.privacy.piiScrub', DEFAULT_PRIVACY_CONFIG.piiScrub),
-                        scope: g('construct.memory.privacy.scope', DEFAULT_PRIVACY_CONFIG.scope),
-                        retentionDays: g('construct.memory.privacy.retentionDays', DEFAULT_PRIVACY_CONFIG.retentionDays),
-                        crossProjectLearning: g('construct.memory.privacy.crossProjectLearning', DEFAULT_PRIVACY_CONFIG.crossProjectLearning),
-                        redactFileContents: g('construct.memory.privacy.redactFileContents', DEFAULT_PRIVACY_CONFIG.redactFileContents),
-                        telemetryOptOut: g('construct.memory.privacy.telemetryOptOut', DEFAULT_PRIVACY_CONFIG.telemetryOptOut),
-                        forgetOnWindowClose: g('construct.memory.privacy.forgetOnWindowClose', DEFAULT_PRIVACY_CONFIG.forgetOnWindowClose),
-                        allowNetworkSync: g('construct.memory.privacy.allowNetworkSync', DEFAULT_PRIVACY_CONFIG.allowNetworkSync),
+                        autoRemember: g('kovix.memory.privacy.autoRemember', DEFAULT_PRIVACY_CONFIG.autoRemember),
+                        requireExplicitConsent: g('kovix.memory.privacy.requireExplicitConsent', DEFAULT_PRIVACY_CONFIG.requireExplicitConsent),
+                        piiScrub: g('kovix.memory.privacy.piiScrub', DEFAULT_PRIVACY_CONFIG.piiScrub),
+                        scope: g('kovix.memory.privacy.scope', DEFAULT_PRIVACY_CONFIG.scope),
+                        retentionDays: g('kovix.memory.privacy.retentionDays', DEFAULT_PRIVACY_CONFIG.retentionDays),
+                        crossProjectLearning: g('kovix.memory.privacy.crossProjectLearning', DEFAULT_PRIVACY_CONFIG.crossProjectLearning),
+                        redactFileContents: g('kovix.memory.privacy.redactFileContents', DEFAULT_PRIVACY_CONFIG.redactFileContents),
+                        telemetryOptOut: g('kovix.memory.privacy.telemetryOptOut', DEFAULT_PRIVACY_CONFIG.telemetryOptOut),
+                        forgetOnWindowClose: g('kovix.memory.privacy.forgetOnWindowClose', DEFAULT_PRIVACY_CONFIG.forgetOnWindowClose),
+                        allowNetworkSync: g('kovix.memory.privacy.allowNetworkSync', DEFAULT_PRIVACY_CONFIG.allowNetworkSync),
                 };
         }
 

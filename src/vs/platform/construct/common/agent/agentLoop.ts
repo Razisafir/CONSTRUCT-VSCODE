@@ -11,7 +11,7 @@ import { LoadingState, FileChangeEntry } from './loadingState.js';
 import { IRestoreResult } from '../snapshot/snapshotManager.js';
 import { IApprovedPlan, IMilestone, ExecutionState } from './milestoneStateMachine.js';
 
-export const IAgentLoop = createDecorator<IAgentLoop>('construct.agentLoop');
+export const IAgentLoop = createDecorator<IAgentLoop>('kovix.agentLoop');
 
 /**
  * Events emitted by the agent loop during execution.

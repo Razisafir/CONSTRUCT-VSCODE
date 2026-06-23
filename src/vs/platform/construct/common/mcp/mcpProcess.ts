@@ -8,7 +8,7 @@
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 import { Event } from '../../../../base/common/event.js';
 
-export const IMCPProcess = createDecorator<IMCPProcess>('construct.mcpProcess');
+export const IMCPProcess = createDecorator<IMCPProcess>('kovix.mcpProcess');
 
 /**
  * Service providing filesystem operations through MCP-compatible interface.

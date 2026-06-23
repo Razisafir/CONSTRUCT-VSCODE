@@ -7,7 +7,7 @@
 
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 
-export const ITerminalExecutor = createDecorator<ITerminalExecutor>('construct.terminalExecutor');
+export const ITerminalExecutor = createDecorator<ITerminalExecutor>('kovix.terminalExecutor');
 
 /**
  * Result of a terminal command execution.
@@ -39,7 +39,7 @@ const SHELL_METACHAR_REGEX = /;|&&|\|\||\||`|\$\(|\{|}|\d*>|</;
 
 /**
  * SEC-3 + SEC-7 (H4 fix): Default allowlist for restricted mode.
- * Only these commands are allowed when construct.terminal.restrictedMode is true.
+ * Only these commands are allowed when kovix.terminal.restrictedMode is true.
  *
  * SEC-7 (H4 fix): Removed interpreters (node, python, python3, npx, npm, yarn,
  * pnpm, pip, pip3, cargo, go, dotnet, java, javac, mvn, gradle, rustc, make,
@@ -49,7 +49,7 @@ const SHELL_METACHAR_REGEX = /;|&&|\|\||\||`|\$\(|\{|}|\d*>|</;
  * code lives inside a quoted string literal the metachar detector can't see.
  * `npx -y some-malicious-pkg` is the same problem.
  *
- * Users who need interpreters can set `construct.terminal.restrictedMode` to
+ * Users who need interpreters can set `kovix.terminal.restrictedMode` to
  * false (which already exists) — but then they're outside the default-safety
  * posture and every command will pop a confirmation dialog (planned, see H4
  * main fix in the tool registry).

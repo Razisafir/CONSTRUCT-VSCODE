@@ -16,15 +16,15 @@ import { IInstantiationService } from '../../../../../../platform/instantiation/
 import { AIProviderType } from '../../../../../../platform/construct/common/llm/constructAIProvider.js';
 
 // Storage keys for non-sensitive configuration
-const STORAGE_KEY_PREFIX = 'construct.keyManager';
+const STORAGE_KEY_PREFIX = 'kovix.keyManager';
 // P0-2: Generic cloud API key storage key for CloudProvider backward compatibility
-const STORAGE_KEY_CLOUD_API_KEY = 'construct.cloud.apiKey';
+const STORAGE_KEY_CLOUD_API_KEY = 'kovix.cloud.apiKey';
 const MASKED_KEY_STORAGE_KEY = `${STORAGE_KEY_PREFIX}.maskedKeys`;
 const ACTIVE_PROVIDER_STORAGE_KEY = `${STORAGE_KEY_PREFIX}.activeProvider`;
 const PROVIDERS_STORAGE_KEY = `${STORAGE_KEY_PREFIX}.providers`;
 
 // Secret storage key prefix for actual API keys
-const SECRET_KEY_PREFIX = 'construct.apiKey';
+const SECRET_KEY_PREFIX = 'kovix.apiKey';
 
 /**
  * Default endpoints per provider type.
@@ -224,7 +224,7 @@ export class SecureKeyManagerService extends Disposable implements ISecureKeyMan
                 @IStorageService private readonly storageService: IStorageService,
                 @ILogService private readonly logService: ILogService,
                 // BUGFIX (v1.2.0): break the constructor-time DI cycle
-                // construct.aiService ↔ construct.secureKeyManager.
+                // kovix.aiService ↔ construct.secureKeyManager.
                 // Previously @IConstructAIService was injected here directly, and
                 // ConstructAIService injected @ISecureKeyManager — the VS Code
                 // instantiator cannot satisfy a cycle and throws

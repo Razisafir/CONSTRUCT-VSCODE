@@ -8,7 +8,7 @@
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 import { Event } from '../../../../base/common/event.js';
 
-export const IConstructSessionService = createDecorator<IConstructSessionService>('construct.sessionService');
+export const IConstructSessionService = createDecorator<IConstructSessionService>('kovix.sessionService');
 
 /**
  * A conversation session with the AI agent.

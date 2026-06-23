@@ -48,7 +48,7 @@ export class EmbeddingNodeService extends Disposable implements IEmbeddingServic
 
                 if (this._ollamaAvailable) {
                         try {
-                                const baseUrl = this.configurationService.getValue<string>('construct.ollama.baseUrl') || 'http://localhost:11434';
+                                const baseUrl = this.configurationService.getValue<string>('kovix.ollama.baseUrl') || 'http://localhost:11434';
                                 const response = await fetch(`${baseUrl}/api/embed`, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },

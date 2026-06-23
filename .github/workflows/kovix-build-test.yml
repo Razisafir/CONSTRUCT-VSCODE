@@ -180,13 +180,12 @@ jobs:
           mkdir -p /tmp/kovix-test/userdata/User
           cat > /tmp/kovix-test/userdata/User/settings.json <<EOF
           {
-            "construct.llm.provider": "nvidia",
-            "construct.llm.apiKey":   "$NVIDIA_KEY_HIKMAH",
-            "construct.llm.model":    "meta/llama-3.1-70b-instruct",
-            "construct.memory.embeddingProvider": "nvidia",
-            "construct.memory.embeddingModel":    "nvidia/nv-embed-v1",
-            "construct.memory.vectorStore":       "bm25",
-            "construct.safety.confirmDestructive": false,
+            "kovix.api.activeProvider": "nvidia",
+            "kovix.cloud.apiKey":   "$NVIDIA_KEY_HIKMAH",
+            "kovix.cloud.model":    "meta/llama-3.1-70b-instruct",
+            "kovix.embedding": "nvidia",
+            "kovix.memory.enabled": true,
+            "kovix.security.allowExternalTargets": false,
             "window.menuBarVisibility": "visible",
             "workbench.colorTheme": "Kovix Dark Luxury",
             "workbench.sideBar.location": "left",

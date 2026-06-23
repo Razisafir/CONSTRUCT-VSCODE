@@ -10,7 +10,7 @@ import { Event } from '../../../../base/common/event.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 import { IEpisodicMemoryEntry } from './memoryTypes.js';
 
-export const IEpisodicMemoryService = createDecorator<IEpisodicMemoryService>('construct.episodicMemory');
+export const IEpisodicMemoryService = createDecorator<IEpisodicMemoryService>('kovix.episodicMemory');
 
 export interface IEpisodicMemoryService extends IDisposable {
 	readonly _serviceBrand: undefined;

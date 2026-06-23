@@ -81,7 +81,7 @@ export class MCPServerRegistry extends Disposable {
                         // fields tell us where each value came from.
                         //
                         // Defense layers (per the audit's K2-C2 fix spec):
-                        //   (a) construct.mcp.servers is now registered with
+                        //   (a) kovix.mcp.servers is now registered with
                         //       restricted:true (constructApiConfig.ts). VS Code
                         //       Workspace Trust will refuse to read workspace-
                         //       scoped values for restricted settings when the
@@ -279,7 +279,7 @@ export class MCPServerRegistry extends Disposable {
 
         /**
          * SEC-7 (H2 follow-up): Mark a server as user-approved. The approval is
-         * persisted in the server configuration (construct.mcp.servers) so it
+         * persisted in the server configuration (kovix.mcp.servers) so it
          * survives restarts. Once approved, MCPConnectionPool's consent gate
          * will let the server spawn.
          *

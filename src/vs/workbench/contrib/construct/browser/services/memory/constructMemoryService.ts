@@ -13,9 +13,9 @@ import { IWorkspaceContextService } from '../../../../../../platform/workspace/c
 import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
 import { IConstructMemoryService, IConstructMemoryProfile, IConstructMemoryItem, IConstructMemoryConfig, IConstructMemoryAddEvent, ConstructSearchMode } from '../../../../../../platform/construct/common/memory/constructMemory.js';
 
-const SUPERMEMORY_API_KEY_STORAGE_KEY = 'construct.supermemory.apiKey';
-const SUPERMEMORY_ENABLED_STORAGE_KEY = 'construct.supermemory.enabled';
-const SUPERMEMORY_AUTOLEARN_STORAGE_KEY = 'construct.supermemory.autoLearn';
+const SUPERMEMORY_API_KEY_STORAGE_KEY = 'kovix.supermemory.apiKey';
+const SUPERMEMORY_ENABLED_STORAGE_KEY = 'kovix.supermemory.enabled';
+const SUPERMEMORY_AUTOLEARN_STORAGE_KEY = 'kovix.supermemory.autoLearn';
 
 /**
  * In-memory representation of a Supermemory search result.
@@ -63,7 +63,7 @@ export class ConstructMemoryService extends Disposable implements IConstructMemo
                                 super();
 
                                 // Generate container tag from workspace name or custom config
-                                const customTag = this.configurationService.getValue<string>('construct.memory.containerTag');
+                                const customTag = this.configurationService.getValue<string>('kovix.memory.containerTag');
                                 if (customTag) {
                                                 this.containerTag = customTag;
                                 } else {
@@ -72,15 +72,15 @@ export class ConstructMemoryService extends Disposable implements IConstructMemo
                                 }
 
                                 // Load config from Kovix IDE settings first, fall back to storage
-                                const enabled = this.configurationService.getValue<boolean>('construct.memory.enabled')
+                                const enabled = this.configurationService.getValue<boolean>('kovix.memory.enabled')
                                                 ?? this.storageService.getBoolean(SUPERMEMORY_ENABLED_STORAGE_KEY, StorageScope.WORKSPACE, false);
-                                const autoLearn = this.configurationService.getValue<boolean>('construct.memory.autoLearn')
+                                const autoLearn = this.configurationService.getValue<boolean>('kovix.memory.autoLearn')
                                                 ?? this.storageService.getBoolean(SUPERMEMORY_AUTOLEARN_STORAGE_KEY, StorageScope.WORKSPACE, true);
                                 this._config = { enabled, autoLearn };
 
                                 // Listen for configuration changes
                                 this._register(this.configurationService.onDidChangeConfiguration((e: any) => {
-                                                if (e.affectsConfiguration('construct.memory')) {
+                                                if (e.affectsConfiguration('kovix.memory')) {
                                                                 this.onConfigurationChanged();
                                                 }
                                 }));
@@ -92,9 +92,9 @@ export class ConstructMemoryService extends Disposable implements IConstructMemo
                 }
 
                 private onConfigurationChanged(): void {
-                                const newEnabled = this.configurationService.getValue<boolean>('construct.memory.enabled');
-                                const newAutoLearn = this.configurationService.getValue<boolean>('construct.memory.autoLearn');
-                                const newContainerTag = this.configurationService.getValue<string>('construct.memory.containerTag');
+                                const newEnabled = this.configurationService.getValue<boolean>('kovix.memory.enabled');
+                                const newAutoLearn = this.configurationService.getValue<boolean>('kovix.memory.autoLearn');
+                                const newContainerTag = this.configurationService.getValue<string>('kovix.memory.containerTag');
 
                                 const configUpdate: Partial<IConstructMemoryConfig> = {};
                                 if (newEnabled !== undefined) { (configUpdate as Record<string, boolean>).enabled = newEnabled; }

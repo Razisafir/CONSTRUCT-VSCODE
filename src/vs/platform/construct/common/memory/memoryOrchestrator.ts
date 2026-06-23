@@ -10,7 +10,7 @@ import { Event } from '../../../../base/common/event.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 import { IMemoryQuery, IMemorySearchResult, IMemoryStats } from './memoryTypes.js';
 
-export const IMemoryOrchestrator = createDecorator<IMemoryOrchestrator>('construct.memoryOrchestrator');
+export const IMemoryOrchestrator = createDecorator<IMemoryOrchestrator>('kovix.memoryOrchestrator');
 
 export interface IMemoryOrchestrator extends IDisposable {
 	readonly _serviceBrand: undefined;

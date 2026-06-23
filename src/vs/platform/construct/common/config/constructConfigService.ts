@@ -9,7 +9,7 @@ import { createDecorator } from '../../../instantiation/common/instantiation.js'
 import { Event } from '../../../../base/common/event.js';
 import { URI } from '../../../../base/common/uri.js';
 
-export const IConstructConfigService = createDecorator<IConstructConfigService>('construct.configService');
+export const IConstructConfigService = createDecorator<IConstructConfigService>('kovix.configService');
 
 /**
  * Configuration scopes for CONSTRUCT settings.
@@ -20,7 +20,7 @@ export type ConstructConfigScope = 'machine' | 'workspace' | 'profile';
  * A single configuration entry with metadata.
  */
 export interface IConstructConfigEntry<T = unknown> {
-        /** The configuration key (e.g., 'construct.cloud.apiKey'). */
+        /** The configuration key (e.g., 'kovix.cloud.apiKey'). */
         readonly key: string;
         /** The current value. */
         value: T;
@@ -56,7 +56,7 @@ export interface IConstructConfigService {
 
         /**
          * Get a configuration value.
-         * @param key The configuration key (e.g., 'construct.cloud.baseUrl').
+         * @param key The configuration key (e.g., 'kovix.cloud.baseUrl').
          * @param scope Optional scope to read from (defaults to most specific).
          */
         getValue<T>(key: string, scope?: ConstructConfigScope): T;

@@ -19,7 +19,7 @@ import {
         IMCPResourceResult
 } from './mcpTypes.js';
 
-export const IMCPServerManager = createDecorator<IMCPServerManager>('construct.mcpServerManager');
+export const IMCPServerManager = createDecorator<IMCPServerManager>('kovix.mcpServerManager');
 
 export interface IMCPServerManager extends IDisposable {
         readonly _serviceBrand: undefined;

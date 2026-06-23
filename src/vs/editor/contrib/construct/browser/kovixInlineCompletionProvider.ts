@@ -23,10 +23,10 @@ import { ILogService } from '../../../../platform/log/common/log.js';
  * suggestion rendered as ghost text. The user accepts with Tab.
  *
  * Behavior:
- * - Disabled unless construct.autocomplete.enabled is true (default: true)
- * - Debounced by construct.autocomplete.debounceMs (default: 200)
- * - Bounded by construct.autocomplete.maxTokens (default: 32)
- * - Tunable via construct.autocomplete.temperature (default: 0.2)
+ * - Disabled unless kovix.autocomplete.enabled is true (default: true)
+ * - Debounced by kovix.autocomplete.debounceMs (default: 200)
+ * - Bounded by kovix.autocomplete.maxTokens (default: 32)
+ * - Tunable via kovix.autocomplete.temperature (default: 0.2)
  * - Skipped for: empty lines, very short prefixes (< 3 chars), plaintext files
  *   (markdown, txt, plain) unless the user explicitly enables them
  * - Aborts the previous in-flight request when a new one starts
@@ -50,7 +50,7 @@ export class KovixInlineCompletionProvider extends Disposable implements InlineC
          * Whether autocomplete is enabled and a provider is available.
          */
         private isEnabled(): boolean {
-                const enabled = this._configService.getValue<boolean>('construct.autocomplete.enabled');
+                const enabled = this._configService.getValue<boolean>('kovix.autocomplete.enabled');
                 if (!enabled) { return false; }
                 // Need an active model to make suggestions
                 if (!this._aiService.getActiveModel()) { return false; }
@@ -117,7 +117,7 @@ export class KovixInlineCompletionProvider extends Disposable implements InlineC
                 if (textBeforeCursor.length === 0 && lineContent.trim().length === 0) { return undefined; }
 
                 // 3. Debounce: skip if fired too soon after the last request
-                const debounceMs = this._configService.getValue<number>('construct.autocomplete.debounceMs') ?? 200;
+                const debounceMs = this._configService.getValue<number>('kovix.autocomplete.debounceMs') ?? 200;
                 const now = Date.now();
                 if (now - this._lastRequestTime < debounceMs) {
                         return undefined;
@@ -138,8 +138,8 @@ export class KovixInlineCompletionProvider extends Disposable implements InlineC
                 const { prefix, suffix } = this.buildPrefixSuffix(model, position);
 
                 // 6. Read configuration
-                const maxTokens = this._configService.getValue<number>('construct.autocomplete.maxTokens') ?? 32;
-                const temperature = this._configService.getValue<number>('construct.autocomplete.temperature') ?? 0.2;
+                const maxTokens = this._configService.getValue<number>('kovix.autocomplete.maxTokens') ?? 32;
+                const temperature = this._configService.getValue<number>('kovix.autocomplete.temperature') ?? 0.2;
 
                 // 7. Call the AI provider
                 try {

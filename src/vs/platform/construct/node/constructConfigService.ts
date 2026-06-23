@@ -21,16 +21,16 @@ const CONFIG_FILE_NAME = 'settings.json';
  * Default CONSTRUCT configuration values.
  */
 const DEFAULTS: Record<string, unknown> = {
-	'construct.cloud.baseUrl': 'https://api.openai.com/v1',
-	'construct.cloud.model': 'gpt-4o-mini',
-	'construct.anthropic.model': 'claude-sonnet-4-20250514',
-	'construct.ollama.baseUrl': 'http://localhost:11434',
-	'construct.ollama.model': 'codellama',
-	'construct.agent.maxRounds': 15,
-	'construct.agent.autoAccept': false,
-	'construct.memory.autoLearn': true,
-	'construct.telemetry.enabled': false,
-	'construct.debug': false,
+	'kovix.cloud.baseUrl': 'https://api.openai.com/v1',
+	'kovix.cloud.model': 'gpt-4o-mini',
+	'kovix.anthropic.model': 'claude-sonnet-4-20250514',
+	'kovix.ollama.baseUrl': 'http://localhost:11434',
+	'kovix.ollama.model': 'codellama',
+	'kovix.agent.maxRounds': 15,
+	'kovix.agent.autoAccept': false,
+	'kovix.memory.autoLearn': true,
+	'kovix.telemetry.enabled': false,
+	'kovix.debug': false,
 };
 
 /**

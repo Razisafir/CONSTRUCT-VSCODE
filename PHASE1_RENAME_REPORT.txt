@@ -1,0 +1,65 @@
+Phase 1.3 — construct.* → kovix.* rename report
+Date: 2026-06-24 (recovery session)
+Total files modified: 58
+Total replacements: 477
+Unique identifiers renamed: 178
+
+File-by-file replacement count (sorted desc):
+     97  src/vs/workbench/contrib/construct/browser/construct.contribution.ts
+     86  src/vs/workbench/contrib/construct/browser/kovixMenu.ts
+     53  src/vs/workbench/contrib/construct/browser/kovixAgentSettings.ts
+     43  src/vs/workbench/contrib/construct/browser/constructApiConfig.ts
+     31  src/vs/workbench/contrib/construct/browser/constructMemoryConfig.ts
+     29  src/vs/workbench/contrib/construct/browser/constructAgentView.ts
+     18  src/vs/workbench/contrib/construct/browser/kovixAutonomousConfig.ts
+     13  src/vs/workbench/contrib/construct/browser/services/tools/constructToolRegistryService.ts
+     10  src/vs/workbench/contrib/construct/browser/services/memory/constructMemoryService.ts
+     10  src/vs/platform/construct/node/constructConfigService.ts
+      8  src/vs/editor/contrib/construct/browser/kovixInlineCompletionProvider.ts
+      6  src/vs/workbench/contrib/construct/browser/constructOnboarding.ts
+      5  src/vs/workbench/contrib/construct/browser/services/llm/cloudProvider.ts
+      4  src/vs/workbench/contrib/construct/browser/constructApiSettings.ts
+      4  src/vs/workbench/contrib/construct/browser/services/security/secureKeyManager.ts
+      4  src/vs/platform/construct/common/mcp/mcpTypes.ts
+      3  src/vs/workbench/contrib/construct/browser/services/agent/agentModeService.ts
+      3  src/vs/workbench/contrib/construct/browser/services/agent/agentLoop.ts
+      3  src/vs/platform/construct/common/config/constructConfigService.ts
+      3  src/vs/platform/construct/common/terminal/terminalExecutor.ts
+      2  src/vs/workbench/contrib/construct/browser/kovixWelcome.ts
+      2  src/vs/workbench/contrib/construct/browser/kovixSurfaceBranding.ts
+      2  src/vs/workbench/contrib/construct/browser/services/llm/ollamaProvider.ts
+      2  src/vs/workbench/contrib/construct/browser/services/llm/constructAIService.ts
+      2  src/vs/workbench/contrib/construct/browser/services/mcp/mcpServerRegistry.ts
+      2  src/vs/workbench/contrib/construct/browser/services/terminal/terminalExecutor.ts
+      1  src/vs/workbench/contrib/construct/browser/services/llm/xenovaProvider.ts
+      1  src/vs/workbench/contrib/construct/browser/services/session/constructSessionServiceImpl.ts
+      1  src/vs/platform/construct/common/notification/constructNotificationService.ts
+      1  src/vs/platform/construct/common/tools/constructToolRegistry.ts
+      1  src/vs/platform/construct/common/recovery/agentErrorRecovery.ts
+      1  src/vs/platform/construct/common/skills/skillRegistry.ts
+      1  src/vs/platform/construct/common/llm/constructAIProvider.ts
+      1  src/vs/platform/construct/common/llm/constructAIService.ts
+      1  src/vs/platform/construct/common/memory/workingMemory.ts
+      1  src/vs/platform/construct/common/memory/proceduralMemory.ts
+      1  src/vs/platform/construct/common/memory/memoryOrchestrator.ts
+      1  src/vs/platform/construct/common/memory/vectorStore.ts
+      1  src/vs/platform/construct/common/memory/embeddingService.ts
+      1  src/vs/platform/construct/common/memory/constructMemory.ts
+      1  src/vs/platform/construct/common/memory/universalMemoryService.ts
+      1  src/vs/platform/construct/common/memory/semanticMemory.ts
+      1  src/vs/platform/construct/common/memory/episodicMemory.ts
+      1  src/vs/platform/construct/common/watcher/fileWatcherService.ts
+      1  src/vs/platform/construct/common/security/secureKeyManager.ts
+      1  src/vs/platform/construct/common/mcp/mcpServerManager.ts
+      1  src/vs/platform/construct/common/mcp/browserAutomation.ts
+      1  src/vs/platform/construct/common/mcp/mcpProcessNode.ts
+      1  src/vs/platform/construct/common/mcp/mcpMarketplace.ts
+      1  src/vs/platform/construct/common/mcp/mcpProcess.ts
+      1  src/vs/platform/construct/common/session/constructSessionService.ts
+      1  src/vs/platform/construct/common/diff/pendingChanges.ts
+      1  src/vs/platform/construct/common/agent/agentLoop.ts
+      1  src/vs/platform/construct/common/agent/ideaRefinementService.ts
+      1  src/vs/platform/construct/common/editor/diffApplier.ts
+      1  src/vs/platform/construct/common/project/constructProjectService.ts
+      1  src/vs/platform/construct/common/snapshot/snapshotManager.ts
+      1  src/vs/platform/construct/node/constructEmbeddingService.ts
