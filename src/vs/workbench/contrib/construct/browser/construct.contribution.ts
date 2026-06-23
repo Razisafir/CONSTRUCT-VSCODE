@@ -114,6 +114,9 @@ import { ICostGovernorService } from '../../../../platform/construct/common/cost
 import { ICreditSystem, ICostGovernor } from '../../../../platform/construct/common/pricing/creditSystem.js';
 import { CostGovernorService } from './services/costGovernorService.js';
 import { CreditSystemService, CostGovernorEnhancedService } from './services/pricing/creditSystemService.js';
+// Phase 4 port (from recovery/phase-28-launch): Execution Sanity Validation
+import { IExecutionSanityService } from '../../../../platform/construct/common/executionSanity.js';
+import { ExecutionSanityService } from './services/executionSanityService.js';
 import { SkillRegistryService } from './services/skills/skillRegistryService.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
@@ -1046,6 +1049,7 @@ registerSingleton(IConstructSessionService, ConstructSessionServiceImpl, Instant
 registerSingleton(ICostGovernorService, CostGovernorService, InstantiationType.Delayed);
 registerSingleton(ICreditSystem, CreditSystemService, InstantiationType.Delayed);
 registerSingleton(ICostGovernor, CostGovernorEnhancedService, InstantiationType.Delayed);
+registerSingleton(IExecutionSanityService, ExecutionSanityService, InstantiationType.Delayed);
 
 // --- Feature Build: Project Commands -----------------------------------------
 registerAction2(class NewProjectAction extends Action2 {
