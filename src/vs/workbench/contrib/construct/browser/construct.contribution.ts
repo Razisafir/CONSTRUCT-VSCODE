@@ -109,6 +109,11 @@ import { ILanguageFeaturesService } from '../../../../editor/common/services/lan
 import { registerKovixAutocomplete } from '../../../../editor/contrib/construct/browser/kovixInlineCompletionProvider.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { ISkillRegistry } from '../../../../platform/construct/common/skills/skillRegistry.js';
+// Phase 27 port (from recovery/phase-28-launch): Cost Governor + Credit System
+import { ICostGovernorService } from '../../../../platform/construct/common/costGovernor.js';
+import { ICreditSystem, ICostGovernor } from '../../../../platform/construct/common/pricing/creditSystem.js';
+import { CostGovernorService } from './services/costGovernorService.js';
+import { CreditSystemService, CostGovernorEnhancedService } from './services/pricing/creditSystemService.js';
 import { SkillRegistryService } from './services/skills/skillRegistryService.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
@@ -1032,6 +1037,15 @@ registerSingleton(IConstructProjectService, ConstructProjectServiceImpl, Instant
 registerSingleton(IIdeaRefinementService, IdeaRefinementServiceImpl, InstantiationType.Delayed);
 registerSingleton(IUniversalMemoryService, UniversalMemoryService, InstantiationType.Delayed);
 registerSingleton(IConstructSessionService, ConstructSessionServiceImpl, InstantiationType.Delayed);
+
+// --- Phase 27 port (from recovery/phase-28-launch): Cost Governor + Credit System ---
+// These are pure additive services for LLM API spend governance. All dependencies
+// (ILogService, IStorageService, IConfigurationService, IOpenerService, ITelemetryService)
+// are VS Code platform services that already exist on main. No phase-28-launch-specific
+// dependencies. See PART1-ARCHITECTURE-COMPARISON.md §4.2 for port rationale.
+registerSingleton(ICostGovernorService, CostGovernorService, InstantiationType.Delayed);
+registerSingleton(ICreditSystem, CreditSystemService, InstantiationType.Delayed);
+registerSingleton(ICostGovernor, CostGovernorEnhancedService, InstantiationType.Delayed);
 
 // --- Feature Build: Project Commands -----------------------------------------
 registerAction2(class NewProjectAction extends Action2 {
