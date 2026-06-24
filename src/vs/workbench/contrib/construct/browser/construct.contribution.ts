@@ -8,7 +8,7 @@
 import { localize, localize2 } from '../../../../nls.js';
 import { URI } from '../../../../base/common/uri.js';
 import { Registry } from '../../../../platform/registry/common/platform.js';
-import { IViewsRegistry, Extensions as ViewExtensions, IViewContainersRegistry, ViewContainerLocation, IViewDescriptorService } from '../../../../workbench/common/views.js';
+import { IViewsRegistry, Extensions as ViewExtensions, IViewContainersRegistry, ViewContainerLocation } from '../../../../workbench/common/views.js';
 import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
 import { Codicon } from '../../../../base/common/codicons.js';
 import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
@@ -31,6 +31,7 @@ import { Disposable } from '../../../../base/common/lifecycle.js';
 import { Action2, registerAction2 } from '../../../../platform/actions/common/actions.js';
 import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
 import { IViewsService } from '../../../../workbench/services/views/common/viewsService.js';
+import { IWorkbenchLayoutService, Parts } from '../../../../workbench/services/layout/browser/layoutService.js';
 import { KeybindingWeight } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
 import { KeyMod, KeyCode } from '../../../../base/common/keyCodes.js';
 import { registerSingleton, InstantiationType } from '../../../../platform/instantiation/common/extensions.js';
@@ -315,33 +316,46 @@ class ConstructStatusBarContribution extends Disposable implements IWorkbenchCon
 
 // Auto-open the Kovix Agent panel on the right-hand side after the workbench restores.
 // This ensures the agent is visible on first launch (matching the Antigravity IDE UX).
+//
+// HISTORY: This contribution had a long-standing bug where the agent panel would not
+// appear on first launch. Root cause was that `openView(id, false)` (focus=false) does
+// not reliably expand the auxiliary bar if it was hidden by default. Fix: (1) use
+// focus=true which forces the container visible, (2) explicitly set the auxiliary bar
+// part visible via IWorkbenchLayoutService as a belt-and-suspenders measure, (3) defer
+// the open call to a microtask so the layout service has finished initializing.
 class ConstructAutoOpenContribution extends Disposable implements IWorkbenchContribution {
                 static readonly ID = 'workbench.contrib.constructAutoOpen';
 
                 constructor(
                                 @IViewsService private readonly viewsService: IViewsService,
-                                @IViewDescriptorService private readonly viewDescriptorService: IViewDescriptorService,
+                                @IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
+                                @ILogService private readonly logService: ILogService,
                 ) {
                                 super();
-                                // This contribution is registered at LifecyclePhase.Restored, so by the time
-                                // the constructor runs the workbench layout is ready. Just call openView directly.
-                                try {
-                                                // DIAGNOSTIC: log view registration state before opening
-                                                const container = this.viewDescriptorService.getViewContainerByViewId('kovix.agentPanel');
-                                                console.log('[Kovix AutoOpen] container for kovix.agentPanel:', container?.id, 'location:', container ? this.viewDescriptorService.getViewContainerLocation(container) : 'N/A');
-                                                if (container) {
-                                                                const model = this.viewDescriptorService.getViewContainerModel(container);
-                                                                const all = model.allViewDescriptors;
-                                                                const active = model.activeViewDescriptors;
-                                                                console.log('[Kovix AutoOpen] allViewDescriptors:', all.map(v => v.id));
-                                                                console.log('[Kovix AutoOpen] activeViewDescriptors:', active.map(v => v.id));
+                                // Defer to a microtask so the workbench layout has fully settled after
+                                // LifecyclePhase.Restored. Synchronous openView calls in the constructor
+                                // race with the layout service's own restoration logic.
+                                queueMicrotask(() => {
+                                                try {
+                                                                // Step 1: explicitly make the auxiliary bar visible. This is the
+                                                                // belt-and-suspenders fix — openView should do this internally,
+                                                                // but historically doesn't if the part was never opened before.
+                                                                this.layoutService.setPartHidden(false, Parts.AUXILIARYBAR_PART);
+
+                                                                // Step 2: open the agent panel view with focus=true. focus=true
+                                                                // forces the container to become visible even if it was hidden.
+                                                                // The previous `focus=false` was the primary cause of the
+                                                                // "agent panel not showing" bug.
+                                                                this.viewsService.openView('kovix.agentPanel', true).then(
+                                                                                () => this.logService.trace('[Kovix AutoOpen] agent panel opened successfully'),
+                                                                                err => this.logService.error('[Kovix AutoOpen] openView rejected:', err)
+                                                                );
+
+                                                                this.logService.trace('[Kovix AutoOpen] agent panel auto-open sequence complete');
+                                                } catch (err) {
+                                                                this.logService.error('[Kovix AutoOpen] failed to auto-open agent panel:', err);
                                                 }
-                                                const result = this.viewsService.openView('kovix.agentPanel', false);
-                                                console.log('[Kovix AutoOpen] openView returned:', result);
-                                                result.then(v => console.log('[Kovix AutoOpen] openView resolved:', v)).catch(err => console.error('[Kovix AutoOpen] openView rejected:', err));
-                                } catch (err) {
-                                                console.error('[Kovix] Failed to auto-open agent panel:', err);
-                                }
+                                });
                 }
 }
 

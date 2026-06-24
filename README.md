@@ -4,7 +4,7 @@
 
 **AI-native development environment — Claude Code, in your IDE, with its own OS.**
 
-[![Version](https://img.shields.io/badge/version-v1.7.1-blue.svg)](https://github.com/Razisafir/KOVIX/releases)
+[![Version](https://img.shields.io/badge/version-v1.8.0--pre-blue.svg)](https://github.com/Razisafir/KOVIX/releases)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](./LICENSE.txt)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/Razisafir/KOVIX/releases)
 [![Build](https://github.com/Razisafir/KOVIX/actions/workflows/ci.yml/badge.svg)](https://github.com/Razisafir/KOVIX/actions)
@@ -38,13 +38,14 @@ sha256sum -c checksums.txt --ignore-missing
 
 Kovix is an AI-native development environment built on a VS Code fork. The headline feature is an autonomous coding agent that lives in a right-side panel — like Cursor's composer or Claude Code, but embedded in the IDE rather than the terminal. The agent has its own "OS": it can read and write files, execute terminal commands, search the codebase semantically, browse the web, call MCP servers, and spawn sub-agents — all with human approval before applying changes.
 
-**v1.7.1 ships the Teal Identity release** — the entire workbench (editor, activity bar, sidebar, status bar, command palette, dialogs) is re-themed around a single signature palette: teal `#14B8A6` accents on a blue-black `#0B1115` canvas. The theme is auto-applied on first launch — no manual theme selection needed. See [KOVIX_DESIGN_SYSTEM_FOUNDATION.md](./KOVIX_DESIGN_SYSTEM_FOUNDATION.md) for the full design system specification.
+**v1.8.0 (in development)** adds the Kovix Consolidation pass: verification-gap fix (Plan→Approve→Execute→**Verify**→Complete with `Verifying` / `VerificationFailed` states), cost governor + credit system + execution sanity interfaces ported from the phase-28-launch lineage (interfaces registered, runtime wiring tracked in #140/#141/#142), and the construct→kovix identifier rename. Multi-agent swarm is **not** in v1.x (see [`docs/DECISIONS-v1.8.0.md`](./docs/DECISIONS-v1.8.0.md) for the full reasoning).
+
+**v1.7.1 ships the Teal Identity release** — the entire workbench (editor, activity bar, sidebar, status bar, command palette, dialogs) is re-themed around a single signature palette: teal `#14B8A6` accents on a blue-black `#0B1115` canvas. The theme is auto-applied on first launch — no manual theme selection needed.
 
 ### Why Kovix instead of Cursor or Claude Code?
 
 - **Multi-provider, user-owned keys** — Use NVIDIA NIM, OpenRouter, OpenAI, Anthropic, Gemini, Mistral, Groq, Together, DeepSeek, LM Studio, Ollama, or any OpenAI-compatible endpoint. Your keys, your choice, your cost.
 - **Per-agent model selection** — Each agent mode (architect, coder, reviewer, debugger, etc.) can use a different model. Run a strong model for planning and a cheap fast model for execution.
-- **Multi-agent swarms** — Spawn sub-agents in different modes for parallel or pipelined work. Architect plans → Coder executes → Reviewer audits, each with its own model and tools.
 - **Runs locally** — Works with Ollama or LM Studio. Your code and keys never leave your machine if you don't want them to. (Note: the in-process ONNX provider via Transformers.js requires an internet connection on first model load — model weights and WASM binaries are fetched from the HuggingFace Hub. For fully offline use, prefer Ollama.)
 - **No telemetry, no Microsoft account, no subscription** — All Microsoft telemetry stripped out. Open VSX gallery replaces the proprietary marketplace.
 - **Right-side agent panel** — Matches Google Antigravity's layout. The agent sits beside your code, not on top of it.
@@ -102,9 +103,7 @@ Kovix v1.7.0 ships **agent modes** (inspired by Roo Code's custom modes pattern)
 
 Each mode can override the global model. Run a strong model (Claude Sonnet, GPT-4o) for the Architect mode and a cheap fast model (Llama 3.1 8B, Haiku) for the Coder mode — best of both worlds.
 
-### Sub-Agent Spawning (OpenAI Swarm pattern)
-
-Modes with `canSpawnSubAgents: true` can hand off work to sub-agents. Use the Command Palette → "Spawn Sub-Agent" to start one. The supervisor agent delegates work; sub-agents report back with their outputs.
+> **Note on multi-agent / sub-agent swarms (v1.8.0):** The `parallelSwarm` and `swarmSize` settings exist in Kovix v1.x but are **no-ops** — multi-agent execution is deferred to v2.0 pending a design decision between the pool-model and role-handoff-model implementations on recovery branches. See [`docs/DECISIONS-v1.8.0.md`](./docs/DECISIONS-v1.8.0.md) for the full reasoning. Single-agent mode (one agent per session, with idea→plan→execute→verify→complete) is fully implemented and is what v1.x ships.
 
 ### Custom Modes
 
@@ -294,9 +293,8 @@ git clone https://github.com/Razisafir/KOVIX
 cd KOVIX
 npm install
 NODE_OPTIONS="--max-old-space-size=8192" npm run compile
-./scripts/construct.sh   # Linux/macOS — Kovix-branded launcher
-.\scripts\construct.bat  # Windows — Kovix-branded launcher
-# (the upstream code.sh / code.bat launchers also still work)
+./scripts/code.sh        # Linux/macOS — dev launcher (BUILD.md's reference to ./scripts/construct.sh is stale post-rename)
+.\scripts\code.bat       # Windows — dev launcher
 ```
 
 For detailed build instructions, see [BUILD.md](./BUILD.md). For packaging into installers (.deb/.rpm/.exe/.zip), see [PACKAGING.md](./PACKAGING.md).
@@ -309,6 +307,6 @@ This project is licensed under a Proprietary license. See [LICENSE.txt](./LICENS
 
 <div align="center">
 
-**[Download Kovix v1.7.0](https://github.com/Razisafir/KOVIX/releases/latest)** · **[Report an Issue](https://github.com/Razisafir/KOVIX/issues)** · **[Read the Changelog](./CHANGELOG.md)** · **[Security Policy](./SECURITY.md)** · **[Privacy Policy](./PRIVACY.md)**
+**[Download Kovix Latest Release](https://github.com/Razisafir/KOVIX/releases/latest)** · **[Report an Issue](https://github.com/Razisafir/KOVIX/issues)** · **[Read the Changelog](./CHANGELOG.md)** · **[Architecture Decisions v1.8.0](./docs/DECISIONS-v1.8.0.md)** · **[Security Policy](./SECURITY.md)** · **[Privacy Policy](./PRIVACY.md)**
 
 </div>
