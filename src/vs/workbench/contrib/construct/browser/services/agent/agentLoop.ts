@@ -49,6 +49,17 @@ import { IConstructToolRegistry } from '../../../../../../platform/construct/com
 import { ICostGovernor, ICreditSystem } from '../../../../../../platform/construct/common/pricing/creditSystem.js';
 import { CreditActionType } from '../../../../../../platform/construct/common/pricing/pricingTypes.js';
 import { IExecutionSanityService, SanitySeverity } from '../../../../../../platform/construct/common/executionSanity.js';
+// Phase 4 -- the three Phase 3 helpers (mapToolToActionType, checkCostGate,
+// applyCommandSanity) and the credit-consumption path were extracted to
+// agentLoopHelpers.ts for unit testability. AgentLoopService has 22 injected
+// dependencies, making direct instantiation impractical for tests. The
+// extracted helpers take their collaborators as parameters instead.
+import {
+        mapToolToActionType,
+        checkCostGate,
+        applyCommandSanity,
+        consumeCreditsForToolCall,
+} from '../../../../../../platform/construct/common/agent/agentLoopHelpers.js';
 
 const MAX_ROUNDS = 50;
 
@@ -287,92 +298,30 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         // success (exit 0 + empty output, exit 0 + 'error' in stderr, missing
         // build artifacts, etc.). Together these replace the deleted permissive
         // ICostGovernorService stub with real, enforceable spending protection.
+        //
+        // Phase 4 -- the helper implementations were extracted to
+        // agentLoopHelpers.ts so they can be unit-tested directly. These
+        // private wrappers just delegate, preserving the call sites in this
+        // file (this.checkCostGate(), this.applyCommandSanity()) while the
+        // real logic lives in the extracted module. See agentLoopHelpers.ts
+        // for the testable implementations.
         // ----------------------------------------------------------------------
 
-        /**
-         * Map a tool name to the corresponding CreditActionType for billing.
-         * Reads are free. Writes and commands consume credits.
-         */
         private mapToolToActionType(toolName: string): CreditActionType {
-                switch (toolName) {
-                        case 'write_file':
-                        case 'edit_file':
-                                return 'file_edit';
-                        case 'run_command':
-                                return 'terminal_command';
-                        case 'web_search':
-                                return 'browser_action';
-                        case 'search_codebase':
-                                return 'tool_call';
-                        default:
-                                // MCP tools (serverName__toolName) and any other
-                                // registered tools count as generic tool calls.
-                                return 'tool_call';
-                }
+                return mapToolToActionType(toolName);
         }
 
-        /**
-         * Check whether the cost governor allows another LLM round.
-         * Returns { allowed: true } when fine, or { allowed: false, reason }
-         * when the agent must stop because emergency mode is active.
-         */
         private checkCostGate(): { allowed: boolean; reason: string } {
-                if (this.costGovernor.isEmergencyMode()) {
-                        const remaining = this.creditSystem.getCreditsRemaining();
-                        return {
-                                allowed: false,
-                                reason: `Cost governor emergency stop: only ${remaining} credits remaining. ` +
-                                        `Replenish credits or upgrade your tier to resume agent execution. ` +
-                                        `Essential actions (file save, git commit, settings) remain available outside the agent loop.`,
-                        };
-                }
-                if (this.costGovernor.shouldAutoSwitchModel()) {
-                        // Log a recommendation; actual model switching is handled by the
-                        // AI service / user settings. This is informational only for v1.
-                        const cheaper = this.costGovernor.getCheaperModel('default');
-                        if (cheaper) {
-                                this.logService.info(`[AgentLoop][CostGovernor] Credits low (<20% of allocation). Consider switching to ${cheaper} to conserve credits.`);
-                        }
-                }
-                return { allowed: true, reason: '' };
+                return checkCostGate(this.costGovernor, this.creditSystem, this.logService);
         }
 
-        /**
-         * Run sanity checks on a `run_command` tool result and append the findings
-         * to the output so the LLM sees them. If any Critical/Fail results come
-         * back, the tool result is marked as suspicious (the LLM should re-plan).
-         *
-         * Returns the (possibly augmented) output string plus a flag indicating
-         * whether a hallucinated success was detected.
-         */
         private applyCommandSanity(
                 command: string,
                 exitCode: number,
                 stdout: string,
                 stderr: string,
         ): { output: string; suspicious: boolean } {
-                try {
-                        const checks = this.executionSanity.validateCommandResult(command, exitCode, stdout, stderr);
-                        const suspiciousChecks = checks.filter(
-                                c => c.severity === SanitySeverity.Critical || c.severity === SanitySeverity.Fail
-                        );
-                        if (suspiciousChecks.length === 0) {
-                                return { output: stdout + (stderr ? `\n${stderr}` : ''), suspicious: false };
-                        }
-                        const findings = suspiciousChecks
-                                .map(c => `[Sanity ${c.severity}] ${c.checkName}: ${c.message}${c.suggestedAction ? ` (${c.suggestedAction})` : ''}`)
-                                .join('\n');
-                        this.logService.warn(`[AgentLoop][ExecutionSanity] Suspicious command output for "${command}":\n${findings}`);
-                        const baseOutput = stdout + (stderr ? `\n${stderr}` : '') + (exitCode !== 0 ? `\nExit code: ${exitCode}` : '');
-                        return {
-                                output: `${baseOutput}\n\n--- Execution Sanity Findings ---\n${findings}\n--- End Sanity Findings ---\nThe above sanity checks flagged this command's output as suspicious. Re-plan based on the actual output, not on the assumption that the command succeeded.`,
-                                suspicious: true,
-                        };
-                } catch (err) {
-                        // Sanity checks must never break tool execution. Log and fall through.
-                        this.logService.warn(`[AgentLoop][ExecutionSanity] validateCommandResult threw: ${err instanceof Error ? err.message : String(err)}`);
-                        return { output: stdout + (stderr ? `\n${stderr}` : ''), suspicious: false };
-                }
+                return applyCommandSanity(this.executionSanity, this.logService, command, exitCode, stdout, stderr);
         }
 
         get isRunning(): boolean {
@@ -745,27 +694,23 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
 
                                                         // Phase 3: consume credits for successful tool calls.
                                                         // Reads are free; writes/commands consume 1 credit each.
-                                                        // Failures do not consume credits (the user shouldn't pay
+                                                        // Failures do NOT consume credits (the user shouldn't pay
                                                         // for broken tool calls). Fire-and-forget: credit
                                                         // accounting must never block the agent loop. If
                                                         // consumeCredits returns false (insufficient credits),
                                                         // the next round's checkCostGate() will catch it and
                                                         // stop the loop with a recoverable error.
-                                                        if (success) {
-                                                                const actionType = this.mapToolToActionType(event.toolName);
-                                                                try {
-                                                                        const consumed = this.creditSystem.consumeCredits(1, actionType, {
-                                                                                agentType: 'kovix-agent',
-                                                                                sessionId: this._activeSnapshotId ?? undefined,
-                                                                                description: `Agent tool: ${event.toolName}`,
-                                                                        });
-                                                                        if (!consumed) {
-                                                                                this.logService.warn(`[AgentLoop][CostGovernor] consumeCredits returned false for ${event.toolName} -- credits likely exhausted; next round will be blocked by checkCostGate`);
-                                                                        }
-                                                                } catch (err) {
-                                                                        this.logService.warn(`[AgentLoop][CostGovernor] consumeCredits threw for ${event.toolName}: ${err instanceof Error ? err.message : String(err)} -- continuing, gate will catch on next round`);
-                                                                }
-                                                        }
+                                                        //
+                                                        // Phase 4: the consumption logic was extracted to
+                                                        // consumeCreditsForToolCall() in agentLoopHelpers.ts
+                                                        // for unit testability.
+                                                        consumeCreditsForToolCall(
+                                                                this.creditSystem,
+                                                                this.logService,
+                                                                event.toolName,
+                                                                success,
+                                                                this._activeSnapshotId ?? undefined,
+                                                        );
 
                                                         // Store in memory
                                                         if (this.constructMemory.isInitialized && this.constructMemory.config.autoLearn) {
