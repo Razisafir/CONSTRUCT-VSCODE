@@ -20,9 +20,9 @@
  *   one link of the chain. This script catches the rest:
  *
  *     - If someone bumps package.json electron but forgets build/checksums/electron.txt
- *       → checksum verification against the wrong SHASUMS256 file will pass on
+ *       -> checksum verification against the wrong SHASUMS256 file will pass on
  *         hashes that don't actually correspond to the installed Electron.
- *     - If someone bumps Electron major (e.g. 42 → 44) but forgets .nvmrc →
+ *     - If someone bumps Electron major (e.g. 42 -> 44) but forgets .nvmrc ->
  *       the dev Node version may be too old to build native modules for the
  *       new Electron's expected Node-API version.
  *     - If package.json electron uses "^42.4.1" (caret) and a future `npm install`
@@ -162,9 +162,9 @@ if (!fs.existsSync(nvmrcPath)) {
                                 // (>=22.12.0 is the LTS minor recommended for Electron 42).
                                 //
                                 // General rule: Electron N embeds Node (N-20).x -- e.g.
-                                //   Electron 32 → Node 20.x
-                                //   Electron 38 → Node 22.x (Node 22 LTS aligned with Electron 38+)
-                                //   Electron 42 → Node 22.x (still 22.x; Electron 42 is on Node 22.20.0)
+                                //   Electron 32 -> Node 20.x
+                                //   Electron 38 -> Node 22.x (Node 22 LTS aligned with Electron 38+)
+                                //   Electron 42 -> Node 22.x (still 22.x; Electron 42 is on Node 22.20.0)
                                 // For dev/build safety, require Node major >= embedded major.
                                 const expectedNodeMajor = electronMajor >= 38 ? 22 : 20;
                                 const minNodeMinor = expectedNodeMajor === 22 ? 12 : 18;
