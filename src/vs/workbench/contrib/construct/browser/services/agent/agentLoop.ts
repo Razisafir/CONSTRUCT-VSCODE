@@ -47,7 +47,6 @@ import { IConstructToolRegistry } from '../../../../../../platform/construct/com
 // pretend to gate spending; this is the real gate. Execution sanity catches
 // hallucinated success (exit 0 + stderr 'error', empty build output, etc.).
 import { ICostGovernor, ICreditSystem } from '../../../../../../platform/construct/common/pricing/creditSystem.js';
-import { CreditActionType } from '../../../../../../platform/construct/common/pricing/pricingTypes.js';
 import { IExecutionSanityService, SanitySeverity } from '../../../../../../platform/construct/common/executionSanity.js';
 // Phase 4 -- the three Phase 3 helpers (mapToolToActionType, checkCostGate,
 // applyCommandSanity) and the credit-consumption path were extracted to
@@ -305,11 +304,12 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         // file (this.checkCostGate(), this.applyCommandSanity()) while the
         // real logic lives in the extracted module. See agentLoopHelpers.ts
         // for the testable implementations.
+        //
+        // Note: mapToolToActionType does NOT have a wrapper here because it's
+        // only called from consumeCreditsForToolCall() in the extracted module,
+        // which calls the extracted function directly. Keeping a wrapper would
+        // be dead code (the compiler catches this as 'declared but never read').
         // ----------------------------------------------------------------------
-
-        private mapToolToActionType(toolName: string): CreditActionType {
-                return mapToolToActionType(toolName);
-        }
 
         private checkCostGate(): { allowed: boolean; reason: string } {
                 return checkCostGate(this.costGovernor, this.creditSystem, this.logService);
