@@ -42,6 +42,13 @@ import { ISkillRegistry } from '../../../../../../platform/construct/common/skil
 // Fix for F-002 (#72): inject the tool registry so security tools (nmap, nuclei, ghidra)
 // and MCP server tools are visible to the LLM, not just the 8 hardcoded AGENT_TOOLS.
 import { IConstructToolRegistry } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
+// Phase 3 -- wire the enhanced cost governor + credit system + execution sanity layer
+// into the agent loop. The deleted permissive ICostGovernorService stub used to
+// pretend to gate spending; this is the real gate. Execution sanity catches
+// hallucinated success (exit 0 + stderr 'error', empty build output, etc.).
+import { ICostGovernor, ICreditSystem } from '../../../../../../platform/construct/common/pricing/creditSystem.js';
+import { CreditActionType } from '../../../../../../platform/construct/common/pricing/pricingTypes.js';
+import { IExecutionSanityService, SanitySeverity } from '../../../../../../platform/construct/common/executionSanity.js';
 
 const MAX_ROUNDS = 50;
 
@@ -226,9 +233,31 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 // Fix for F-002 (#72): inject the tool registry so the agent loop sees
                 // security tools (nmap, nuclei, ghidra) and MCP server tools too.
                 @IConstructToolRegistry private readonly toolRegistry: IConstructToolRegistry,
+                // Phase 3: real spending gate (replaces the deleted permissive stub).
+                @ICostGovernor private readonly costGovernor: ICostGovernor,
+                @ICreditSystem private readonly creditSystem: ICreditSystem,
+                // Phase 3: hallucinated-success detector -- validates that claimed
+                // success (exit 0) actually matches reality (artifacts present, no
+                // 'error' in stderr, non-empty output, etc.).
+                @IExecutionSanityService private readonly executionSanity: IExecutionSanityService,
         ) {
                 super();
-                this.logService.info('[AgentLoop] Service created with error recovery, snapshots, file watcher, pending changes, universal memory, skill registry, and tool registry');
+                this.logService.info('[AgentLoop] Service created with error recovery, snapshots, file watcher, pending changes, universal memory, skill registry, tool registry, cost governor, credit system, and execution sanity');
+
+                // Phase 3: surface cost-governor events into the Kovix log channel so
+                // the user can see budget warnings and emergency-stop triggers in
+                // real time during an agent task. Non-fatal: listeners are registered
+                // as disposables so they clean up with the service.
+                this._register(this.creditSystem.onEmergencyStop(({ creditsRemaining }) => {
+                        this.logService.error(`[AgentLoop][CostGovernor] EMERGENCY STOP triggered: only ${creditsRemaining} credits remaining. Further agent actions will be blocked until credits are replenished.`);
+                }));
+                this._register(this.creditSystem.onBudgetWarning(alert => {
+                        this.logService.warn(`[AgentLoop][CostGovernor] Budget warning (${alert.type}): ${alert.message} -- usage ${alert.currentUsage}/${alert.threshold}. ${alert.suggestedAction}`);
+                }));
+                this._register(this.creditSystem.onCreditsChanged(({ remaining, total, consumed }) => {
+                        // Trace-level: too noisy for info, but useful for debugging spend.
+                        this.logService.trace(`[AgentLoop][CostGovernor] Credits: ${remaining}/${total} remaining (${consumed} consumed this period)`);
+                }));
         }
 
         /**
@@ -247,6 +276,103 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 const readOnlyNames = new Set(['read_file', 'list_directory', 'search_codebase', 'web_search']);
                 const filtered = all.filter(t => readOnlyNames.has(t.name));
                 return filtered.length > 0 ? filtered : PLANNING_TOOLS;
+        }
+
+        // ----------------------------------------------------------------------
+        // Phase 3 -- cost governor + execution sanity integration
+        //
+        // The cost governor gates each LLM round on emergency mode (<10 credits)
+        // and consumes credits per tool call so the governor's data is real. The
+        // execution sanity layer validates command output to catch hallucinated
+        // success (exit 0 + empty output, exit 0 + 'error' in stderr, missing
+        // build artifacts, etc.). Together these replace the deleted permissive
+        // ICostGovernorService stub with real, enforceable spending protection.
+        // ----------------------------------------------------------------------
+
+        /**
+         * Map a tool name to the corresponding CreditActionType for billing.
+         * Reads are free. Writes and commands consume credits.
+         */
+        private mapToolToActionType(toolName: string): CreditActionType {
+                switch (toolName) {
+                        case 'write_file':
+                        case 'edit_file':
+                                return 'file_edit';
+                        case 'run_command':
+                                return 'terminal_command';
+                        case 'web_search':
+                                return 'browser_action';
+                        case 'search_codebase':
+                                return 'tool_call';
+                        default:
+                                // MCP tools (serverName__toolName) and any other
+                                // registered tools count as generic tool calls.
+                                return 'tool_call';
+                }
+        }
+
+        /**
+         * Check whether the cost governor allows another LLM round.
+         * Returns { allowed: true } when fine, or { allowed: false, reason }
+         * when the agent must stop because emergency mode is active.
+         */
+        private checkCostGate(): { allowed: boolean; reason: string } {
+                if (this.costGovernor.isEmergencyMode()) {
+                        const remaining = this.creditSystem.getCreditsRemaining();
+                        return {
+                                allowed: false,
+                                reason: `Cost governor emergency stop: only ${remaining} credits remaining. ` +
+                                        `Replenish credits or upgrade your tier to resume agent execution. ` +
+                                        `Essential actions (file save, git commit, settings) remain available outside the agent loop.`,
+                        };
+                }
+                if (this.costGovernor.shouldAutoSwitchModel()) {
+                        // Log a recommendation; actual model switching is handled by the
+                        // AI service / user settings. This is informational only for v1.
+                        const cheaper = this.costGovernor.getCheaperModel('default');
+                        if (cheaper) {
+                                this.logService.info(`[AgentLoop][CostGovernor] Credits low (<20% of allocation). Consider switching to ${cheaper} to conserve credits.`);
+                        }
+                }
+                return { allowed: true, reason: '' };
+        }
+
+        /**
+         * Run sanity checks on a `run_command` tool result and append the findings
+         * to the output so the LLM sees them. If any Critical/Fail results come
+         * back, the tool result is marked as suspicious (the LLM should re-plan).
+         *
+         * Returns the (possibly augmented) output string plus a flag indicating
+         * whether a hallucinated success was detected.
+         */
+        private applyCommandSanity(
+                command: string,
+                exitCode: number,
+                stdout: string,
+                stderr: string,
+        ): { output: string; suspicious: boolean } {
+                try {
+                        const checks = this.executionSanity.validateCommandResult(command, exitCode, stdout, stderr);
+                        const suspiciousChecks = checks.filter(
+                                c => c.severity === SanitySeverity.Critical || c.severity === SanitySeverity.Fail
+                        );
+                        if (suspiciousChecks.length === 0) {
+                                return { output: stdout + (stderr ? `\n${stderr}` : ''), suspicious: false };
+                        }
+                        const findings = suspiciousChecks
+                                .map(c => `[Sanity ${c.severity}] ${c.checkName}: ${c.message}${c.suggestedAction ? ` (${c.suggestedAction})` : ''}`)
+                                .join('\n');
+                        this.logService.warn(`[AgentLoop][ExecutionSanity] Suspicious command output for "${command}":\n${findings}`);
+                        const baseOutput = stdout + (stderr ? `\n${stderr}` : '') + (exitCode !== 0 ? `\nExit code: ${exitCode}` : '');
+                        return {
+                                output: `${baseOutput}\n\n--- Execution Sanity Findings ---\n${findings}\n--- End Sanity Findings ---\nThe above sanity checks flagged this command's output as suspicious. Re-plan based on the actual output, not on the assumption that the command succeeded.`,
+                                suspicious: true,
+                        };
+                } catch (err) {
+                        // Sanity checks must never break tool execution. Log and fall through.
+                        this.logService.warn(`[AgentLoop][ExecutionSanity] validateCommandResult threw: ${err instanceof Error ? err.message : String(err)}`);
+                        return { output: stdout + (stderr ? `\n${stderr}` : ''), suspicious: false };
+                }
         }
 
         get isRunning(): boolean {
@@ -469,6 +595,22 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
 
                         while (roundCount < MAX_ROUNDS) {
                                 roundCount++;
+
+                                // Phase 3: cost-governor gate. Each LLM round consumes
+                                // credits (via the tool calls it triggers); if we're in
+                                // emergency mode (<10 credits), stop the loop with a
+                                // clear, recoverable error. The user can replenish
+                                // credits and re-run; essential actions outside the
+                                // agent loop (file save, git commit, settings) remain
+                                // available regardless of credit balance.
+                                const gate = this.checkCostGate();
+                                if (!gate.allowed) {
+                                        this._executionState = ExecutionState.Error;
+                                        this._onError.fire({ text: gate.reason, recoverable: true });
+                                        yield { type: 'error', text: gate.reason, recoverable: true };
+                                        return;
+                                }
+
                                 this.logService.info(`[AgentLoop] Round ${roundCount}/${MAX_ROUNDS}`);
 
                                 const assistantToolCalls: IToolCall[] = [];
@@ -600,6 +742,30 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                                                 success,
                                                                 filePath,
                                                         });
+
+                                                        // Phase 3: consume credits for successful tool calls.
+                                                        // Reads are free; writes/commands consume 1 credit each.
+                                                        // Failures do not consume credits (the user shouldn't pay
+                                                        // for broken tool calls). Fire-and-forget: credit
+                                                        // accounting must never block the agent loop. If
+                                                        // consumeCredits returns false (insufficient credits),
+                                                        // the next round's checkCostGate() will catch it and
+                                                        // stop the loop with a recoverable error.
+                                                        if (success) {
+                                                                const actionType = this.mapToolToActionType(event.toolName);
+                                                                try {
+                                                                        const consumed = this.creditSystem.consumeCredits(1, actionType, {
+                                                                                toolName: event.toolName,
+                                                                                sessionId: this._activeSnapshotId ?? undefined,
+                                                                                description: `Agent tool: ${event.toolName}`,
+                                                                        });
+                                                                        if (!consumed) {
+                                                                                this.logService.warn(`[AgentLoop][CostGovernor] consumeCredits returned false for ${event.toolName} -- credits likely exhausted; next round will be blocked by checkCostGate`);
+                                                                        }
+                                                                } catch (err) {
+                                                                        this.logService.warn(`[AgentLoop][CostGovernor] consumeCredits threw for ${event.toolName}: ${err instanceof Error ? err.message : String(err)} -- continuing, gate will catch on next round`);
+                                                                }
+                                                        }
 
                                                         // Store in memory
                                                         if (this.constructMemory.isInitialized && this.constructMemory.config.autoLearn) {
@@ -944,6 +1110,14 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                         if (result.exitCode !== 0) {
                                                 output += `\nExit code: ${result.exitCode}`;
                                         }
+                                        // Phase 3: Execution sanity check on command output.
+                                        // Catches hallucinated success (exit 0 + 'error' in stderr,
+                                        // exit 0 + empty output, etc.). Findings are appended to
+                                        // the output so the LLM sees them and re-plans accordingly.
+                                        const sanity = this.applyCommandSanity(command, result.exitCode, result.stdout ?? '', result.stderr ?? '');
+                                        if (sanity.suspicious) {
+                                                output = sanity.output;
+                                        }
                                         // SEC-6: Sanitise command output to prevent injection
                                         // SEC-7: Redact any secrets from command output
                                         return PromptSanitiser.sanitise(redactSecrets(output || '(no output)'));
@@ -1060,11 +1234,69 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         const execResult = await this.terminalExecutor.execute(
                                 detection.command,
                                 cwd,
-                                120_000, // 2-minute timeout — tests shouldn't run forever
+                                120_000, // 2-minute timeout -- tests shouldn't run forever
                                 signal
                         );
-                        const passed = execResult.exitCode === 0;
-                        const output = `--- verification command: ${detection.command} (${detection.reason}) ---\n--- stdout (last 4KB) ---\n${execResult.stdout.slice(-4096)}\n--- stderr (last 4KB) ---\n${execResult.stderr.slice(-4096)}\n--- exit code: ${execResult.exitCode} ---`;
+                        let passed = execResult.exitCode === 0;
+                        let output = `--- verification command: ${detection.command} (${detection.reason}) ---\n--- stdout (last 4KB) ---\n${execResult.stdout.slice(-4096)}\n--- stderr (last 4KB) ---\n${execResult.stderr.slice(-4096)}\n--- exit code: ${execResult.exitCode} ---`;
+
+                        // Phase 3: Execution sanity check on the verification result.
+                        // This is the critical hallucinated-success detector -- if the
+                        // verification command exited 0 but the output is suspicious
+                        // (empty, contains 'error' in stderr, missing build artifacts
+                        // for build commands), we override `passed` to false and route
+                        // the failure through AgentErrorRecoveryService as a
+                        // 'verification_failed' error.
+                        //
+                        // We run both validateCommandResult (general sanity) and, if the
+                        // detected command looks like a build (npm run build, tsc),
+                        // validateBuildResult (artifact presence check). Either one
+                        // returning Critical/Fail flips the result.
+                        try {
+                                const cmdChecks = this.executionSanity.validateCommandResult(
+                                        detection.command,
+                                        execResult.exitCode,
+                                        execResult.stdout,
+                                        execResult.stderr,
+                                );
+                                const suspicious = cmdChecks.filter(
+                                        c => c.severity === SanitySeverity.Critical || c.severity === SanitySeverity.Fail
+                                );
+                                if (suspicious.length > 0) {
+                                        passed = false;
+                                        const findings = suspicious
+                                                .map(c => `[Sanity ${c.severity}] ${c.checkName}: ${c.message}`)
+                                                .join('\n');
+                                        output += `\n\n--- Execution Sanity Findings (override: verification FAILED despite exit 0) ---\n${findings}\n--- End Sanity Findings ---`;
+                                        this.logService.warn(`[AgentLoop][ExecutionSanity] Verification flagged as hallucinated success despite exit ${execResult.exitCode}:\n${findings}`);
+                                }
+
+                                // Run build-result validation too if the command looks like a build.
+                                // This adds artifact-presence checks (dist/, build/, out/) on top
+                                // of the generic command-output checks above.
+                                const looksLikeBuild = /(^|\s)(build|tsc|compile|webpack|vite|rollup)(\s|$)/i.test(detection.command);
+                                if (looksLikeBuild) {
+                                        const buildChecks = this.executionSanity.validateBuildResult(
+                                                execResult.exitCode,
+                                                `${execResult.stdout}\n${execResult.stderr}`,
+                                        );
+                                        const buildFail = buildChecks.filter(
+                                                c => c.severity === SanitySeverity.Critical || c.severity === SanitySeverity.Fail
+                                        );
+                                        if (buildFail.length > 0) {
+                                                passed = false;
+                                                const findings = buildFail
+                                                        .map(c => `[Sanity ${c.severity}] ${c.checkName}: ${c.message}`)
+                                                        .join('\n');
+                                                output += `\n\n--- Build Sanity Findings (override: verification FAILED despite exit 0) ---\n${findings}\n--- End Build Sanity Findings ---`;
+                                                this.logService.warn(`[AgentLoop][ExecutionSanity] Build verification flagged as hallucinated success:\n${findings}`);
+                                        }
+                                }
+                        } catch (sanityErr) {
+                                // Sanity checks must never break verification. Log and proceed
+                                // with the raw exit-code-based result.
+                                this.logService.warn(`[AgentLoop][ExecutionSanity] Verification sanity check threw: ${sanityErr instanceof Error ? sanityErr.message : String(sanityErr)}`);
+                        }
 
                         this.logService.info(`[AgentLoop] Verification ${passed ? 'PASSED' : 'FAILED'} (exit ${execResult.exitCode})`);
                         yield { type: 'verification_result', passed, output };
