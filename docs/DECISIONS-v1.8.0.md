@@ -89,10 +89,10 @@ v1.9.0 (wire automatic role dispatch + swarm UI) or v2.0 (port AgentOrchestrator
 
 | File | Lines | Status |
 |------|-------|--------|
-| `src/vs/platform/construct/common/costGovernor.ts` | 54 | Interface only |
+| `src/vs/platform/construct/common/costGovernor.ts` | ~~54~~ | **DELETED 2026-06-25** — was a permissive stub interface (always-true, Infinity ceilings) |
 | `src/vs/platform/construct/common/pricing/creditSystem.ts` | 201 | Interface only |
 | `src/vs/platform/construct/common/pricing/pricingTypes.ts` | 269 | Types (SubscriptionTier, TIER_CONFIG, CreditActionType, DEFAULT_CREDIT_RULES) |
-| `src/vs/workbench/contrib/construct/browser/services/costGovernorService.ts` | 48 | **Permissive stub** — all checks return allow |
+| `src/vs/workbench/contrib/construct/browser/services/costGovernorService.ts` | ~~48~~ | **DELETED 2026-06-25** — was a permissive stub impl (always returned allow) |
 | `src/vs/workbench/contrib/construct/browser/services/pricing/creditSystemService.ts` | 869 | Full CreditSystemService + CostGovernorEnhancedService impl |
 | `src/vs/platform/construct/common/executionSanity.ts` | 189 | Interface only |
 | `src/vs/workbench/contrib/construct/browser/services/executionSanityService.ts` | 585 | Full impl with 7 validation methods |

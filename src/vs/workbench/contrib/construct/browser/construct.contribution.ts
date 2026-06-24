@@ -110,10 +110,12 @@ import { ILanguageFeaturesService } from '../../../../editor/common/services/lan
 import { registerKovixAutocomplete } from '../../../../editor/contrib/construct/browser/kovixInlineCompletionProvider.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { ISkillRegistry } from '../../../../platform/construct/common/skills/skillRegistry.js';
-// Phase 27 port (from recovery/phase-28-launch): Cost Governor + Credit System
-import { ICostGovernorService } from '../../../../platform/construct/common/costGovernor.js';
+// Phase 27 port (from recovery/phase-28-launch): Credit System + enhanced Cost Governor
+// Note: the permissive ICostGovernorService stub (costGovernor.ts / costGovernorService.ts)
+// was deleted 2026-06-25 — it always returned true with Infinity ceilings, which is worse
+// than having no service at all because it gave a false impression of spending-cap protection.
+// The enhanced ICostGovernor (CostGovernorEnhancedService) is the real implementation.
 import { ICreditSystem, ICostGovernor } from '../../../../platform/construct/common/pricing/creditSystem.js';
-import { CostGovernorService } from './services/costGovernorService.js';
 import { CreditSystemService, CostGovernorEnhancedService } from './services/pricing/creditSystemService.js';
 // Phase 4 port (from recovery/phase-28-launch): Execution Sanity Validation
 import { IExecutionSanityService } from '../../../../platform/construct/common/executionSanity.js';
@@ -1062,7 +1064,6 @@ registerSingleton(IConstructSessionService, ConstructSessionServiceImpl, Instant
 // (ILogService, IStorageService, IConfigurationService, IOpenerService, ITelemetryService)
 // are VS Code platform services that already exist on main. No phase-28-launch-specific
 // dependencies. See PART1-ARCHITECTURE-COMPARISON.md §4.2 for port rationale.
-registerSingleton(ICostGovernorService, CostGovernorService, InstantiationType.Delayed);
 registerSingleton(ICreditSystem, CreditSystemService, InstantiationType.Delayed);
 registerSingleton(ICostGovernor, CostGovernorEnhancedService, InstantiationType.Delayed);
 registerSingleton(IExecutionSanityService, ExecutionSanityService, InstantiationType.Delayed);
