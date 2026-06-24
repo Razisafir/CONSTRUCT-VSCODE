@@ -87,6 +87,10 @@ jobs:
           # Electron 32's ABI, then was loaded by Electron 42 at runtime.
           # This check fails the build fast if the pin ever drifts again.
           node build/lib/verify-npmrc-target.js
+          # Phase 1 guard (2026-06-25): verify the FULL pin chain is consistent —
+          # package.json devDependencies.electron + .npmrc target +
+          # build/checksums/electron.txt + .nvmrc Node version.
+          node build/lib/verify-electron-pins.js
 
       - name: Verify native modules load against current ABI
         shell: bash
@@ -327,6 +331,10 @@ jobs:
         shell: bash
         run: node build/lib/verify-npmrc-target.js
 
+      - name: Verify Electron version pin chain (full)
+        shell: bash
+        run: node build/lib/verify-electron-pins.js
+
       - name: Verify native modules load against current ABI
         shell: bash
         run: node build/lib/verify-native-modules.js
@@ -446,6 +454,10 @@ jobs:
       - name: Verify .npmrc target matches resolved Electron version
         shell: bash
         run: node build/lib/verify-npmrc-target.js
+
+      - name: Verify Electron version pin chain (full)
+        shell: bash
+        run: node build/lib/verify-electron-pins.js
 
       - name: Verify native modules load against current ABI
         shell: bash

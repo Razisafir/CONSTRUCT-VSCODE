@@ -73,6 +73,10 @@ jobs:
         shell: bash
         run: node build/lib/verify-npmrc-target.js
 
+      - name: Verify Electron version pin chain (full)
+        shell: bash
+        run: node build/lib/verify-electron-pins.js
+
       - name: Verify native modules load against current ABI
         shell: bash
         run: node build/lib/verify-native-modules.js
@@ -135,6 +139,10 @@ jobs:
       - name: Verify .npmrc target matches resolved Electron version
         shell: bash
         run: node build/lib/verify-npmrc-target.js
+
+      - name: Verify Electron version pin chain (full)
+        shell: bash
+        run: node build/lib/verify-electron-pins.js
 
       - name: Verify native modules load against current ABI
         shell: bash
@@ -216,6 +224,10 @@ jobs:
       - name: Verify .npmrc target matches resolved Electron version
         shell: bash
         run: node build/lib/verify-npmrc-target.js
+
+      - name: Verify Electron version pin chain (full)
+        shell: bash
+        run: node build/lib/verify-electron-pins.js
 
       - name: Verify native modules load against current ABI
         shell: bash
@@ -302,6 +314,10 @@ jobs:
       - name: Verify .npmrc target matches resolved Electron version
         shell: bash
         run: node build/lib/verify-npmrc-target.js
+
+      - name: Verify Electron version pin chain (full)
+        shell: bash
+        run: node build/lib/verify-electron-pins.js
 
       - name: Verify native modules load against current ABI
         shell: bash
