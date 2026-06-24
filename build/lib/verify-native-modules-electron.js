@@ -105,6 +105,7 @@ function main() {
 		'@vscode/policy-watcher',
 		'@vscode/sqlite3',
 		'@vscode/kerberos',
+		'@vscode/spdlog',
 		'native-keymap',
 		'native-watchdog',
 		'sharp',

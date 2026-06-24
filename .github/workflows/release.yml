@@ -78,6 +78,9 @@ jobs:
           npm_config_msvs_version: '2022'
           npm_config_build_from_source: "true"
 
+      - name: Rebuild native modules against Electron ABI
+        shell: bash
+        run: node build/lib/rebuild-native-modules.js
       - name: Verify .npmrc target matches resolved Electron version
         shell: bash
         run: |
@@ -327,6 +330,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Rebuild native modules against Electron ABI
+        shell: bash
+        run: node build/lib/rebuild-native-modules.js
       - name: Verify .npmrc target matches resolved Electron version
         shell: bash
         run: node build/lib/verify-npmrc-target.js
@@ -451,6 +457,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Rebuild native modules against Electron ABI
+        shell: bash
+        run: node build/lib/rebuild-native-modules.js
       - name: Verify .npmrc target matches resolved Electron version
         shell: bash
         run: node build/lib/verify-npmrc-target.js

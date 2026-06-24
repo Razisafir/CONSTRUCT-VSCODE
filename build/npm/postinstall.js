@@ -171,5 +171,33 @@ for (let dir of dirs) {
 	npmInstall(dir, opts);
 }
 
+// Phase 2: Force native module rebuild against the Electron ABI declared
+// in .npmrc. This catches stale cached binaries from prior broken commits
+// (e.g. v1.8.0 shipped with .npmrc target=32.2.6 while package.json declared
+// Electron 42 -- cached node_modules from that era had wrong-ABI .node files).
+// In CI this also runs as an explicit workflow step for log visibility.
+// Skip if SKIP_NATIVE_REBUILD is set (used in sandbox / unit-test-only contexts).
+if (!process.env['SKIP_NATIVE_REBUILD']) {
+	const rebuildScript = path.join(root, 'build', 'lib', 'rebuild-native-modules.js');
+	if (fs.existsSync(rebuildScript)) {
+		console.log('[postinstall] Rebuilding native modules against Electron ABI...');
+		const rebuildResult = cp.spawnSync('node', [rebuildScript], {
+			stdio: 'inherit',
+			cwd: root,
+			env: { ...process.env },
+		});
+		if (rebuildResult.error) {
+			console.error('[postinstall] WARN: failed to spawn rebuild-native-modules:', rebuildResult.error);
+			// Don't fail the whole install -- verify-native-modules.js will catch the broken state.
+		} else if (rebuildResult.status !== 0) {
+			console.error(`[postinstall] WARN: rebuild-native-modules exited with code ${rebuildResult.status}`);
+			console.error('[postinstall]       Subsequent verify-native-modules.js checks will fail with details.');
+			// Don't fail the whole install -- let CI surface the specific failure in the verify step.
+		} else {
+			console.log('[postinstall] Native modules rebuilt successfully.');
+		}
+	}
+}
+
 cp.execSync('git config pull.rebase merges');
 cp.execSync('git config blame.ignoreRevsFile .git-blame-ignore-revs');

@@ -64,6 +64,7 @@ function candidateModules() {
 
 	add('@vscode/kerberos/build/Release/kerberos.node');
 	add('@vscode/sqlite3/build/Release/better_sqlite3.node');
+	add('@vscode/spdlog/build/Release/spdlog.node');
 	add('native-keymap/build/Release/keymapping.node');
 	add('native-watchdog/build/Release/watchdog.node');
 
