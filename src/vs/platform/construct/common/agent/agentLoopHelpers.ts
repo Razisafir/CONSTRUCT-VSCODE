@@ -43,21 +43,21 @@ import { IExecutionSanityService, SanitySeverity } from '../executionSanity.js';
  * Pure function -- no side effects, deterministic.
  */
 export function mapToolToActionType(toolName: string): CreditActionType {
-        switch (toolName) {
-                case 'write_file':
-                case 'edit_file':
-                        return 'file_edit';
-                case 'run_command':
-                        return 'terminal_command';
-                case 'web_search':
-                        return 'browser_action';
-                case 'search_codebase':
-                        return 'tool_call';
-                default:
-                        // MCP tools (serverName__toolName) and any other registered tools
-                        // count as generic tool calls.
-                        return 'tool_call';
-        }
+	switch (toolName) {
+		case 'write_file':
+		case 'edit_file':
+			return 'file_edit';
+		case 'run_command':
+			return 'terminal_command';
+		case 'web_search':
+			return 'browser_action';
+		case 'search_codebase':
+			return 'tool_call';
+		default:
+			// MCP tools (serverName__toolName) and any other registered tools
+			// count as generic tool calls.
+			return 'tool_call';
+	}
 }
 
 // ----------------------------------------------------------------------
@@ -79,28 +79,28 @@ export function mapToolToActionType(toolName: string): CreditActionType {
  * Pure-ish: reads from costGovernor + creditSystem, may write to logService.
  */
 export function checkCostGate(
-        costGovernor: ICostGovernor,
-        creditSystem: ICreditSystem,
-        logService: ILogService,
+	costGovernor: ICostGovernor,
+	creditSystem: ICreditSystem,
+	logService: ILogService,
 ): { allowed: boolean; reason: string } {
-        if (costGovernor.isEmergencyMode()) {
-                const remaining = creditSystem.getCreditsRemaining();
-                return {
-                        allowed: false,
-                        reason: `Cost governor emergency stop: only ${remaining} credits remaining. ` +
-                                `Replenish credits or upgrade your tier to resume agent execution. ` +
-                                `Essential actions (file save, git commit, settings) remain available outside the agent loop.`,
-                };
-        }
-        if (costGovernor.shouldAutoSwitchModel()) {
-                // Log a recommendation; actual model switching is handled by the
-                // AI service / user settings. This is informational only for v1.
-                const cheaper = costGovernor.getCheaperModel('default');
-                if (cheaper) {
-                        logService.info(`[AgentLoop][CostGovernor] Credits low (<20% of allocation). Consider switching to ${cheaper} to conserve credits.`);
-                }
-        }
-        return { allowed: true, reason: '' };
+	if (costGovernor.isEmergencyMode()) {
+		const remaining = creditSystem.getCreditsRemaining();
+		return {
+			allowed: false,
+			reason: `Cost governor emergency stop: only ${remaining} credits remaining. ` +
+				`Replenish credits or upgrade your tier to resume agent execution. ` +
+				`Essential actions (file save, git commit, settings) remain available outside the agent loop.`,
+		};
+	}
+	if (costGovernor.shouldAutoSwitchModel()) {
+		// Log a recommendation; actual model switching is handled by the
+		// AI service / user settings. This is informational only for v1.
+		const cheaper = costGovernor.getCheaperModel('default');
+		if (cheaper) {
+			logService.info(`[AgentLoop][CostGovernor] Credits low (<20% of allocation). Consider switching to ${cheaper} to conserve credits.`);
+		}
+	}
+	return { allowed: true, reason: '' };
 }
 
 // ----------------------------------------------------------------------
@@ -127,40 +127,40 @@ export function checkCostGate(
  * output, not just the suspicious ones. The LLM gets maximum signal.
  */
 export function applyCommandSanity(
-        executionSanity: IExecutionSanityService,
-        logService: ILogService,
-        command: string,
-        exitCode: number,
-        stdout: string,
-        stderr: string,
+	executionSanity: IExecutionSanityService,
+	logService: ILogService,
+	command: string,
+	exitCode: number,
+	stdout: string,
+	stderr: string,
 ): { output: string; suspicious: boolean } {
-        try {
-                const checks = executionSanity.validateCommandResult(command, exitCode, stdout, stderr);
-                // Phase 4 fix: include Warning in the suspicious filter.
-                // Prior code only flagged Critical/Fail, which meant "exit 0 +
-                // empty output" (Warning) was silently dropped.
-                const suspiciousChecks = checks.filter(
-                        c => c.severity === SanitySeverity.Critical
-                                || c.severity === SanitySeverity.Fail
-                                || c.severity === SanitySeverity.Warning,
-                );
-                if (suspiciousChecks.length === 0) {
-                        return { output: stdout + (stderr ? `\n${stderr}` : ''), suspicious: false };
-                }
-                const findings = suspiciousChecks
-                        .map(c => `[Sanity ${c.severity}] ${c.checkName}: ${c.message}${c.suggestedAction ? ` (${c.suggestedAction})` : ''}`)
-                        .join('\n');
-                logService.warn(`[AgentLoop][ExecutionSanity] Suspicious command output for "${command}":\n${findings}`);
-                const baseOutput = stdout + (stderr ? `\n${stderr}` : '') + (exitCode !== 0 ? `\nExit code: ${exitCode}` : '');
-                return {
-                        output: `${baseOutput}\n\n--- Execution Sanity Findings ---\n${findings}\n--- End Sanity Findings ---\nThe above sanity checks flagged this command's output as suspicious. Re-plan based on the actual output, not on the assumption that the command succeeded.`,
-                        suspicious: true,
-                };
-        } catch (err) {
-                // Sanity checks must never break tool execution. Log and fall through.
-                logService.warn(`[AgentLoop][ExecutionSanity] validateCommandResult threw: ${err instanceof Error ? err.message : String(err)}`);
-                return { output: stdout + (stderr ? `\n${stderr}` : ''), suspicious: false };
-        }
+	try {
+		const checks = executionSanity.validateCommandResult(command, exitCode, stdout, stderr);
+		// Phase 4 fix: include Warning in the suspicious filter.
+		// Prior code only flagged Critical/Fail, which meant "exit 0 +
+		// empty output" (Warning) was silently dropped.
+		const suspiciousChecks = checks.filter(
+			c => c.severity === SanitySeverity.Critical
+				|| c.severity === SanitySeverity.Fail
+				|| c.severity === SanitySeverity.Warning,
+		);
+		if (suspiciousChecks.length === 0) {
+			return { output: stdout + (stderr ? `\n${stderr}` : ''), suspicious: false };
+		}
+		const findings = suspiciousChecks
+			.map(c => `[Sanity ${c.severity}] ${c.checkName}: ${c.message}${c.suggestedAction ? ` (${c.suggestedAction})` : ''}`)
+			.join('\n');
+		logService.warn(`[AgentLoop][ExecutionSanity] Suspicious command output for "${command}":\n${findings}`);
+		const baseOutput = stdout + (stderr ? `\n${stderr}` : '') + (exitCode !== 0 ? `\nExit code: ${exitCode}` : '');
+		return {
+			output: `${baseOutput}\n\n--- Execution Sanity Findings ---\n${findings}\n--- End Sanity Findings ---\nThe above sanity checks flagged this command's output as suspicious. Re-plan based on the actual output, not on the assumption that the command succeeded.`,
+			suspicious: true,
+		};
+	} catch (err) {
+		// Sanity checks must never break tool execution. Log and fall through.
+		logService.warn(`[AgentLoop][ExecutionSanity] validateCommandResult threw: ${err instanceof Error ? err.message : String(err)}`);
+		return { output: stdout + (stderr ? `\n${stderr}` : ''), suspicious: false };
+	}
 }
 
 // ----------------------------------------------------------------------
@@ -182,29 +182,29 @@ export function applyCommandSanity(
  * consumeCredits returned false, or threw).
  */
 export function consumeCreditsForToolCall(
-        creditSystem: ICreditSystem,
-        logService: ILogService,
-        toolName: string,
-        success: boolean,
-        sessionId: string | undefined,
+	creditSystem: ICreditSystem,
+	logService: ILogService,
+	toolName: string,
+	success: boolean,
+	sessionId: string | undefined,
 ): boolean {
-        if (!success) {
-                // Failed tool calls do not consume credits.
-                return false;
-        }
-        const actionType = mapToolToActionType(toolName);
-        try {
-                const consumed = creditSystem.consumeCredits(1, actionType, {
-                        agentType: 'kovix-agent',
-                        sessionId: sessionId,
-                        description: `Agent tool: ${toolName}`,
-                });
-                if (!consumed) {
-                        logService.warn(`[AgentLoop][CostGovernor] consumeCredits returned false for ${toolName} -- credits likely exhausted; next round will be blocked by checkCostGate`);
-                }
-                return consumed;
-        } catch (err) {
-                logService.warn(`[AgentLoop][CostGovernor] consumeCredits threw for ${toolName}: ${err instanceof Error ? err.message : String(err)} -- continuing, gate will catch on next round`);
-                return false;
-        }
+	if (!success) {
+		// Failed tool calls do not consume credits.
+		return false;
+	}
+	const actionType = mapToolToActionType(toolName);
+	try {
+		const consumed = creditSystem.consumeCredits(1, actionType, {
+			agentType: 'kovix-agent',
+			sessionId: sessionId,
+			description: `Agent tool: ${toolName}`,
+		});
+		if (!consumed) {
+			logService.warn(`[AgentLoop][CostGovernor] consumeCredits returned false for ${toolName} -- credits likely exhausted; next round will be blocked by checkCostGate`);
+		}
+		return consumed;
+	} catch (err) {
+		logService.warn(`[AgentLoop][CostGovernor] consumeCredits threw for ${toolName}: ${err instanceof Error ? err.message : String(err)} -- continuing, gate will catch on next round`);
+		return false;
+	}
 }
