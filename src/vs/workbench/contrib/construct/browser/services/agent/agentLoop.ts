@@ -53,8 +53,12 @@ import { IExecutionSanityService, SanitySeverity } from '../../../../../../platf
 // agentLoopHelpers.ts for unit testability. AgentLoopService has 22 injected
 // dependencies, making direct instantiation impractical for tests. The
 // extracted helpers take their collaborators as parameters instead.
+//
+// Note: only checkCostGate, applyCommandSanity, and consumeCreditsForToolCall
+// are imported here. mapToolToActionType is called internally by
+// consumeCreditsForToolCall (in the extracted module), so agentLoop.ts
+// does not need to import it directly.
 import {
-        mapToolToActionType,
         checkCostGate,
         applyCommandSanity,
         consumeCreditsForToolCall,
