@@ -755,7 +755,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                                                 const actionType = this.mapToolToActionType(event.toolName);
                                                                 try {
                                                                         const consumed = this.creditSystem.consumeCredits(1, actionType, {
-                                                                                toolName: event.toolName,
+                                                                                agentType: 'kovix-agent',
                                                                                 sessionId: this._activeSnapshotId ?? undefined,
                                                                                 description: `Agent tool: ${event.toolName}`,
                                                                         });
