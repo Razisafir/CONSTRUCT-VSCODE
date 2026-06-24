@@ -20,7 +20,7 @@
  *
  * This script does NOT attempt to dlopen the modules from Node, because
  * native modules built against the Electron ABI cannot be loaded by Node
- * (different NODE_MODULE_VERSION). That's expected and correct — the .npmrc
+ * (different NODE_MODULE_VERSION). That's expected and correct -- the .npmrc
  * target check (verify-npmrc-target.js) is what proves the ABI is right.
  *
  * For the strongest end-to-end verification, run verify-native-modules-electron.js
@@ -77,13 +77,13 @@ function candidateModules() {
 
 	add('@vscode/signature-blake3/build/Release/blake3.node');
 
-	// sharp — per-platform filename
+	// sharp -- per-platform filename
 	if (platform === 'win32' && arch === 'x64') add('sharp/build/Release/sharp-win32-x64.node');
 	else if (platform === 'linux' && arch === 'x64') add('sharp/build/Release/sharp-linux-x64.node');
 	else if (platform === 'darwin' && arch === 'x64') add('sharp/build/Release/sharp-darwin-x64.node');
 	else if (platform === 'darwin' && arch === 'arm64') add('sharp/build/Release/sharp-darwin-arm64.node');
 
-	// onnxruntime-node — per-platform precompiled
+	// onnxruntime-node -- per-platform precompiled
 	if (platform === 'win32' && arch === 'x64') add('onnxruntime-node/bin/napi-v3/win32/x64/onnxruntime_binding.node');
 	else if (platform === 'linux' && arch === 'x64') add('onnxruntime-node/bin/napi-v3/linux/x64/onnxruntime_binding.node');
 	else if (platform === 'darwin' && arch === 'x64') add('onnxruntime-node/bin/napi-v3/darwin/x64/onnxruntime_binding.node');
@@ -113,7 +113,7 @@ function main() {
 		const abs = path.join(repoRoot, 'node_modules', relPath);
 
 		if (!fs.existsSync(abs)) {
-			// Module not installed on this platform / not in this repo — skip, not a failure.
+			// Module not installed on this platform / not in this repo -- skip, not a failure.
 			console.log(`  SKIP  ${relPath}  (not installed)`);
 			skips++;
 			continue;
@@ -130,7 +130,7 @@ function main() {
 		if (!actualMagic.startsWith(expectedMagic)) {
 			console.error(`  FAIL  ${relPath}`);
 			console.error(`        expected magic ${expectedMagic}, got ${actualMagic}`);
-			console.error(`        This file is NOT a valid ${platform} binary — possible cross-platform contamination.`);
+			console.error(`        This file is NOT a valid ${platform} binary -- possible cross-platform contamination.`);
 			console.error(`        (This is exactly the v1.8.0 bug: a linux binary was bundled inside the Windows release.)`);
 			failures++;
 			continue;
@@ -146,7 +146,7 @@ function main() {
 			// `file` not available on all systems (especially Windows); ignore.
 		}
 
-		console.log(`  OK    ${relPath}  (${(stat.size / 1024 / 1024).toFixed(1)} MB) ${fileDesc ? '— ' + fileDesc : ''}`);
+		console.log(`  OK    ${relPath}  (${(stat.size / 1024 / 1024).toFixed(1)} MB) ${fileDesc ? '-- ' + fileDesc : ''}`);
 		passes++;
 	}
 

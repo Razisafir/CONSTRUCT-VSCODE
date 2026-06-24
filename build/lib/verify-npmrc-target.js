@@ -9,7 +9,7 @@
  * Fails the build LOUDLY when the `target=...` pin in .npmrc does not match
  * the actually-resolved Electron version. This is the structural guard against
  * the v1.8.0 bug, where .npmrc pinned `target="32.2.6"` while package.json
- * declared `electron: ^42.4.1` — every native .node module ended up compiled
+ * declared `electron: ^42.4.1` -- every native .node module ended up compiled
  * against Electron 32's ABI and then loaded by an Electron 42 runtime, which
  * crashes every renderer with ERR_DLOPEN_FAILED on Windows.
  *
@@ -58,7 +58,7 @@ if (pinnedTarget !== resolvedVersion) {
 	console.error('');
 	console.error('  Native .node modules built with this .npmrc will be loaded by a');
 	console.error('  different Electron runtime, causing ERR_DLOPEN_FAILED at launch.');
-	console.error('  This is exactly the v1.8.0 bug — see CHANGELOG.md / v1.8.1 notes.');
+	console.error('  This is exactly the v1.8.0 bug -- see CHANGELOG.md / v1.8.1 notes.');
 	console.error('');
 	console.error('  Fix: edit .npmrc and set target="' + resolvedVersion + '"');
 	console.error('  (or run: node build/lib/sync-npmrc-target.js)');

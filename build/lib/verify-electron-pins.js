@@ -8,14 +8,14 @@
  *
  * Verifies the FULL Electron version pin chain is internally consistent:
  *
- *   1. package.json: "electron" field — the version we declare as a dep
- *   2. .npmrc: target="..." — the ABI native modules compile against
- *   3. build/checksums/electron.txt — SHASUMS256 file for the pinned version
- *   4. .nvmrc — Node version used for dev/build (must be compatible with Electron major)
+ *   1. package.json: "electron" field -- the version we declare as a dep
+ *   2. .npmrc: target="..." -- the ABI native modules compile against
+ *   3. build/checksums/electron.txt -- SHASUMS256 file for the pinned version
+ *   4. .nvmrc -- Node version used for dev/build (must be compatible with Electron major)
  *
  * Why this exists:
  *   v1.8.0 shipped with .npmrc target="32.2.6" but package.json electron "^42.4.1"
- *   (resolved to 42.4.1) — every native module ended up built against the wrong
+ *   (resolved to 42.4.1) -- every native module ended up built against the wrong
  *   ABI. v1.8.1 fixed .npmrc + added verify-npmrc-target.js, but that only catches
  *   one link of the chain. This script catches the rest:
  *
@@ -65,9 +65,9 @@ if (!fs.existsSync(pkgJsonPath)) {
 const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
 const pkgElectron = pkgJson.devDependencies && pkgJson.devDependencies.electron;
 if (!pkgElectron) {
-        fail('package.json devDependencies.electron is missing — Electron version must be pinned here.');
+        fail('package.json devDependencies.electron is missing -- Electron version must be pinned here.');
 } else if (pkgElectron.startsWith('^') || pkgElectron.startsWith('~')) {
-        fail(`package.json devDependencies.electron is "${pkgElectron}" — caret/tilde allows silent drift. Pin exact version (e.g. "42.4.1").`);
+        fail(`package.json devDependencies.electron is "${pkgElectron}" -- caret/tilde allows silent drift. Pin exact version (e.g. "42.4.1").`);
 } else {
         ok(`package.json devDependencies.electron = "${pkgElectron}" (exact pin)`);
 }
@@ -103,7 +103,7 @@ if (!fs.existsSync(electronPkgPath)) {
                 fail(`package.json electron ("${pkgElectron}") does not match node_modules/electron ("${resolvedVersion}"). Run \`npm install\` to resync.`);
         }
         if (targetMatch && targetMatch[1] !== resolvedVersion) {
-                fail(`.npmrc target ("${targetMatch[1]}") does not match resolved Electron ("${resolvedVersion}"). This is the v1.8.0 bug — see verify-npmrc-target.js.`);
+                fail(`.npmrc target ("${targetMatch[1]}") does not match resolved Electron ("${resolvedVersion}"). This is the v1.8.0 bug -- see verify-npmrc-target.js.`);
         }
 }
 
@@ -115,7 +115,7 @@ if (!fs.existsSync(checksumsPath)) {
         const checksums = fs.readFileSync(checksumsPath, 'utf8');
         const versionToCheck = resolvedVersion || pkgElectron;
         if (!versionToCheck) {
-                fail('Cannot verify checksums file — no Electron version known (package.json missing electron field and node_modules/electron not installed).');
+                fail('Cannot verify checksums file -- no Electron version known (package.json missing electron field and node_modules/electron not installed).');
         } else {
                 const expectedPrefix = `v${versionToCheck}`;
                 const linesReferencingVersion = checksums
@@ -161,7 +161,7 @@ if (!fs.existsSync(nvmrcPath)) {
                                 // the embedded Node is 22.x. Dev/build should use Node 22.x+
                                 // (>=22.12.0 is the LTS minor recommended for Electron 42).
                                 //
-                                // General rule: Electron N embeds Node (N-20).x — e.g.
+                                // General rule: Electron N embeds Node (N-20).x -- e.g.
                                 //   Electron 32 → Node 20.x
                                 //   Electron 38 → Node 22.x (Node 22 LTS aligned with Electron 38+)
                                 //   Electron 42 → Node 22.x (still 22.x; Electron 42 is on Node 22.20.0)
@@ -171,7 +171,7 @@ if (!fs.existsSync(nvmrcPath)) {
                                 const minNodePatch = 0;
 
                                 if (nodeMajor < expectedNodeMajor) {
-                                        fail(`.nvmrc Node v${nodeMajor}.${nodeMinor}.${nodePatch} is too old for Electron ${electronMajor}. Electron ${electronMajor} embeds Node ${expectedNodeMajor}.x — dev Node must be >= v${expectedNodeMajor}.${minNodeMinor}.${minNodePatch}.`);
+                                        fail(`.nvmrc Node v${nodeMajor}.${nodeMinor}.${nodePatch} is too old for Electron ${electronMajor}. Electron ${electronMajor} embeds Node ${expectedNodeMajor}.x -- dev Node must be >= v${expectedNodeMajor}.${minNodeMinor}.${minNodePatch}.`);
                                 } else if (nodeMajor === expectedNodeMajor && nodeMinor < minNodeMinor) {
                                         fail(`.nvmrc Node v${nodeMajor}.${nodeMinor}.${nodePatch} is too old for Electron ${electronMajor}. Required: >= v${expectedNodeMajor}.${minNodeMinor}.${minNodePatch}.`);
                                 } else {

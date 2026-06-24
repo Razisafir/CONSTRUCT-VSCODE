@@ -29,7 +29,7 @@
  *     run: node build/lib/verify-native-modules-electron.js
  *
  * Note: on Linux CI runners without a display, this script uses
- * `--disable-gpu --no-sandbox` and avoids opening a window — it only needs
+ * `--disable-gpu --no-sandbox` and avoids opening a window -- it only needs
  * the main process to be able to dlopen native modules, which works headless.
  */
 
@@ -95,7 +95,7 @@ function main() {
 		console.error('SKIP: electron binary not found in node_modules/.bin');
 		console.error('      (This is OK if ELECTRON_SKIP_BINARY_DOWNLOAD=1 was set.)');
 		console.error('      This check requires Electron to be installed.');
-		// Don't fail — let the caller decide if this is fatal. In CI for the
+		// Don't fail -- let the caller decide if this is fatal. In CI for the
 		// main release path, Electron IS installed, so this will run.
 		process.exit(0);
 	}
@@ -172,7 +172,7 @@ function main() {
 	if (failures > 0 || probeResult.failures > 0) {
 		console.error('');
 		console.error('Native module load verification (Electron) FAILED.');
-		console.error('This is the v1.8.0 bug class — every renderer would crash with ERR_DLOPEN_FAILED.');
+		console.error('This is the v1.8.0 bug class -- every renderer would crash with ERR_DLOPEN_FAILED.');
 		process.exit(1);
 	}
 	console.log('All native modules loaded successfully inside Electron.');

@@ -40,7 +40,7 @@ const after = before.replace(
 );
 
 if (before === after) {
-	console.error(`ABORT: no \`target="..." line found in .npmrc — nothing to sync.`);
+	console.error(`ABORT: no \`target="..." line found in .npmrc -- nothing to sync.`);
 	process.exit(1);
 }
 
