@@ -107,8 +107,15 @@ console.log('');
 // We pass them explicitly (not just rely on .npmrc) because some CI
 // environments run this script with a clean env that may not have
 // loaded .npmrc into npm_config_* vars yet.
+//
+// CRITICAL: set SKIP_NATIVE_REBUILD=1 to break recursion. 'npm rebuild'
+// runs the root package's postinstall script (node build/npm/postinstall.js),
+// which in turn calls this rebuild script again. Without this flag, we'd
+// infinite-loop. postinstall.js checks SKIP_NATIVE_REBUILD and skips the
+// rebuild call when it's set.
 const env = {
 	...process.env,
+	SKIP_NATIVE_REBUILD: '1',
 	npm_config_target: target,
 	npm_config_runtime: runtime,
 	npm_config_disturl: disturl || '',
