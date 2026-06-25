@@ -73,7 +73,7 @@ class StubCostGovernor implements ICostGovernor {
 			shouldAutoSwitch?: boolean;
 			cheaperModel?: string | undefined;
 		} = {},
-	) {}
+	) { }
 
 	isEmergencyMode(): boolean { return this.opts.emergencyMode ?? false; }
 	shouldAutoSwitchModel(): boolean { return this.opts.shouldAutoSwitch ?? false; }
