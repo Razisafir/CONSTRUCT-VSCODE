@@ -21,6 +21,10 @@
 		"../../src/vs/platform/construct/common/agent/agentLoopHelpers.ts",
 		"../../src/vs/platform/construct/common/executionSanity.ts",
 		"../../src/vs/platform/construct/common/pricing/creditSystem.ts",
-		"../../src/vs/platform/construct/common/pricing/pricingTypes.ts"
+		"../../src/vs/platform/construct/common/pricing/pricingTypes.ts",
+		"../../src/vs/platform/construct/common/security/securityTargetGuard.ts",
+		"../../src/vs/workbench/contrib/construct/browser/tools/security/nmapTool.ts",
+		"../../src/vs/workbench/contrib/construct/browser/tools/security/ghidraTool.ts",
+		"../../src/vs/workbench/contrib/construct/browser/tools/security/nucleiTool.ts"
 	]
 }

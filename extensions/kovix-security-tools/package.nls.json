@@ -1,0 +1,7 @@
+{
+  "displayName": "Kovix Security Tools",
+  "description": "Opt-in security scanning tools (nmap, Ghidra, Nuclei) for the Kovix agent. Disabled by default; activate via the Kovix: Enable Security Tools command or by setting kovix.enableSecurityTools=true.",
+  "commands.enable": "Enable Security Tools",
+  "commands.disable": "Disable Security Tools",
+  "commands.status": "Show Security Tools Status"
+}

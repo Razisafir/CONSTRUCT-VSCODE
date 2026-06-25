@@ -2373,3 +2373,50 @@ Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).regi
         KovixAutocompleteContribution,
         LifecyclePhase.Restored
 );
+
+// --- Phase 5: Security Tools Extension Bridge ---
+//
+// Internal commands used by the Kovix Security Tools extension
+// (extensions/kovix-security-tools) to register/unregister the three
+// security tools (nmap_scan, ghidra_decompile, nuclei_scan) with the
+// core IConstructToolRegistry.
+//
+// The extension calls these commands from its activate() function,
+// gated by the kovix.enableSecurityTools setting. Without the extension
+// installed+activated, these commands are never invoked, so the security
+// tools are never registered, and the agent loop never offers them to
+// the LLM.
+
+registerAction2(class RegisterSecurityToolsAction extends Action2 {
+	constructor() {
+		super({
+			id: '_kovix.toolRegistry.registerSecurityTools',
+			title: localize2('registerSecurityToolsInternal', "[Internal] Register Kovix Security Tools"),
+			f1: false,
+		});
+	}
+	run(accessor: ServicesAccessor): string[] {
+		const registry = accessor.get(IConstructToolRegistry);
+		if (registry instanceof ConstructToolRegistryService) {
+			return registry.registerSecurityTools();
+		}
+		return [];
+	}
+});
+
+registerAction2(class UnregisterSecurityToolsAction extends Action2 {
+	constructor() {
+		super({
+			id: '_kovix.toolRegistry.unregisterSecurityTools',
+			title: localize2('unregisterSecurityToolsInternal', "[Internal] Unregister Kovix Security Tools"),
+			f1: false,
+		});
+	}
+	run(accessor: ServicesAccessor): string[] {
+		const registry = accessor.get(IConstructToolRegistry);
+		if (registry instanceof ConstructToolRegistryService) {
+			return registry.unregisterSecurityTools();
+		}
+		return [];
+	}
+});

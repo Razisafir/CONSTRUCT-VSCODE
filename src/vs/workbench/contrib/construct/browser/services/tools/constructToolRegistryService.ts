@@ -27,6 +27,8 @@ import { ghidraToolDefinition } from '../../tools/security/ghidraTool.js';
 import { nucleiToolDefinition } from '../../tools/security/nucleiTool.js';
 // Browser-safe path utilities
 import * as pathModule from '../../../../../../base/common/path.js';
+// Phase 5: extracted external-target guard (pure functions, unit-tested).
+import { checkExternalTargetAllowed } from '../../../../../../platform/construct/common/security/securityTargetGuard.js';
 
 const MAX_OUTPUT_LENGTH = 100_000; // Characters
 const COMMAND_BLOCKLIST = [
@@ -100,11 +102,21 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
                 // Check for Kali WSL2 (async, non-blocking)
                 this.checkKaliWSL();
 
-                // Security tools — gated by kovix.enableSecurityTools setting
-                const enableSecurityTools = this._configurationService.getValue<boolean>('kovix.enableSecurityTools');
-                if (enableSecurityTools !== false) {
-                        this.registerSecurityTools();
-                }
+                // Phase 5: Security tools (nmap_scan, ghidra_decompile, nuclei_scan)
+                // are NOT auto-registered here. They are registered on-demand by the
+                // Kovix Security Tools extension (extensions/kovix-security-tools)
+                // when BOTH conditions hold:
+                //   1. The extension is installed and enabled (it ships built-in but
+                //      is dormant until the user activates it).
+                //   2. The user has set kovix.enableSecurityTools = true.
+                // The extension calls the _kovix.toolRegistry.registerSecurityTools
+                // command (registered below in registerCommands()) to trigger
+                // registration. Without the extension installed, this setting has
+                // no effect and the LLM is never offered these tools.
+                //
+                // See extensions/kovix-security-tools/src/extension.ts for the
+                // activation logic. See test/unit/construct/services/securityToolsOptIn.test.ts
+                // for the integration test that verifies this behavior.
 
                 this.logService.info('[ToolRegistry] Initialized with ' + this._tools.size + ' built-in tools');
         }
@@ -1684,17 +1696,62 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
 
         // --- Security Tool Registration ---
 
-        private registerSecurityTools(): void {
+        /**
+         * Phase 5: Public entry point for security tool registration.
+         *
+         * Called by the _kovix.toolRegistry.registerSecurityTools command (registered
+         * in construct.contribution.ts) when the Kovix Security Tools extension
+         * activates and kovix.enableSecurityTools = true.
+         *
+         * Returns the list of tool names that were registered, so the caller
+         * (the extension) can confirm registration succeeded.
+         *
+         * Idempotent: if the tools are already registered, this is a no-op.
+         */
+        public registerSecurityTools(): string[] {
+                const registered: string[] = [];
                 // nmap_scan — network port scanner
-                this.registerTool(nmapToolDefinition, async (input) => this.executeNmapScan(input));
+                if (!this._tools.has(nmapToolDefinition.name)) {
+                        this.registerTool(nmapToolDefinition, async (input) => this.executeNmapScan(input));
+                        registered.push(nmapToolDefinition.name);
+                }
 
                 // ghidra_decompile — binary decompiler via Docker
-                this.registerTool(ghidraToolDefinition, async (input) => this.executeGhidraDecompile(input));
+                if (!this._tools.has(ghidraToolDefinition.name)) {
+                        this.registerTool(ghidraToolDefinition, async (input) => this.executeGhidraDecompile(input));
+                        registered.push(ghidraToolDefinition.name);
+                }
 
                 // nuclei_scan — vulnerability scanner
-                this.registerTool(nucleiToolDefinition, async (input) => this.executeNucleiScan(input));
+                if (!this._tools.has(nucleiToolDefinition.name)) {
+                        this.registerTool(nucleiToolDefinition, async (input) => this.executeNucleiScan(input));
+                        registered.push(nucleiToolDefinition.name);
+                }
 
-                this.logService.info('[ToolRegistry] Security tools registered (nmap, ghidra, nuclei)');
+                if (registered.length > 0) {
+                        this.logService.info('[ToolRegistry] Security tools registered: ' + registered.join(', '));
+                }
+                return registered;
+        }
+
+        /**
+         * Phase 5: Public entry point for security tool unregistration.
+         *
+         * Called by the _kovix.toolRegistry.unregisterSecurityTools command when
+         * the user disables the extension or flips kovix.enableSecurityTools to false.
+         */
+        public unregisterSecurityTools(): string[] {
+                const unregistered: string[] = [];
+                for (const name of [nmapToolDefinition.name, ghidraToolDefinition.name, nucleiToolDefinition.name]) {
+                        if (this._tools.has(name)) {
+                                this.unregisterTool(name);
+                                unregistered.push(name);
+                        }
+                }
+                if (unregistered.length > 0) {
+                        this.logService.info('[ToolRegistry] Security tools unregistered: ' + unregistered.join(', '));
+                }
+                return unregistered;
         }
 
         private async executeNmapScan(input: Record<string, unknown>): Promise<IToolResult> {
@@ -1811,47 +1868,19 @@ export class ConstructToolRegistryService extends Disposable implements IConstru
         }
 
         // --- Security: external-target guard (QA-8) ---
+        //
+        // Phase 5: the isExternalTarget() and checkExternalTargetAllowed()
+        // implementations were extracted to
+        // src/vs/platform/construct/common/security/securityTargetGuard.ts
+        // for unit testability. These private wrappers delegate to the
+        // extracted functions so existing call sites in executeNmapScan and
+        // executeNucleiScan continue to work unchanged.
 
-        /**
-         * Returns true if the target is NOT loopback and NOT in a private RFC1918 range.
-         * Used to gate nmap/nuclei scans behind an explicit user opt-in setting.
-         */
-        private isExternalTarget(target: string): boolean {
-                const t = target.trim().toLowerCase();
-                if (t === 'localhost' || t === '::1' || t === '127.0.0.1') { return false; }
-                const host = t.split(':')[0];
-                const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-                if (ipv4) {
-                        const a = +ipv4[1], b = +ipv4[2];
-                        if (a === 10) { return false; }
-                        if (a === 172 && b >= 16 && b <= 31) { return false; }
-                        if (a === 192 && b === 168) { return false; }
-                        if (a === 127) { return false; }
-                        return true;
-                }
-                return true;
-        }
-
-        /**
-         * Returns an error message if the scan should be refused, or undefined if it may proceed.
-         */
         private checkExternalTargetAllowed(target: string): string | undefined {
-                if (!this.isExternalTarget(target)) { return undefined; }
                 const allowed = this._configurationService.getValue<boolean>(
                         'kovix.security.allowExternalTargets'
                 );
-                if (allowed) { return undefined; }
-                return [
-                        `Refusing to scan external target '${target}'.`,
-                        '',
-                        'This is a safety guard: scanning external hosts without explicit permission',
-                        'may be illegal and is blocked by default.',
-                        '',
-                        'To allow external scans, enable the setting:',
-                        '  Settings -> Kovix — Security Tools -> Allow External Targets',
-                        'Or in settings.json:',
-                        '  "kovix.security.allowExternalTargets": true',
-                ].join('\n');
+                return checkExternalTargetAllowed(target, allowed);
         }
 
         // --- Private Helpers ---

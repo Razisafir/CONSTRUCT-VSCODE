@@ -1,0 +1,63 @@
+{
+  "name": "kovix-security-tools",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "version": "0.1.0",
+  "publisher": "razisafir",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "categories": [
+    "Other",
+    "Security"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": false,
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Security tools (nmap, Ghidra, Nuclei) are not available in untrusted workspaces because they can execute arbitrary shell commands against user-supplied targets."
+    }
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension",
+  "contributes": {
+    "commands": [
+      {
+        "command": "kovix-security-tools.enable",
+        "title": "%commands.enable%",
+        "category": "Kovix"
+      },
+      {
+        "command": "kovix-security-tools.disable",
+        "title": "%commands.disable%",
+        "category": "Kovix"
+      },
+      {
+        "command": "kovix-security-tools.status",
+        "title": "%commands.status%",
+        "category": "Kovix"
+      }
+    ],
+    "configuration": {
+      "title": "Kovix Security Tools",
+      "properties": {
+        "kovix-security-tools.sandboxedTargetsOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true (default), nmap and Nuclei scans are restricted to loopback and RFC1918 private ranges unless kovix.security.allowExternalTargets is explicitly enabled. This is the same external-target guard that existed before Phase 5; the setting is exposed here for visibility but the actual enforcement lives in the core registry.",
+          "scope": "application"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "20.x"
+  }
+}

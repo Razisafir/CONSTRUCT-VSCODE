@@ -41,6 +41,12 @@ import { IUniversalMemoryService } from '../../../../../../platform/construct/co
 import { ISkillRegistry } from '../../../../../../platform/construct/common/skills/skillRegistry.js';
 // Fix for F-002 (#72): inject the tool registry so security tools (nmap, nuclei, ghidra)
 // and MCP server tools are visible to the LLM, not just the 8 hardcoded AGENT_TOOLS.
+//
+// Phase 5 update: security tools are now opt-in. They are NOT registered by default
+// and will not appear in listTools() unless the Kovix Security Tools extension is
+// installed+enabled AND kovix.enableSecurityTools=true. The injection here is still
+// correct -- it just surfaces whatever the registry has, which by default excludes
+// the security tools.
 import { IConstructToolRegistry } from '../../../../../../platform/construct/common/tools/constructToolRegistry.js';
 // Phase 3 -- wire the enhanced cost governor + credit system + execution sanity layer
 // into the agent loop. The deleted permissive ICostGovernorService stub used to

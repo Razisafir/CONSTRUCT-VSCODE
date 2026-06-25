@@ -793,7 +793,7 @@ New injection patterns → FILTERED ✅
 ### Known Limitations
 - **No conversation memory between turns.** Each message to the agent starts a fresh context. The agent cannot remember what you said in previous messages. Include relevant context in each message.
 - **`list_directory` is not recursive.** The `recursive` parameter exists in the schema but is not implemented. Only one level of directory contents is returned.
-- **Security tools (nmap, ghidra, nuclei) are not visible to the agent.** They exist in the registry but are not included in the tools sent to the LLM.
+- **Security tools (nmap, ghidra, nuclei) are opt-in as of Phase 5.** They are NOT registered with the agent by default. To enable, install and activate the Kovix Security Tools extension AND set `kovix.enableSecurityTools = true`. Without both, the LLM is never offered these tools. (Pre-Phase-5 status: this doc previously claimed the tools were "not visible to the agent" — that was true before the F-002 fix in PR #72, which made them visible by default. Phase 5 reverted to the safer default-off posture, but for a different reason: legal/AV/IT-policy posture, not a registry bug.)
 - **MCP tools are not dynamically registered with the LLM.** MCP tools can be executed if the LLM uses the `serverName__toolName` format, but the LLM doesn't know about them by default.
 - **`Ctrl+Shift+K` conflicts with VS Code's "Delete Line" command.** You may need to rebind one of them.
 - **`native-keymap` errors on startup** are non-fatal. Install `libxkbfile-dev` and rebuild to resolve.

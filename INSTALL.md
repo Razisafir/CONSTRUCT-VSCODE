@@ -237,11 +237,11 @@ The Ghidra decompilation tool requires Docker to run the headless analyzer:
 curl -fsSL https://get.docker.com | sh  # Linux
 # Or download Docker Desktop for macOS/Windows
 
-# Pull the Ghidra headless image
-docker pull ghidra-headless
+# Pull the official Ghidra image
+docker pull ghidra/ghidra
 
 # Verify
-docker run --rm ghidra-headless analyzeHeadless 2>&1 | head -5
+docker run --rm ghidra/ghidra 2>&1 | head -5
 ```
 
 **Platform Notes:**
@@ -251,13 +251,40 @@ docker run --rm ghidra-headless analyzeHeadless 2>&1 | head -5
 
 ---
 
-## Security Tools
+## Security Tools (Opt-in Extension — Phase 5)
 
-Kovix integrates with security testing tools. These are optional but enhance the security analysis capabilities:
+Kovix integrates with security testing tools (nmap, Ghidra, Nuclei). These are
+**disabled by default** and are not registered with the agent loop on a fresh
+install. The LLM is never offered these tools unless you explicitly enable
+them.
 
-### Nmap — Network Scanner
+### Enabling the security tools
 
-Nmap is used by the `nmap_scan` agent tool for network discovery and security auditing.
+Two steps are required:
+
+1. **Enable the Kovix Security Tools extension** (it ships built-in but dormant):
+   - Open the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+   - Search for "Kovix Security Tools"
+   - Click Enable
+
+2. **Set `kovix.enableSecurityTools = true`** in settings:
+   - Open Settings (`Ctrl+,` / `Cmd+,`)
+   - Search for `kovix.enableSecurityTools`
+   - Check the box
+   - OR run the `Kovix: Enable Security Tools` command from the command palette
+
+When both conditions hold, the extension registers `nmap_scan`,
+`ghidra_decompile`, and `nuclei_scan` with the agent. The agent will then
+offer these tools to the LLM on subsequent rounds.
+
+### Installing the underlying tools
+
+The extension invokes the user-installed nmap, Ghidra, and Nuclei binaries
+at runtime. The tools themselves are NOT redistributed with Kovix.
+
+#### Nmap — Network Scanner
+
+Used by the `nmap_scan` agent tool for network discovery and security auditing.
 
 ```bash
 # Linux (Debian/Ubuntu)
@@ -272,9 +299,9 @@ brew install nmap
 # Windows: download from https://nmap.org/download.html
 ```
 
-### Nuclei — Vulnerability Scanner
+#### Nuclei — Vulnerability Scanner
 
-Nuclei is used by the `nuclei_scan` agent tool for template-based vulnerability scanning.
+Used by the `nuclei_scan` agent tool for template-based vulnerability scanning.
 
 ```bash
 # Requires Go 1.21+
@@ -284,7 +311,31 @@ go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 nuclei --version
 ```
 
-**Important:** All security tools require explicit user confirmation before execution. The agent will always ask for approval before running nmap, nuclei, or Ghidra scans.
+### Safety guards (always on, regardless of extension state)
+
+These guards live in the core `ConstructToolRegistryService` and are NOT
+affected by whether the extension is installed or enabled:
+
+- **nmap / nuclei external-target guard**: refuses to scan non-loopback,
+  non-RFC1918 targets unless `kovix.security.allowExternalTargets = true`
+  is explicitly set (application-scoped, so malicious workspaces cannot
+  enable it without the user's consent).
+- **ghidra workspace-local binary guard**: `assertWithinWorkspace()`
+  enforces that `binary_path` is inside the current workspace root. Cannot
+  decompile arbitrary system binaries.
+
+### Why opt-in?
+
+- **Antivirus / EDR**: enterprise security software (CrowdStrike, SentinelOne,
+  Windows Defender ASR) often flags software that builds `nmap ...` shell
+  commands. Default-off means Kovix's core installer has zero references
+  to nmap/nuclei in its active code path.
+- **Legal posture**: security scanning tools can be misused to scan
+  unauthorized targets. Two-step opt-in shifts the user from "passive
+  recipient" to "active installer" — the same model Kali Linux uses.
+- **Enterprise IT**: corporate policy often blocks software that integrates
+  nmap/nuclei. Default-off lets IT install Kovix core without triggering
+  policy blocks.
 
 ---
 

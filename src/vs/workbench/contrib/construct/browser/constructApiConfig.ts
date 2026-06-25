@@ -119,8 +119,8 @@ const securityConfiguration: IConfigurationNode = {
         properties: {
                 'kovix.enableSecurityTools': {
                         type: 'boolean',
-                        default: true,
-                        description: localize('kovix.enableSecurityTools', "Enable security scanning tools (nmap, Ghidra, Nuclei). When disabled, security tools are not registered."),
+                        default: false,
+                        description: localize('kovix.enableSecurityTools', "Enable security scanning tools (nmap, Ghidra, Nuclei). Phase 5: defaults to false -- security tools are now provided by the Kovix Security Tools extension (extensions/kovix-security-tools). Install and enable the extension, then set this to true to register nmap_scan, ghidra_decompile, and nuclei_scan with the agent. Without the extension installed, this setting has no effect."),
                         scope: 4 /* ConfigurationScope.WINDOW */
                 },
                 'kovix.security.allowExternalTargets': {

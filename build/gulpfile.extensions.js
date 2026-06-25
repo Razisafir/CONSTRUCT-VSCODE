@@ -45,6 +45,8 @@ const compilations = [
 	'extensions/html-language-features/server/tsconfig.json',
 	'extensions/ipynb/tsconfig.json',
 	'extensions/jake/tsconfig.json',
+	// Phase 5: Kovix Security Tools extension (opt-in nmap/Ghidra/Nuclei integration)
+	'extensions/kovix-security-tools/tsconfig.json',
 	'extensions/json-language-features/client/tsconfig.json',
 	'extensions/json-language-features/server/tsconfig.json',
 	'extensions/markdown-language-features/tsconfig.json',

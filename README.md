@@ -238,8 +238,14 @@ Kovix integrates professional security tools with mandatory safety gates (explic
 | Tool | Description | Requires |
 |---|---|---|
 | `nmap_scan` | Network scanning with XML output parsing | `nmap` |
-| `ghidra_decompile` | Binary decompilation via Docker headless Ghidra | Docker + `ghidra-headless` |
+| `ghidra_decompile` | Binary decompilation via Docker headless Ghidra | Docker + `ghidra/ghidra` image |
 | `nuclei_scan` | Template-based vulnerability scanning | `nuclei` |
+
+**Phase 5: These three security tools are disabled by default.** They are
+provided by the Kovix Security Tools extension (`extensions/kovix-security-tools`)
+and require a two-step opt-in: (1) enable the extension, and (2) set
+`kovix.enableSecurityTools = true`. Without both, the agent never offers
+these tools to the LLM. See [INSTALL.md](./INSTALL.md) for details.
 
 ## Architecture
 
@@ -282,7 +288,7 @@ Kovix is built on [Microsoft's Code-OSS](https://github.com/microsoft/vscode), t
 - **Git**
 - For local AI: [Ollama](https://ollama.ai) (recommended) or [LM Studio](https://lmstudio.ai)
 - For Kali terminal (Windows only): WSL2 + Kali Linux from Microsoft Store
-- For Ghidra decompilation: [Docker](https://www.docker.com) + `ghidra-headless` image
+- For Ghidra decompilation: [Docker](https://www.docker.com) + `ghidra/ghidra` image (Phase 5: opt-in extension)
 
 See [INSTALL.md](./INSTALL.md) for detailed platform-specific installation instructions.
 
