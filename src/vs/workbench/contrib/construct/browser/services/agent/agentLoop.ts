@@ -37,6 +37,8 @@ import { redactSecrets } from '../../../../../../platform/construct/common/secur
 // P0-5: In-memory staging for agent-proposed changes
 import { IPendingChangesService } from '../../../../../../platform/construct/common/diff/pendingChanges.js';
 import { IUniversalMemoryService } from '../../../../../../platform/construct/common/memory/universalMemoryService.js';
+// Phase 5.5 (Fix 3): IAutoExtractContext for richer auto-extract.
+import type { IAutoExtractContext } from '../../../../../../platform/construct/common/memory/universalMemoryService.js';
 import { ISkillRegistry } from '../../../../../../platform/construct/common/skills/skillRegistry.js';
 // Fix for F-002 (#72): inject the tool registry so security tools (nmap, nuclei, ghidra)
 // and MCP server tools are visible to the LLM, not just the 8 hardcoded AGENT_TOOLS.
@@ -233,6 +235,15 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         private _currentMilestone: IMilestone | null = null;
         private _milestoneResumeResolver: (() => void) | null = null;
         private _completedMilestoneIds: Set<string> = new Set();
+
+        /**
+         * Phase 5.5 (Fix 3) -- per-task tracking for richer auto-extract.
+         * Cleared at the start of each task (run() or runWithApprovedPlan()),
+         * populated during _executeRounds(), consumed by autoExtractFromTask()
+         * at task completion.
+         */
+        private _taskFailedToolResults: Array<{ toolName: string; input: unknown; result: string }> = [];
+        private _taskFileReadCounts: Map<string, number> = new Map();
 
         constructor(
                 @ILogService private readonly logService: ILogService,
@@ -517,6 +528,10 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 this._onDidStart.fire(task);
                 this.logService.info(`[AgentLoop] Execution started: ${task}`);
 
+                // Phase 5.5 (Fix 3): clear per-task tracking for auto-extract.
+                this._taskFailedToolResults = [];
+                this._taskFileReadCounts.clear();
+
                 try {
                         // Ensure MCP process is connected
                         if (!this.mcpProcess.connected) {
@@ -665,6 +680,23 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                                         }
 
                                                         yield { type: 'tool_result', toolId: event.toolId, toolName: event.toolName, result: toolResult, success };
+
+                                                        // Phase 5.5 (Fix 3): track failed tool results + file reads
+                                                        // for richer auto-extract at task completion.
+                                                        if (!success) {
+                                                                this._taskFailedToolResults.push({
+                                                                        toolName: event.toolName,
+                                                                        input: event.toolInput,
+                                                                        result: toolResult,
+                                                                });
+                                                        }
+                                                        if (event.toolName === 'read_file') {
+                                                                const toolInput = event.toolInput as Record<string, string> | null;
+                                                                const readPath = toolInput?.path ?? '';
+                                                                if (readPath) {
+                                                                        this._taskFileReadCounts.set(readPath, (this._taskFileReadCounts.get(readPath) ?? 0) + 1);
+                                                                }
+                                                        }
 
                                                         // Track file writes for snapshot + file watcher
                                                         let filePath: string | undefined;
@@ -820,8 +852,11 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         }
 
                         // Auto-extract universal memory from completed task
+                        // Phase 5.5 (Fix 3): pass enriched context (conversation history,
+                        // failed tool results, repeated file reads) for richer extraction.
                         if (this.universalMemory && finalSummary) {
-                                this.universalMemory.autoExtractFromTask(task, finalSummary.substring(0, 500)).catch(() => { /* non-critical */ });
+                                const enrichedContext = this.buildAutoExtractContext(task);
+                                this.universalMemory.autoExtractFromTask(task, finalSummary.substring(0, 500), enrichedContext).catch(() => { /* non-critical */ });
                         }
 
                         // Fix for F-003 (#73): remember this turn so the next turn has context.
@@ -885,6 +920,10 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 this._isRunning = true;
                 this._onDidStart.fire(approvedPlan.task);
                 this.logService.info(`[AgentLoop] runWithApprovedPlan started: ${approvedPlan.task} (${approvedPlan.milestones.length} milestones, mode=${pauseMode})`);
+
+                // Phase 5.5 (Fix 3): clear per-task tracking for auto-extract.
+                this._taskFailedToolResults = [];
+                this._taskFileReadCounts.clear();
 
                 try {
                         // Ensure MCP process is connected
@@ -982,8 +1021,10 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                         }
 
                         // Auto-extract universal memory from completed task
+                        // Phase 5.5 (Fix 3): pass enriched context for richer extraction.
                         if (this.universalMemory && aggregatedSummary) {
-                                this.universalMemory.autoExtractFromTask(approvedPlan.task, aggregatedSummary.substring(0, 500)).catch(() => { /* non-critical */ });
+                                const enrichedContext = this.buildAutoExtractContext(approvedPlan.task);
+                                this.universalMemory.autoExtractFromTask(approvedPlan.task, aggregatedSummary.substring(0, 500), enrichedContext).catch(() => { /* non-critical */ });
                         }
 
                         // Update conversation history
@@ -1824,6 +1865,50 @@ Ponytail discipline (DEFAULT: full):
                                 // Non-critical -- file explorer will refresh eventually via watchers
                         }
                 }
+        }
+
+        /**
+         * Phase 5.5 (Fix 3) -- build the IAutoExtractContext for richer memory extraction.
+         *
+         * Called at task completion (from run() and runWithApprovedPlan()) to
+         * pass the agent's accumulated context to universalMemory.autoExtractFromTask().
+         *
+         * Returns undefined if there's nothing useful to extract from (no
+         * conversation history, no failed tool results, no repeated file reads).
+         * In that case, the caller falls back to the basic autoExtractFromTask()
+         * signature (task + summary only).
+         */
+        private buildAutoExtractContext(_task: string): IAutoExtractContext | undefined {
+                // Conversation history (last 20 messages, role + content only)
+                const conversationHistory = this._conversationHistory.slice(-20).map(m => ({
+                        role: m.role,
+                        content: m.content,
+                }));
+
+                // Failed tool results (already accumulated during _executeRounds)
+                const failedToolResults = this._taskFailedToolResults.length > 0
+                        ? this._taskFailedToolResults
+                        : undefined;
+
+                // Repeated file reads (files read more than once)
+                const repeatedFileReads: string[] = [];
+                for (const [path, count] of this._taskFileReadCounts) {
+                        if (count > 1) {
+                                repeatedFileReads.push(path);
+                        }
+                }
+
+                // Only return a context object if at least one field has data.
+                // Otherwise the caller falls back to the basic signature.
+                if (conversationHistory.length === 0 && !failedToolResults && repeatedFileReads.length === 0) {
+                        return undefined;
+                }
+
+                return {
+                        conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
+                        failedToolResults,
+                        repeatedFileReads: repeatedFileReads.length > 0 ? repeatedFileReads : undefined,
+                };
         }
 
         override dispose(): void {

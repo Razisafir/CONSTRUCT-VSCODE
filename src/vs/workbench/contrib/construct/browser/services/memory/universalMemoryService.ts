@@ -8,7 +8,7 @@
 import { Disposable } from '../../../../../../base/common/lifecycle.js';
 import { generateUuid } from '../../../../../../base/common/uuid.js';
 import { ILogService } from '../../../../../../platform/log/common/log.js';
-import { IUniversalMemoryService } from '../../../../../../platform/construct/common/memory/universalMemoryService.js';
+import { IUniversalMemoryService, IAutoExtractContext } from '../../../../../../platform/construct/common/memory/universalMemoryService.js';
 import { IConstructAIService } from '../../../../../../platform/construct/common/llm/constructAIService.js';
 import { IConstructMemoryService } from '../../../../../../platform/construct/common/memory/constructMemory.js';
 import {
@@ -43,7 +43,7 @@ const DEFAULT_CONTEXT_LIMIT = 8;
 /**
  * System prompt used when asking the AI to extract reusable memories from a completed task.
  */
-const AUTO_EXTRACT_SYSTEM_PROMPT = `You are a memory extraction engine. Given a task description and its summary, extract reusable facts, patterns, conventions, or error solutions that would help with future tasks.
+const AUTO_EXTRACT_SYSTEM_PROMPT = `You are a memory extraction engine. Given a task description, its summary, and optional enriched context (conversation history, failed tool results, repeated file reads), extract reusable facts, patterns, conventions, or error solutions that would help with future tasks.
 
 Respond with a JSON array. Each element must have:
 - "content": the fact or pattern (concise, <200 chars)
@@ -51,6 +51,19 @@ Respond with a JSON array. Each element must have:
 - "tags": an array of 1-3 short lowercase tags
 
 If nothing worth remembering, return an empty array: []
+
+Focus on extracting:
+- User preferences (e.g. "User prefers tabs over spaces", "User uses pnpm not npm")
+- Project conventions (e.g. "Project uses Vitest for testing", "Project's build command is 'npm run build'")
+- Error -> solution pairs (e.g. "Module not found errors often fixed by clearing node_modules and reinstalling")
+- Tool usage patterns (e.g. "Agent reads package.json before planning")
+- Project context (e.g. "Project is a VS Code fork", "Project's main language is TypeScript")
+- Architecture decisions (e.g. "Agent uses milestone-based execution with pause/resume")
+
+Do NOT extract:
+- Task-specific details that won't apply to future tasks
+- Verbatim code snippets
+- Sensitive information (API keys, passwords, tokens)
 
 Example:
 [
@@ -176,14 +189,52 @@ export class UniversalMemoryService extends Disposable implements IUniversalMemo
 		return lines.join('\n');
 	}
 
-	async autoExtractFromTask(task: string, summary: string): Promise<void> {
+	async autoExtractFromTask(task: string, summary: string, enrichedContext?: IAutoExtractContext): Promise<void> {
 		if (!this.aiService.activeProvider) {
 			this.logService.debug('[UniversalMemory] Skipping auto-extract — no AI provider available');
 			return;
 		}
 
 		try {
-			const userMessage = `Task: ${task}\n\nSummary:\n${summary}`;
+			// Phase 5.5 (Fix 3): build a richer user message when enrichedContext is provided.
+			// The basic form (task + summary) is preserved for backward compatibility.
+			let userMessage = `Task: ${task}\n\nSummary:\n${summary}`;
+
+			if (enrichedContext) {
+				const parts: string[] = [userMessage];
+
+				// Conversation history (truncated to last 20 messages or 8KB)
+				if (enrichedContext.conversationHistory && enrichedContext.conversationHistory.length > 0) {
+					const history = enrichedContext.conversationHistory.slice(-20);
+					let historyText = history.map(m => `[${m.role}] ${m.content}`).join('\n\n');
+					// Truncate to 8KB to avoid blowing the context window
+					if (historyText.length > 8192) {
+						historyText = historyText.substring(0, 8192) + '\n... (truncated)';
+					}
+					parts.push(`Conversation History (last ${history.length} messages):\n${historyText}`);
+				}
+
+				// Failed tool results (error -> solution pairs)
+				if (enrichedContext.failedToolResults && enrichedContext.failedToolResults.length > 0) {
+					const failures = enrichedContext.failedToolResults.slice(0, 10).map(f => {
+						const inputStr = typeof f.input === 'object'
+							? JSON.stringify(f.input).substring(0, 200)
+							: String(f.input).substring(0, 200);
+						const resultStr = f.result.substring(0, 500);
+						return `Tool: ${f.toolName}\nInput: ${inputStr}\nError: ${resultStr}`;
+					}).join('\n\n');
+					parts.push(`Failed Tool Results (${enrichedContext.failedToolResults.length} total, showing ${Math.min(10, enrichedContext.failedToolResults.length)}):\n${failures}`);
+				}
+
+				// Repeated file reads (project context)
+				if (enrichedContext.repeatedFileReads && enrichedContext.repeatedFileReads.length > 0) {
+					const files = enrichedContext.repeatedFileReads.slice(0, 20).join('\n');
+					parts.push(`Files Read Multiple Times (likely project context):\n${files}`);
+				}
+
+				userMessage = parts.join('\n\n---\n\n');
+			}
+
 			const messages = [
 				{ role: 'system' as const, content: AUTO_EXTRACT_SYSTEM_PROMPT },
 				{ role: 'user' as const, content: userMessage },
@@ -209,7 +260,8 @@ export class UniversalMemoryService extends Disposable implements IUniversalMemo
 				await this.addMemory(item.content, item.category, item.tags);
 			}
 
-			this.logService.info(`[UniversalMemory] Auto-extracted ${extracted.length} memories from task`);
+			const ctxNote = enrichedContext ? ' (enriched)' : '';
+			this.logService.info(`[UniversalMemory] Auto-extracted ${extracted.length} memories from task${ctxNote}`);
 		} catch (error) {
 			const msg = error instanceof Error ? error.message : String(error);
 			this.logService.warn(`[UniversalMemory] Auto-extract failed (non-critical): ${msg}`);
