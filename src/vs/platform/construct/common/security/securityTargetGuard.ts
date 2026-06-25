@@ -6,7 +6,7 @@
 // Kovix proprietary code. See LICENSE.txt for proprietary license terms.
 
 /**
- * securityTargetGuard — pure helpers for the nmap/nuclei external-target
+ * securityTargetGuard -- pure helpers for the nmap/nuclei external-target
  * safety gate (QA-8).
  *
  * Extracted from ConstructToolRegistryService in Phase 5 for unit
@@ -75,7 +75,7 @@ export function checkExternalTargetAllowed(
 		'may be illegal and is blocked by default.',
 		'',
 		'To allow external scans, enable the setting:',
-		'  Settings -> Kovix — Security Tools -> Allow External Targets',
+		'  Settings -> Kovix -- Security Tools -> Allow External Targets',
 		'Or in settings.json:',
 		'  "kovix.security.allowExternalTargets": true',
 	].join('\n');
