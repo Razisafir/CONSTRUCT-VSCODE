@@ -6,10 +6,10 @@
 // Kovix proprietary code. See LICENSE.txt for proprietary license terms.
 
 /**
- * Kovix Security Tools extension — Phase 5.
+ * Kovix Security Tools extension -- Phase 5.
  *
  * This extension provides the three security scanning tools (nmap, Ghidra,
- * Nuclei) to the Kovix agent. It is DISABLED BY DEFAULT — a fresh install
+ * Nuclei) to the Kovix agent. It is DISABLED BY DEFAULT -- a fresh install
  * has the extension files present but the tools are NOT registered with the
  * agent loop. The LLM is never offered these tools unless the user takes
  * explicit opt-in action:
@@ -146,7 +146,7 @@ export function deactivate(): void {
 		try {
 			vscode.commands.executeCommand<string[]>(UNREGISTER_CMD);
 		} catch {
-			// Best effort — ignore.
+			// Best effort -- ignore.
 		}
 		currentlyRegistered = false;
 	}
