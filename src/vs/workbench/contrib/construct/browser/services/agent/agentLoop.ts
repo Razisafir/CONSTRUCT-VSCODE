@@ -69,6 +69,10 @@ import {
         applyCommandSanity,
         consumeCreditsForToolCall,
 } from '../../../../../../platform/construct/common/agent/agentLoopHelpers.js';
+// Phase 5.5 (Fix 1): extracted milestone iteration + pause/resume logic.
+// The runWithApprovedPlan() method delegates to this helper so the core
+// feature is testable without instantiating AgentLoopService's 22 deps.
+import { executeMilestonesWithPauses } from '../../../../../../platform/construct/common/agent/milestoneExecutor.js';
 
 const MAX_ROUNDS = 50;
 
@@ -842,19 +846,365 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         }
 
         /**
-         * Run execution with an approved plan, supporting milestone-based pausing.
+         * Phase 5.5 (Fix 1) -- Run execution with an approved plan, iterating
+         * milestones with real pause/resume support.
+         *
+         * For each milestone in approvedPlan.milestones:
+         *   1. Fire `milestone_reached` + set _currentMilestone + state=Executing
+         *   2. Build a sub-task string from the milestone's SELECTED steps
+         *      (filtered by approvedPlan.steps[i].selected)
+         *   3. Call _executeRounds() for that sub-task (real LLM + tool loop)
+         *   4. Run runVerification() -- the harness-controlled check
+         *   5. If verification failed OR the user selected pause-here:
+         *        - Fire `milestone_paused` + fire _onDidMilestonePause
+         *        - Set _executionState = PausedAtMilestone
+         *        - Assign _milestoneResumeResolver from a new Promise<void>
+         *        - Await the promise (loop blocks until user calls
+         *          resumeFromMilestone() or skipCurrentMilestone())
+         *        - Fire `milestone_resumed` + set _executionState = Executing
+         *   6. Fire `milestone_completed` + add milestone.id to _completedMilestoneIds
+         *
+         * After the last milestone: fire `complete` with aggregated summary.
+         *
+         * Verification failure always triggers a pause (regardless of pauseMode)
+         * so the user can fix the issue and then resume to continue to the next
+         * milestone. Skip from a failed-verification pause proceeds to the next
+         * milestone without re-running the failed one.
          */
         async *runWithApprovedPlan(approvedPlan: IApprovedPlan, signal?: AbortSignal): AsyncGenerator<AgentLoopEvent> {
+                if (this._isRunning) {
+                        yield { type: 'error', text: 'Agent loop is already running.', recoverable: false };
+                        return;
+                }
+
                 const selectedSteps = approvedPlan.steps.filter(s => s.selected);
                 if (selectedSteps.length === 0) {
                         yield { type: 'error', text: 'No steps selected for execution.', recoverable: false };
                         return;
                 }
 
-                const taskDescription = selectedSteps.map(s => `${s.action}: ${s.target}`).join('\n');
-                const enhancedTask = `${approvedPlan.task}\n\nExecute these specific steps:\n${taskDescription}`;
+                const pauseMode = approvedPlan.executionMode ?? 'auto';
+                this._isRunning = true;
+                this._onDidStart.fire(approvedPlan.task);
+                this.logService.info(`[AgentLoop] runWithApprovedPlan started: ${approvedPlan.task} (${approvedPlan.milestones.length} milestones, mode=${pauseMode})`);
 
-                yield* this.run(enhancedTask, signal);
+                try {
+                        // Ensure MCP process is connected
+                        if (!this.mcpProcess.connected) {
+                                await this.mcpProcess.initialize();
+                        }
+
+                        // Create snapshot before task execution (for undo support)
+                        const workspacePath = this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath ?? '.';
+                        try {
+                                const snapshot = await this.snapshotManager.createSnapshot(workspacePath, approvedPlan.task);
+                                this._activeSnapshotId = snapshot.id;
+                                this.logService.info(`[AgentLoop] Snapshot created: ${snapshot.id} (strategy: ${snapshot.strategy})`);
+                        } catch (snapErr) {
+                                this.logService.warn('[AgentLoop] Snapshot creation failed (non-blocking):', snapErr instanceof Error ? snapErr.message : String(snapErr));
+                        }
+
+                        // Start file watcher for real-time refresh
+                        const workspaceRoot = this.workspaceContextService.getWorkspace().folders[0]?.uri;
+                        if (workspaceRoot && !this.fileWatcher.isWatching) {
+                                this.fileWatcher.startWatching(workspaceRoot);
+                        }
+
+                        // Build system prompt (shared across all milestones in this run)
+                        const systemPrompt = await this.buildSystemPrompt(approvedPlan.task, false);
+
+                        // Phase 5.5 (Fix 1): delegate to the extracted milestone executor.
+                        // The helper handles milestone_reached/paused/resumed/completed events
+                        // + the pause/resume await logic. We provide:
+                        //   - executeSubTask: a closure that calls _executeRounds with the
+                        //     right conversation messages + system prompt
+                        //   - runVerification: bound method reference
+                        //   - awaitResume: a closure that awaits _milestoneResumeResolver
+                        //     (assigned by resumeFromMilestone() / skipCurrentMilestone())
+                        //
+                        // State management (_executionState, _currentMilestone,
+                        // _onDidMilestonePause.fire) happens HERE in the wrapper, by
+                        // observing the events the helper yields. This keeps the helper
+                        // pure-ish (no service dependencies) while preserving the
+                        // production state machine.
+                        let aggregatedSummary = '';
+
+                        const helperStream = executeMilestonesWithPauses({
+                                approvedPlan,
+                                signal,
+                                log: (msg: string) => this.logService.info(msg),
+                                executeSubTask: (subTask: string, sig?: AbortSignal) => {
+                                        const conversationMessages: IChatMessage[] = [
+                                                ...this._conversationHistory,
+                                                { role: 'user', content: subTask }
+                                        ];
+                                        return this._executeRounds(subTask, conversationMessages, systemPrompt, sig);
+                                },
+                                runVerification: (sig?: AbortSignal) => this.runVerification(sig),
+                                awaitResume: async (milestone: IMilestone) => {
+                                        // Assign the resume resolver and await it. The helper
+                                        // blocks here until resumeFromMilestone() or
+                                        // skipCurrentMilestone() is called.
+                                        await new Promise<void>((resolve) => {
+                                                this._milestoneResumeResolver = resolve;
+                                        });
+                                },
+                        });
+
+                        for await (const event of helperStream) {
+                                // Observe milestone events to drive production state.
+                                if (event.type === 'milestone_reached') {
+                                        this._executionState = ExecutionState.Executing;
+                                        this._currentMilestone = event.milestone;
+                                } else if (event.type === 'milestone_paused') {
+                                        this._executionState = ExecutionState.PausedAtMilestone;
+                                        this._onDidMilestonePause.fire(event.milestone);
+                                } else if (event.type === 'milestone_resumed') {
+                                        this._executionState = ExecutionState.Executing;
+                                } else if (event.type === 'milestone_completed') {
+                                        this._completedMilestoneIds.add(event.milestone.id);
+                                        this._currentMilestone = null;
+                                } else if (event.type === 'token') {
+                                        aggregatedSummary += event.text;
+                                } else if (event.type === 'complete') {
+                                        aggregatedSummary = event.summary;
+                                }
+                                yield event;
+                        }
+
+                        // All milestones done
+                        this._executionState = ExecutionState.Complete;
+
+                        // Store task summary in memory
+                        if (this.constructMemory.isInitialized && this.constructMemory.config.autoLearn) {
+                                this.constructMemory.addMemory(
+                                        `Task completed: ${approvedPlan.task}. Summary: ${aggregatedSummary.substring(0, 500)}`,
+                                        { type: 'task_summary', task: approvedPlan.task }
+                                ).catch(() => { /* non-critical */ });
+                        }
+
+                        // Auto-extract universal memory from completed task
+                        if (this.universalMemory && aggregatedSummary) {
+                                this.universalMemory.autoExtractFromTask(approvedPlan.task, aggregatedSummary.substring(0, 500)).catch(() => { /* non-critical */ });
+                        }
+
+                        // Update conversation history
+                        this._conversationHistory.push(
+                                { role: 'user', content: approvedPlan.task },
+                                { role: 'assistant', content: aggregatedSummary || 'Task completed.' },
+                        );
+
+                        this._onDidComplete.fire({ summary: aggregatedSummary });
+                } catch (error) {
+                        const msg = error instanceof Error ? error.message : String(error);
+                        this.logService.error(`[AgentLoop] runWithApprovedPlan error: ${msg}`);
+                        this._onError.fire({ text: msg, recoverable: false });
+                        yield { type: 'error', text: msg, recoverable: false };
+                } finally {
+                        this._isRunning = false;
+                        this._activeSnapshotId = null;
+                        this._currentMilestone = null;
+                        this._milestoneResumeResolver = null;
+                }
+        }
+
+        /**
+         * Phase 5.5 (Fix 1) -- Extracted inner round-loop.
+         *
+         * Runs the LLM-call -> tool-execution -> check-stop cycle for a single
+         * sub-task (one milestone's worth of work). Does NOT do: snapshot
+         * creation, file watcher start, verification, memory storage, or
+         * _isRunning toggling -- those are the caller's responsibility.
+         *
+         * Yields AgentLoopEvents for real-time UI updates. Returns when the
+         * LLM emits end_turn or no tool calls (milestone sub-task done), or
+         * when MAX_ROUNDS is hit, or when signal is aborted.
+         *
+         * Cost-governor gate is checked per round (same as run()).
+         */
+        private async *_executeRounds(
+                task: string,
+                conversationMessages: IChatMessage[],
+                systemPrompt: string,
+                signal?: AbortSignal,
+        ): AsyncGenerator<AgentLoopEvent> {
+                let roundCount = 0;
+
+                while (roundCount < MAX_ROUNDS) {
+                        roundCount++;
+
+                        // Phase 3: cost-governor gate.
+                        const gate = this.checkCostGate();
+                        if (!gate.allowed) {
+                                this._executionState = ExecutionState.Error;
+                                this._onError.fire({ text: gate.reason, recoverable: true });
+                                yield { type: 'error', text: gate.reason, recoverable: true };
+                                return;
+                        }
+
+                        this.logService.info(`[AgentLoop] Round ${roundCount}/${MAX_ROUNDS} (milestone sub-task)`);
+
+                        const assistantToolCalls: IToolCall[] = [];
+                        const toolResults: { toolUseId: string; toolName: string; result: string; success: boolean; filePath?: string }[] = [];
+                        let currentText = '';
+                        let stopReason = '';
+                        let hasToolCalls = false;
+
+                        const timeoutController = new AbortController();
+                        const timeoutId = setTimeout(() => timeoutController.abort(), 60_000);
+                        if (signal) {
+                                signal.addEventListener('abort', () => timeoutController.abort());
+                        }
+
+                        const stream = this.aiService.chat(
+                                conversationMessages,
+                                this.getAgentTools(),
+                                { signal: timeoutController.signal, systemPrompt }
+                        );
+
+                        for await (const event of stream) {
+                                if (signal?.aborted) {
+                                        clearTimeout(timeoutId);
+                                        yield { type: 'error', text: '[STOP] Stopped by user', recoverable: false };
+                                        return;
+                                }
+
+                                switch (event.type) {
+                                        case 'token':
+                                                currentText += event.text;
+                                                yield { type: 'token', text: event.text };
+                                                break;
+
+                                        case 'tool_start':
+                                                hasToolCalls = true;
+                                                assistantToolCalls.push({
+                                                        id: event.toolId,
+                                                        name: event.toolName,
+                                                        arguments: '{}',
+                                                });
+                                                yield { type: 'tool_start', toolId: event.toolId, toolName: event.toolName };
+                                                break;
+
+                                        case 'tool_input':
+                                                yield { type: 'tool_executing', toolId: event.toolId, toolName: '', detail: event.text };
+                                                break;
+
+                                        case 'tool_end': {
+                                                const toolCall = assistantToolCalls.find(tc => tc.id === event.toolId);
+                                                if (toolCall) {
+                                                        toolCall.arguments = JSON.stringify(event.toolInput ?? {});
+                                                }
+
+                                                yield { type: 'tool_executing', toolId: event.toolId, toolName: event.toolName, detail: 'Executing...' };
+
+                                                let toolResult = await this.executeTool(event.toolName, event.toolInput, false);
+                                                let success = !toolResult.startsWith('Error:');
+
+                                                if (!success && this.errorRecovery) {
+                                                        const stepError = this.errorRecovery.classifyError(
+                                                                event.toolName,
+                                                                event.toolInput,
+                                                                toolResult,
+                                                                undefined,
+                                                                undefined
+                                                        );
+                                                        this.logService.info(`[AgentLoop] Step error classified: ${stepError.errorType} for tool ${event.toolName}`);
+
+                                                        const recoveryResult = await this.errorRecovery.attemptRecovery(stepError);
+                                                        if (recoveryResult.strategy === 'retry' && !recoveryResult.success) {
+                                                                const errorContext = this.errorRecovery.buildErrorContext(stepError, [toolResult]);
+                                                                this.logService.info(`[AgentLoop] Injecting error context for retry: ${stepError.errorType}`);
+                                                                toolResult = `${toolResult}\n\n${errorContext}`;
+                                                        } else if (recoveryResult.strategy === 'abort') {
+                                                                yield { type: 'error', text: `Step failed and user chose to abort: ${stepError.message}`, recoverable: false };
+                                                                return;
+                                                        }
+                                                }
+
+                                                yield { type: 'tool_result', toolId: event.toolId, toolName: event.toolName, result: toolResult, success };
+
+                                                let filePath: string | undefined;
+                                                if ((event.toolName === 'write_file' || event.toolName === 'edit_file') && success) {
+                                                        const toolInput = event.toolInput as Record<string, string> | null;
+                                                        filePath = toolInput?.path ?? '';
+                                                        if (filePath) {
+                                                                yield { type: 'file_written', filePath };
+
+                                                                if (this._activeSnapshotId) {
+                                                                        try {
+                                                                                const exists = await this.diffApplier.exists(filePath);
+                                                                                if (exists) {
+                                                                                        this.snapshotManager.trackFileModified(this._activeSnapshotId, filePath);
+                                                                                } else {
+                                                                                        this.snapshotManager.trackFileCreated(this._activeSnapshotId, filePath);
+                                                                                }
+                                                                        } catch {
+                                                                                this.snapshotManager.trackFileCreated(this._activeSnapshotId, filePath);
+                                                                        }
+                                                                }
+
+                                                                const fileUri = URI.file(filePath);
+                                                                this.fileWatcher.notifyAgentFileCreated(fileUri);
+                                                        }
+                                                }
+
+                                                toolResults.push({
+                                                        toolUseId: event.toolId,
+                                                        toolName: event.toolName,
+                                                        result: toolResult,
+                                                        success,
+                                                        filePath,
+                                                });
+
+                                                consumeCreditsForToolCall(
+                                                        this.creditSystem,
+                                                        this.logService,
+                                                        event.toolName,
+                                                        success,
+                                                        this._activeSnapshotId ?? undefined,
+                                                );
+
+                                                if (this.constructMemory.isInitialized && this.constructMemory.config.autoLearn) {
+                                                        this.constructMemory.addMemory(
+                                                                `Tool ${event.toolName}: ${JSON.stringify(event.toolInput)} -> ${success ? 'Success' : 'Failed'}`,
+                                                                { type: 'tool_result', toolName: event.toolName, taskId: task }
+                                                        ).catch(() => { /* non-critical */ });
+                                                }
+                                                break;
+                                        }
+
+                                        case 'done':
+                                                stopReason = event.stopReason;
+                                                break;
+
+                                        case 'error':
+                                                yield { type: 'error', text: event.text, recoverable: true };
+                                                break;
+                                }
+                        }
+
+                        clearTimeout(timeoutId);
+
+                        if (hasToolCalls && toolResults.length > 0) {
+                                conversationMessages.push({
+                                        role: 'assistant',
+                                        content: currentText || '(executing tools)',
+                                        toolCalls: assistantToolCalls.length > 0 ? assistantToolCalls : undefined
+                                });
+
+                                for (const tr of toolResults) {
+                                        conversationMessages.push({
+                                                role: 'tool',
+                                                content: tr.result,
+                                                toolCallId: tr.toolUseId,
+                                        });
+                                }
+                        }
+
+                        if (stopReason === 'end_turn' || !hasToolCalls) {
+                                break;
+                        }
+                }
         }
 
         /**
