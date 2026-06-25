@@ -41,18 +41,8 @@ import { IBrowserAutomationService } from '../../../../platform/construct/common
 import { MCPServerManagerService } from './services/mcp/mcpServerManagerService.js';
 import { MCPMarketplaceService } from './services/mcp/mcpMarketplaceService.js';
 import { BrowserAutomationService } from './services/mcp/browserAutomationService.js';
-import { IWorkingMemoryService } from '../../../../platform/construct/common/memory/workingMemory.js';
-import { IEpisodicMemoryService } from '../../../../platform/construct/common/memory/episodicMemory.js';
-import { ISemanticMemoryService } from '../../../../platform/construct/common/memory/semanticMemory.js';
-import { IProceduralMemoryService } from '../../../../platform/construct/common/memory/proceduralMemory.js';
-import { IMemoryOrchestrator } from '../../../../platform/construct/common/memory/memoryOrchestrator.js';
 import { IEmbeddingService } from '../../../../platform/construct/common/memory/embeddingService.js';
 import { IConstructMemoryService } from '../../../../platform/construct/common/memory/constructMemory.js';
-import { WorkingMemoryService } from './services/memory/workingMemoryService.js';
-import { EpisodicMemoryService } from './services/memory/episodicMemoryService.js';
-import { SemanticMemoryService } from './services/memory/semanticMemoryService.js';
-import { ProceduralMemoryService } from './services/memory/proceduralMemoryService.js';
-import { MemoryOrchestratorService } from './services/memory/memoryOrchestratorService.js';
 import { EmbeddingService } from './services/memory/embeddingService.js';
 import { ConstructMemoryService } from './services/memory/constructMemoryService.js';
 import { INotificationService } from '../../../../platform/notification/common/notification.js';
@@ -718,12 +708,7 @@ registerSingleton(IMCPMarketplace, MCPMarketplaceService, InstantiationType.Dela
 registerSingleton(IBrowserAutomationService, BrowserAutomationService, InstantiationType.Delayed);
 
 // --- Memory Architecture Singletons (Phase 19) ---------------------------------
-registerSingleton(IWorkingMemoryService, WorkingMemoryService, InstantiationType.Delayed);
-registerSingleton(IEpisodicMemoryService, EpisodicMemoryService, InstantiationType.Delayed);
 registerSingleton(IEmbeddingService, EmbeddingService, InstantiationType.Delayed);
-registerSingleton(ISemanticMemoryService, SemanticMemoryService, InstantiationType.Delayed);
-registerSingleton(IProceduralMemoryService, ProceduralMemoryService, InstantiationType.Delayed);
-registerSingleton(IMemoryOrchestrator, MemoryOrchestratorService, InstantiationType.Delayed);
 
 // --- Supermemory Integration Singleton (Phase 19+) ----------------------------
 registerSingleton(IConstructMemoryService, ConstructMemoryService, InstantiationType.Delayed);

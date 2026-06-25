@@ -7,7 +7,6 @@
 
 import { IViewPaneOptions, ViewPane } from '../../../../workbench/browser/parts/views/viewPane.js';
 import * as dom from '../../../../base/browser/dom.js';
-import { IMemoryOrchestrator } from '../../../../platform/construct/common/memory/memoryOrchestrator.js';
 import { IConstructMemoryService } from '../../../../platform/construct/common/memory/constructMemory.js';
 import { IAgentLoop, IPlanResult } from '../../../../platform/construct/common/agent/agentLoop.js';
 import { IConstructAIService } from '../../../../platform/construct/common/llm/constructAIService.js';
@@ -153,7 +152,6 @@ export class ConstructAgentViewPane extends ViewPane {
                 @IThemeService themeService: IThemeService,
                 @ITelemetryService telemetryService: ITelemetryService,
                 @IHoverService hoverService: IHoverService,
-                @IMemoryOrchestrator _memoryOrchestrator: IMemoryOrchestrator,
                 @IConstructMemoryService private readonly constructMemory: IConstructMemoryService,
                 @IAgentLoop private readonly agentLoop: IAgentLoop,
                 @IConstructAIService private readonly aiService: IConstructAIService,

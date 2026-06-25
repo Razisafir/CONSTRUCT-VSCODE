@@ -21,7 +21,6 @@ import { ITerminalExecutor, isInterpreterCommand } from '../../../../../../platf
 import { IDialogService } from '../../../../../../platform/dialogs/common/dialogs.js';
 import Severity from '../../../../../../base/common/severity.js';
 import { IDiffApplier } from '../../../../../../platform/construct/common/editor/diffApplier.js';
-import { IMemoryOrchestrator } from '../../../../../../platform/construct/common/memory/memoryOrchestrator.js';
 import { IConstructMemoryService } from '../../../../../../platform/construct/common/memory/constructMemory.js';
 import { ICommandService } from '../../../../../../platform/commands/common/commands.js';
 import { IFileService } from '../../../../../../platform/files/common/files.js';
@@ -241,7 +240,6 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 @IMCPProcess private readonly mcpProcess: IMCPProcess,
                 @ITerminalExecutor private readonly terminalExecutor: ITerminalExecutor,
                 @IDiffApplier private readonly diffApplier: IDiffApplier,
-                @IMemoryOrchestrator private readonly memoryOrchestrator: IMemoryOrchestrator,
                 @IConstructMemoryService private readonly constructMemory: IConstructMemoryService,
                 @IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
                 @ICommandService private readonly commandService: ICommandService,
@@ -266,7 +264,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 @IExecutionSanityService private readonly executionSanity: IExecutionSanityService,
         ) {
                 super();
-                this.logService.info('[AgentLoop] Service created with error recovery, snapshots, file watcher, pending changes, universal memory, skill registry, tool registry, cost governor, credit system, and execution sanity');
+                this.logService.info('[AgentLoop] Service created with error recovery, snapshots, file watcher, pending changes, universal memory, skill registry, tool registry, cost governor, credit system, and execution sanity (Phase 5.5: 4-layer memory orchestrator removed as dead infrastructure)');
 
                 // Phase 3: surface cost-governor events into the Kovix log channel so
                 // the user can see budget warnings and emergency-stop triggers in
@@ -1659,8 +1657,8 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
 
         /**
          * Build the system prompt with memory context injected.
-         * Calls memoryOrchestrator.injectContextIntoPrompt() to include
-         * Supermemory persistent context and local four-layer memory.
+         * Phase 5.5 (Fix 2): memoryOrchestrator removed (dead infrastructure).
+         * UniversalMemory (queried below) is the real persistent memory.
          */
         private async buildSystemPrompt(task: string, planningOnly: boolean): Promise<string> {
                 const workspacePath = this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath ?? '.';
@@ -1721,18 +1719,11 @@ Ponytail discipline (DEFAULT: full):
   framework, plugin system, or config layer, don't add one. Escalate to bigger
   architecture only when the task explicitly requires it.`;
 
-                // Inject memory context from MemoryOrchestrator (Supermemory + local layers)
-                // SEC-6: Sanitise memory context before injection to prevent prompt injection
-                if (this.memoryOrchestrator) {
-                        try {
-                                const projectId = this.workspaceContextService.getWorkspace().folders[0]?.name ?? 'default';
-                                prompt = await this.memoryOrchestrator.injectContextIntoPrompt(prompt, projectId);
-                                // SEC-6: Sanitise the entire prompt after memory injection
-                                // We only sanitise the memory-injected portion, not the system prompt itself
-                        } catch (error) {
-                                this.logService.warn('[AgentLoop] Memory context injection failed, using base prompt:', error instanceof Error ? error.message : String(error));
-                        }
-                }
+                // Phase 5.5 (Fix 2): memoryOrchestrator removed (dead infrastructure -- the
+                // 4-layer memory was never populated, and the orchestrator's
+                // injectContextIntoPrompt() was reading from empty in-memory Maps).
+                // UniversalMemory (queried below) is the real persistent memory and remains.
+                // Supermemory cloud memory (IConstructMemoryService) is opt-in and also remains.
 
                 // Inject universal memory context (cross-project knowledge)
                 if (this.universalMemory) {

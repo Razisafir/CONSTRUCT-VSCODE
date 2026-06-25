@@ -9,8 +9,6 @@ import { IViewPaneOptions, ViewPane } from '../../../../workbench/browser/parts/
 import * as dom from '../../../../base/browser/dom.js';
 import { IConstructMemoryService, IConstructMemoryItem, IConstructMemoryProfile } from '../../../../platform/construct/common/memory/constructMemory.js';
 import { ILogService } from '../../../../platform/log/common/log.js';
-import { IMemoryOrchestrator } from '../../../../platform/construct/common/memory/memoryOrchestrator.js';
-import { IMemoryStats } from '../../../../platform/construct/common/memory/memoryTypes.js';
 import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
 import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
@@ -58,12 +56,12 @@ export class ConstructMemoryViewPane extends ViewPane {
                 private profile: IConstructMemoryProfile = { static: [], dynamic: [] };
                 private recentMemories: IConstructMemoryItem[] = [];
                 private currentFilter: string = '';
-                private localStats: IMemoryStats | null = null;
+                private localStats: { totalEntries: number } | null = null;
 
                 constructor(
                                 options: IViewPaneOptions,
                                 @IConstructMemoryService private readonly constructMemory: IConstructMemoryService,
-                                @IMemoryOrchestrator private readonly memoryOrchestrator: IMemoryOrchestrator,
+                                @IUniversalMemoryService private readonly universalMemory: IUniversalMemoryService,
                                 @ILogService private readonly logService: ILogService,
                                 @IKeybindingService keybindingService: IKeybindingService,
                                 @IContextMenuService contextMenuService: IContextMenuService,
@@ -184,7 +182,14 @@ export class ConstructMemoryViewPane extends ViewPane {
                                                 // Load local stats
                                                 const projectId = 'default';
                                                 try {
-                                                                this.localStats = this.memoryOrchestrator.getMemoryStats(projectId);
+                                                                // Phase 5.5 (Fix 2): use universalMemory (real persistent store) instead of
+								// the dead 4-layer orchestrator. The orchestrator's getMemoryStats()
+								// was reading from empty in-memory Maps, so this is an improvement.
+								this.localStats = null;
+								this.universalMemory.getStats().then(stats => {
+									this.localStats = { totalEntries: stats.totalEntries };
+									this.renderStats();
+								}).catch(() => { /* non-critical */ });
                                                 } catch {
                                                                 this.localStats = null;
                                                 }
