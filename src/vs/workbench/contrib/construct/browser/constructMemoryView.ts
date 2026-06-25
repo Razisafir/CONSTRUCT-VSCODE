@@ -8,6 +8,7 @@
 import { IViewPaneOptions, ViewPane } from '../../../../workbench/browser/parts/views/viewPane.js';
 import * as dom from '../../../../base/browser/dom.js';
 import { IConstructMemoryService, IConstructMemoryItem, IConstructMemoryProfile } from '../../../../platform/construct/common/memory/constructMemory.js';
+import { IUniversalMemoryService } from '../../../../platform/construct/common/memory/universalMemoryService.js';
 import { ILogService } from '../../../../platform/log/common/log.js';
 import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
 import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
@@ -180,19 +181,14 @@ export class ConstructMemoryViewPane extends ViewPane {
                                                 }
 
                                                 // Load local stats
-                                                const projectId = 'default';
-                                                try {
-                                                                // Phase 5.5 (Fix 2): use universalMemory (real persistent store) instead of
-								// the dead 4-layer orchestrator. The orchestrator's getMemoryStats()
-								// was reading from empty in-memory Maps, so this is an improvement.
-								this.localStats = null;
-								this.universalMemory.getStats().then(stats => {
-									this.localStats = { totalEntries: stats.totalEntries };
-									this.renderStats();
-								}).catch(() => { /* non-critical */ });
-                                                } catch {
-                                                                this.localStats = null;
-                                                }
+                                                // Phase 5.5 (Fix 2): use universalMemory (real persistent store) instead of
+                                                // the dead 4-layer orchestrator. The orchestrator's getMemoryStats()
+                                                // was reading from empty in-memory Maps, so this is an improvement.
+                                                this.localStats = null;
+                                                this.universalMemory.getStats().then((stats: { totalEntries: number }) => {
+                                                        this.localStats = { totalEntries: stats.totalEntries };
+                                                        this.renderStats();
+                                                }).catch(() => { /* non-critical */ });
 
                                                 this.renderTree();
                                                 this.renderStats();
@@ -480,45 +476,18 @@ export class ConstructMemoryViewPane extends ViewPane {
                                 }
 
                                 // Workspace context (from local stats)
-                                if (this.localStats) {
-                                                const layers = this.localStats.entriesByLayer;
-                                                if (layers.working > 0) {
-                                                                items.push({
-                                                                                id: 'ws-working',
-                                                                                label: `Working Memory: ${layers.working} active context`,
-                                                                                icon: '[DIR]',
-                                                                                iconColor: 'var(--kovix-text-tertiary)',
-                                                                                category: MemoryCategory.WorkspaceContext,
-                                                                                fullContent: `Working memory has ${layers.working} active context(s) with ${this.localStats.totalEntries} total entries across all layers.`,
-                                                                });
-                                                }
-                                                if (layers.episodic > 0) {
-                                                                items.push({
-                                                                                id: 'ws-episodic',
-                                                                                label: `Episodic: ${layers.episodic} recorded events`,
-                                                                                icon: '[DIR]',
-                                                                                iconColor: 'var(--kovix-text-tertiary)',
-                                                                                category: MemoryCategory.WorkspaceContext,
-                                                                });
-                                                }
-                                                if (layers.semantic > 0) {
-                                                                items.push({
-                                                                                id: 'ws-semantic',
-                                                                                label: `Semantic: ${layers.semantic} knowledge entries`,
-                                                                                icon: '[DIR]',
-                                                                                iconColor: 'var(--kovix-text-tertiary)',
-                                                                                category: MemoryCategory.WorkspaceContext,
-                                                                });
-                                                }
-                                                if (layers.procedural > 0) {
-                                                                items.push({
-                                                                                id: 'ws-procedural',
-                                                                                label: `Procedural: ${layers.procedural} learned patterns`,
-                                                                                icon: '[DIR]',
-                                                                                iconColor: 'var(--kovix-text-tertiary)',
-                                                                                category: MemoryCategory.WorkspaceContext,
-                                                                });
-                                                }
+                                // Phase 5.5 (Fix 2): the 4-layer memory (working/episodic/semantic/procedural)
+                                // was deleted as dead infrastructure. The orchestrator that populated
+                                // entriesByLayer was reading from empty Maps. We now show only the
+                                // totalEntries count from universalMemory (the real persistent store).
+                                if (this.localStats && this.localStats.totalEntries > 0) {
+                                                items.push({
+                                                                id: 'ws-total',
+                                                                label: `Local Memory: ${this.localStats.totalEntries} entries`,
+                                                                icon: '[DIR]',
+                                                                iconColor: 'var(--kovix-text-tertiary)',
+                                                                category: MemoryCategory.WorkspaceContext,
+                                                });
                                 }
 
                                 return items;
