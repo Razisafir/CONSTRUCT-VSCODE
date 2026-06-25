@@ -1146,6 +1146,10 @@ export class ConstructAgentViewPane extends ViewPane {
                                                 fullText += `\n\n\u25B6 Resumed from milestone: ${event.milestone.name}`;
                                                 break;
 
+                                        case 'milestone_skipped':
+                                                fullText += `\n\n\u23ED Milestone skipped: ${event.milestone.name}`;
+                                                break;
+
                                         case 'milestone_completed':
                                                 fullText += `\n\n\u2705 Milestone completed: ${event.milestone.name}`;
                                                 break;

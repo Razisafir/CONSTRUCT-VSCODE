@@ -64,8 +64,20 @@ export interface IConstructMemoryAddEvent {
  * memory that survives reloads, learns from conversations, and provides
  * intelligent context retrieval for the Construct agent.
  *
- * When Supermemory is not initialized or unavailable, falls back to the
- * existing in-memory four-layer architecture.
+ * When Supermemory is not initialized or unavailable (the default state on a
+ * fresh install with no API key configured), every method silently no-ops:
+ * addMemory returns void without storing, searchMemories returns [], and
+ * getContextForTask returns ''. This is a cloud-only service.
+ *
+ * For real local persistent memory that works without a cloud API key, use
+ * IUniversalMemoryService instead -- it persists to
+ * ~/.kovix/universal-memory.json with atomic writes and is the memory store
+ * the agent loop actually queries during planning and execution.
+ *
+ * (Previous versions of this docstring claimed a "fallback to the existing
+ * in-memory four-layer architecture" -- that fallback was dead infrastructure
+ * that was never populated, and was deleted in Phase 5.5 Fix 2. The claim
+ * has been removed to avoid misleading callers.)
  */
 export interface IConstructMemoryService extends IDisposable {
         readonly _serviceBrand: undefined;

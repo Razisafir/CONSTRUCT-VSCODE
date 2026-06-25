@@ -28,6 +28,18 @@ export type AgentLoopEvent =
         | { type: 'milestone_reached'; milestone: IMilestone }
         | { type: 'milestone_paused'; milestone: IMilestone }
         | { type: 'milestone_resumed'; milestone: IMilestone }
+        /**
+         * Emitted when the user clicks 'Skip' on a paused milestone.
+         *
+         * Distinct from milestone_resumed: the skipped milestone is NOT
+         * counted as completed. milestone_completed does NOT fire for this
+         * milestone. The helper proceeds to the next milestone.
+         *
+         * Downstream consumers (memory, verification, UI) should treat
+         * this milestone as not-done -- its work may have been executed
+         * by the LLM, but the user chose not to count it as completed.
+         */
+        | { type: 'milestone_skipped'; milestone: IMilestone }
         | { type: 'milestone_completed'; milestone: IMilestone }
         /**
          * Emitted when the harness enters the Verifying state — i.e. the agent
