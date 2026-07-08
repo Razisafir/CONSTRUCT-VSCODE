@@ -207,6 +207,7 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                 this._conversationHistory = [];
                 this._activeSnapshotId = null;
                 this._completedMilestoneIds.clear();
+                this._skippedMilestoneIds.clear();
                 this.logService.info('[AgentLoop] Conversation history cleared');
         }
         private readonly _onDidStart = this._register(new Emitter<string>());
@@ -231,8 +232,15 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         /** Milestone execution state. */
         private _executionState: ExecutionState = ExecutionState.Idle;
         private _currentMilestone: IMilestone | null = null;
-        private _milestoneResumeResolver: (() => void) | null = null;
+        private _milestoneResumeResolver: ((value: 'resume' | 'skip') => void) | null = null;
         private _completedMilestoneIds: Set<string> = new Set();
+        /**
+         * IDs of milestones the user explicitly skipped (not completed).
+         * Populated when milestone_skipped events are observed.
+         * Distinct from _completedMilestoneIds so downstream consumers
+         * can tell the difference.
+         */
+        private _skippedMilestoneIds: Set<string> = new Set();
 
         constructor(
                 @ILogService private readonly logService: ILogService,
@@ -861,13 +869,16 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
          *          resumeFromMilestone() or skipCurrentMilestone())
          *        - Fire `milestone_resumed` + set _executionState = Executing
          *   6. Fire `milestone_completed` + add milestone.id to _completedMilestoneIds
+           (ONLY on resume; on skip, fire `milestone_skipped` + add to
+           _skippedMilestoneIds instead -- the milestone is NOT completed)
          *
          * After the last milestone: fire `complete` with aggregated summary.
          *
          * Verification failure always triggers a pause (regardless of pauseMode)
          * so the user can fix the issue and then resume to continue to the next
          * milestone. Skip from a failed-verification pause proceeds to the next
-         * milestone without re-running the failed one.
+         * milestone without re-running the failed one. Skip marks the milestone
+         * as skipped (NOT completed) in _skippedMilestoneIds.
          */
         async *runWithApprovedPlan(approvedPlan: IApprovedPlan, signal?: AbortSignal): AsyncGenerator<AgentLoopEvent> {
                 if (this._isRunning) {
@@ -939,11 +950,12 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                         return this._executeRounds(subTask, conversationMessages, systemPrompt, sig);
                                 },
                                 runVerification: (sig?: AbortSignal) => this.runVerification(sig),
-                                awaitResume: async (milestone: IMilestone) => {
+                                awaitResume: async (milestone: IMilestone): Promise<'resume' | 'skip'> => {
                                         // Assign the resume resolver and await it. The helper
                                         // blocks here until resumeFromMilestone() or
-                                        // skipCurrentMilestone() is called.
-                                        await new Promise<void>((resolve) => {
+                                        // skipCurrentMilestone() is called. The resolver is
+                                        // called with resume or skip to distinguish the two paths.
+                                        return new Promise<'resume' | 'skip'>((resolve) => {
                                                 this._milestoneResumeResolver = resolve;
                                         });
                                 },
@@ -959,6 +971,12 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
                                         this._onDidMilestonePause.fire(event.milestone);
                                 } else if (event.type === 'milestone_resumed') {
                                         this._executionState = ExecutionState.Executing;
+                                } else if (event.type === 'milestone_skipped') {
+                                        // User skipped this milestone. Track it as skipped (NOT
+                                        // completed) so downstream consumers can tell the
+                                        // difference. Do NOT add to _completedMilestoneIds.
+                                        this._skippedMilestoneIds.add(event.milestone.id);
+                                        this._currentMilestone = null;
                                 } else if (event.type === 'milestone_completed') {
                                         this._completedMilestoneIds.add(event.milestone.id);
                                         this._currentMilestone = null;
@@ -1211,28 +1229,39 @@ export class AgentLoopService extends Disposable implements IAgentLoop {
         resumeFromMilestone(): void {
                 if (this._milestoneResumeResolver) {
                         this._executionState = ExecutionState.Executing;
-                        const milestone = this._currentMilestone;
-                        this._milestoneResumeResolver();
+                        // Resolve with 'resume' so the helper fires milestone_resumed
+                        // + milestone_completed (the normal path). The
+                        // _completedMilestoneIds add happens in the event-observation
+                        // loop when milestone_completed is observed, NOT here -- this
+                        // avoids double-counting if the helper state tracking changes.
+                        this._milestoneResumeResolver('resume');
                         this._milestoneResumeResolver = null;
-                        if (milestone) {
-                                this._completedMilestoneIds.add(milestone.id);
-                        }
                         this._currentMilestone = null;
                 }
         }
 
         /**
-         * Skip the current milestone and move to the next.
+         * Skip the current milestone. Distinct from resumeFromMilestone():
+         * the skipped milestone is marked as skipped (NOT completed) and
+         * milestone_completed does NOT fire for it. The helper proceeds
+         * to the next milestone.
+         *
+         * Previously this method was identical to resumeFromMilestone() --
+         * both resolved the resolver and added the milestone to
+         * _completedMilestoneIds. That made the Skip button a lie. This
+         * fix makes Skip genuinely skip: the milestone is tracked in
+         * _skippedMilestoneIds (not _completedMilestoneIds), and the
+         * helper emits milestone_skipped (not milestone_completed).
          */
         skipCurrentMilestone(): void {
                 if (this._milestoneResumeResolver) {
                         this._executionState = ExecutionState.Executing;
-                        const milestone = this._currentMilestone;
-                        this._milestoneResumeResolver();
+                        // Resolve with 'skip' so the helper fires milestone_skipped
+                        // (NOT milestone_completed). The _skippedMilestoneIds add
+                        // happens in the event-observation loop when milestone_skipped
+                        // is observed. Do NOT add to _completedMilestoneIds here.
+                        this._milestoneResumeResolver('skip');
                         this._milestoneResumeResolver = null;
-                        if (milestone) {
-                                this._completedMilestoneIds.add(milestone.id);
-                        }
                         this._currentMilestone = null;
                 }
         }

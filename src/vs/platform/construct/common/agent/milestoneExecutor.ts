@@ -75,8 +75,14 @@ export type RunVerificationFn = (
  *
  * The function receives the milestone being paused at, in case the caller
  * needs it for logging or state tracking.
+ *
+ * Return value: 'resume' or 'skip'. The helper branches on this:
+ *   - 'resume' -> emits milestone_resumed + milestone_completed (normal)
+ *   - 'skip'   -> emits milestone_skipped, does NOT emit milestone_completed,
+ *                 and continues to the next milestone. The skipped milestone
+ *                 is NOT counted as completed.
  */
-export type AwaitResumeFn = (milestone: IMilestone) => Promise<void>;
+export type AwaitResumeFn = (milestone: IMilestone) => Promise<'resume' | 'skip'>;
 
 /**
  * Options for executeMilestonesWithPauses.
@@ -98,8 +104,16 @@ export interface IMilestoneExecutorOptions {
  * Phase 5.5 (Fix 1) -- iterate milestones with real pause/resume.
  *
  * Yields AgentLoopEvent including milestone_reached, milestone_paused,
- * milestone_resumed, milestone_completed, plus any events yielded by
- * executeSubTask and runVerification.
+ * milestone_resumed, milestone_skipped, milestone_completed, plus any
+ * events yielded by executeSubTask and runVerification.
+ *
+ * Skip semantics (Fix: skip vs resume are now distinct):
+ *   - resumeFromMilestone() -> awaitResume returns 'resume' ->
+ *     milestone_resumed + milestone_completed fire normally.
+ *   - skipCurrentMilestone() -> awaitResume returns 'skip' ->
+ *     milestone_skipped fires, milestone_completed does NOT fire, and
+ *     the skipped milestone is not counted as completed. The helper
+ *     proceeds to the next milestone.
  *
  * Returns (stops yielding) when:
  *   - All milestones are completed (caller should yield 'complete' after)
@@ -193,8 +207,11 @@ export async function* executeMilestonesWithPauses(
 				log?.(`[MilestoneExecutor] Paused at milestone: ${milestone.name} (verificationFailed=${verificationFailed})`);
 				yield { type: 'milestone_paused', milestone };
 
-				// Await the user's resume/skip action
-				await awaitResume(milestone);
+				// Await the user's resume/skip action. The return value
+				// distinguishes the two paths: 'resume' marks the milestone as
+				// completed-and-verified; 'skip' marks it as skipped (NOT
+				// completed) and proceeds to the next milestone.
+				const resumeAction = await awaitResume(milestone);
 
 				// Re-check abort after resume
 				if (signal?.aborted) {
@@ -202,11 +219,24 @@ export async function* executeMilestonesWithPauses(
 					return;
 				}
 
+				if (resumeAction === 'skip') {
+					// User chose to skip this milestone. Mark it as skipped
+					// (NOT completed), log it clearly so downstream memory /
+					// verification correctly reflects it wasn't actually done,
+					// and proceed to the next milestone WITHOUT firing
+					// milestone_completed.
+					log?.(`[MilestoneExecutor] Milestone ${milestone.name} SKIPPED by user (not completed)`);
+					aggregatedSummary += `\n[Milestone ${milestone.name}: SKIPPED by user -- not completed]\n`;
+					yield { type: 'milestone_skipped', milestone };
+					continue;
+				}
+
 				yield { type: 'milestone_resumed', milestone };
 			}
 		}
 
-		// 6. Fire milestone_completed
+		// 6. Fire milestone_completed (only for the resume path; skip
+		//    path continues past this via the `continue` above).
 		yield { type: 'milestone_completed', milestone };
 		log?.(`[MilestoneExecutor] Milestone ${milestone.name} completed`);
 	}

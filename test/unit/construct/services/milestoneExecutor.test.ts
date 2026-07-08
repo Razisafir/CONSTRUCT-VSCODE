@@ -498,9 +498,106 @@ describe('Phase 5.5 (Fix 1) -- milestone pause/resume integration', () => {
 			assert.ok(executor.calls[0].includes('Milestone 1: M0'), `First call should be M0, got: ${executor.calls[0].substring(0, 100)}`);
 			assert.ok(executor.calls[1].includes('Milestone 2: M1'), `Second call should be M1, got: ${executor.calls[1].substring(0, 100)}`);
 
-			// All milestones completed
+			// All milestones completed (both via resume path)
 			const completed = events.filter(e => e.type === 'milestone_completed');
 			assert.strictEqual(completed.length, 2);
+		});
+
+		it('skip marks the milestone as skipped (NOT completed) and proceeds to the next', async () => {
+			// This is the key test that distinguishes Skip from Resume.
+			//
+			// Skip should:
+			//   1. Emit milestone_skipped (NOT milestone_resumed) for the skipped milestone
+			//   2. NOT emit milestone_completed for the skipped milestone
+			//   3. Still proceed to the next milestone, which runs and completes normally
+			//
+			// Resume should:
+			//   1. Emit milestone_resumed + milestone_completed for the resumed milestone
+			//
+			// This test uses skip() for M0 and resume() for M1, then asserts
+			// that the event sequences are DIFFERENT for the two milestones.
+			const plan = makePlan({
+				steps: [
+					makeStep(0, 'Read', 'a'),
+					makeStep(1, 'Create', 'b'),
+				],
+				milestones: [
+					makeMilestone(0, 'M0', [0]),
+					makeMilestone(1, 'M1', [1]),
+				],
+				executionMode: 'pause_at_every',
+			});
+
+			const executor = makeStubExecutor();
+			const verifier = makeStubVerifier();
+			const resume = makeResumeController();
+
+			const promise = collectEvents(executeMilestonesWithPauses({
+				approvedPlan: plan,
+				executeSubTask: executor.fn,
+				runVerification: verifier.fn,
+				awaitResume: resume.fn,
+			}));
+
+			// Wait for first pause (M0) and SKIP it
+			const start1 = Date.now();
+			while (resume.pauseCount === 0 && Date.now() - start1 < 2000) {
+				await new Promise(r => setTimeout(r, 10));
+			}
+			assert.strictEqual(resume.pauseCount, 1, 'Should have paused once (at M0)');
+			assert.strictEqual(executor.calls.length, 1, 'Only M0 should have executed so far');
+			resume.skip();  // SKIP M0 -- this is the key difference from resume
+
+			// Wait for second pause (M1) and RESUME it
+			const start2 = Date.now();
+			while (resume.pauseCount === 1 && Date.now() - start2 < 2000) {
+				await new Promise(r => setTimeout(r, 10));
+			}
+			assert.strictEqual(executor.calls.length, 2, 'M1 should have executed after skipping M0');
+			resume.resume();  // RESUME M1 -- normal completion
+
+			const events = await promise;
+
+			// M0 was SKIPPED: should have milestone_skipped, NOT milestone_resumed, NOT milestone_completed
+			const skipped = events.filter(e => e.type === 'milestone_skipped');
+			const resumed = events.filter(e => e.type === 'milestone_resumed');
+			const completed = events.filter(e => e.type === 'milestone_completed');
+
+			// Skip assertions (the key difference from resume)
+			assert.strictEqual(skipped.length, 1, 'Should fire 1 milestone_skipped event (for M0)');
+			assert.strictEqual((skipped[0] as any).milestone.id, 'milestone-0', 'Skipped event should be for M0');
+
+			// M0 should NOT appear in milestone_resumed or milestone_completed
+			assert.strictEqual(resumed.length, 1, 'Should fire 1 milestone_resumed event (for M1, NOT M0)');
+			assert.strictEqual((resumed[0] as any).milestone.id, 'milestone-1', 'Resumed event should be for M1');
+			assert.strictEqual(completed.length, 1, 'Should fire 1 milestone_completed event (for M1 only, NOT M0)');
+			assert.strictEqual((completed[0] as any).milestone.id, 'milestone-1', 'Completed event should be for M1');
+
+			// M0 should NOT be in completed events
+			assert.ok(!completed.some(e => (e as any).milestone.id === 'milestone-0'),
+				'M0 should NOT be in milestone_completed events (it was skipped, not completed)');
+
+			// M0 should NOT be in resumed events
+			assert.ok(!resumed.some(e => (e as any).milestone.id === 'milestone-0'),
+				'M0 should NOT be in milestone_resumed events (it was skipped, not resumed)');
+
+			// Verify the event order: reached, paused, skipped for M0; reached, paused, resumed, completed for M1
+			const milestoneEvents = events
+				.filter(e => e.type.startsWith('milestone_'))
+				.map(e => `${e.type}:${(e as any).milestone.id}`);
+			assert.deepStrictEqual(milestoneEvents, [
+				'milestone_reached:milestone-0',
+				'milestone_paused:milestone-0',
+				'milestone_skipped:milestone-0',
+				'milestone_reached:milestone-1',
+				'milestone_paused:milestone-1',
+				'milestone_resumed:milestone-1',
+				'milestone_completed:milestone-1',
+			], 'Event sequence should show skip for M0 and resume+completed for M1');
+
+			// Both milestones should have executed (skip doesn't prevent execution;
+			// it prevents the milestone from being COUNTED as completed)
+			assert.strictEqual(executor.calls.length, 2, 'Both M0 and M1 should have executed their steps');
 		});
 	});
 
